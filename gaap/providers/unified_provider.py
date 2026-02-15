@@ -474,34 +474,73 @@ def _apply_profile_priorities(chain: list[ModelSlot], profile: str) -> list[Mode
 def build_default_chain(profile: str = "quality") -> list[ModelSlot]:
     """
     Build fallback chain dynamically from available env vars.
-
-    Supported env vars:
-      - GEMINI_API_KEYS (comma-separated)
-      - GITHUB_MODELS_TOKEN
-      - CEREBRAS_API_KEYS (comma-separated)
-      - GROQ_API_KEYS (comma-separated)
-      - MISTRAL_API_KEYS (comma-separated)
-      - OPENROUTER_API_KEYS (comma-separated)
+    
+    Priority:
+      1. Kimi K2.5 (WebChat Direct) - Primary
+      2. DeepSeek V3.2 (WebChat Direct) - Fallback
+      3. GLM-5 (WebChat Direct) - Fallback
+      4. Gemini API (Official) - Stable Fallback
     """
-    chain: list[ModelSlot] = [
-        ModelSlot(
-            name="gemini-2.5-flash (g4f)",
-            model_id="gemini-2.5-flash",
-            backend=BackendType.G4F,
-            rpm_per_key=5,
-            context_window=1_000_000,
-            priority=100,
-        ),
-        ModelSlot(
-            name="gemini-2.5-pro (g4f)",
-            model_id="gemini-2.5-pro",
-            backend=BackendType.G4F,
-            rpm_per_key=5,
-            context_window=1_000_000,
-            priority=90,
-        ),
-    ]
+    chain: list[ModelSlot] = []
 
+    # 1. Kimi K2.5 (Primary)
+    kimi_direct_enabled = (
+        os.getenv("GAAP_KIMI_DIRECT", "").strip()
+        or _read_var_from_env_file("GAAP_KIMI_DIRECT")
+        or "1"  # Default to enabled
+    )
+    if kimi_direct_enabled == "1":
+        chain.append(
+            ModelSlot(
+                name="Kimi K2.5 (Direct)",
+                model_id="kimi",
+                backend=BackendType.WEBCHAT,
+                g4f_provider="kimi",
+                rpm_per_key=60,  # WebChat supports higher RPM
+                context_window=128_000,
+                priority=200,    # Highest priority
+            )
+        )
+
+    # 2. DeepSeek V3.2
+    deepseek_direct_enabled = (
+        os.getenv("GAAP_DEEPSEEK_DIRECT", "").strip()
+        or _read_var_from_env_file("GAAP_DEEPSEEK_DIRECT")
+        or "1"
+    )
+    if deepseek_direct_enabled == "1":
+        chain.append(
+            ModelSlot(
+                name="DeepSeek V3.2 (Direct)",
+                model_id="deepseek",
+                backend=BackendType.WEBCHAT,
+                g4f_provider="deepseek",
+                rpm_per_key=60,
+                context_window=128_000,
+                priority=190,
+            )
+        )
+
+    # 3. GLM-5
+    glm_direct_enabled = (
+        os.getenv("GAAP_GLM_DIRECT", "").strip()
+        or _read_var_from_env_file("GAAP_GLM_DIRECT")
+        or "1"
+    )
+    if glm_direct_enabled == "1":
+        chain.append(
+            ModelSlot(
+                name="GLM-5 (Direct)",
+                model_id="GLM-5",
+                backend=BackendType.WEBCHAT,
+                g4f_provider="glm",
+                rpm_per_key=60,
+                context_window=128_000,
+                priority=180,
+            )
+        )
+
+    # 4. Gemini API (Stable Fallback)
     gemini_keys = _split_env_list("GEMINI_API_KEYS") or GEMINI_API_KEYS
     if gemini_keys:
         chain.append(
@@ -513,249 +552,7 @@ def build_default_chain(profile: str = "quality") -> list[ModelSlot]:
                 api_keys=gemini_keys,
                 rpm_per_key=5,
                 context_window=1_000_000,
-                priority=80,
-            )
-        )
-
-    github_token = os.getenv("GITHUB_MODELS_TOKEN", "").strip() or _read_var_from_env_file("GITHUB_MODELS_TOKEN")
-    if github_token:
-        chain.append(
-            ModelSlot(
-                name="gpt-4o-mini (GitHub Models)",
-                model_id="gpt-4o-mini",
-                backend=BackendType.OPENAI_COMPAT,
-                base_url="https://models.inference.ai.azure.com",
-                api_keys=[github_token],
-                rpm_per_key=15,
-                context_window=128_000,
-                priority=70,
-            )
-        )
-
-    cerebras_keys = _split_env_list("CEREBRAS_API_KEYS")
-    if cerebras_keys:
-        chain.append(
-            ModelSlot(
-                name="llama3.3-70b (Cerebras)",
-                model_id="llama3.3-70b",
-                backend=BackendType.OPENAI_COMPAT,
-                base_url="https://api.cerebras.ai/v1",
-                api_keys=cerebras_keys,
-                rpm_per_key=30,
-                context_window=128_000,
-                priority=68,
-            )
-        )
-
-    groq_keys = _split_env_list("GROQ_API_KEYS")
-    if groq_keys:
-        chain.append(
-            ModelSlot(
-                name="llama-3.3-70b-versatile (Groq)",
-                model_id="llama-3.3-70b-versatile",
-                backend=BackendType.OPENAI_COMPAT,
-                base_url="https://api.groq.com/openai/v1",
-                api_keys=groq_keys,
-                rpm_per_key=30,
-                context_window=128_000,
-                priority=67,
-            )
-        )
-
-    mistral_keys = _split_env_list("MISTRAL_API_KEYS")
-    if mistral_keys:
-        chain.append(
-            ModelSlot(
-                name="mistral-large-latest (Mistral)",
-                model_id="mistral-large-latest",
-                backend=BackendType.OPENAI_COMPAT,
-                base_url="https://api.mistral.ai/v1",
-                api_keys=mistral_keys,
-                rpm_per_key=60,
-                context_window=128_000,
-                priority=66,
-            )
-        )
-
-    openrouter_keys = _split_env_list("OPENROUTER_API_KEYS")
-    if openrouter_keys:
-        chain.append(
-            ModelSlot(
-                name="llama-3.3-70b-instruct:free (OpenRouter)",
-                model_id="meta-llama/llama-3.3-70b-instruct:free",
-                backend=BackendType.OPENAI_COMPAT,
-                base_url="https://openrouter.ai/api/v1",
-                api_keys=openrouter_keys,
-                rpm_per_key=20,
-                context_window=128_000,
-                priority=60,
-            )
-        )
-
-    # =========================================================================
-    # LMArena Premium Models (free, no auth, browser automation)
-    # =========================================================================
-    # Controlled by GAAP_ENABLE_LMARENA env var (default: 1 = enabled)
-    # Requires: pip install zendriver platformdirs curl_cffi
-    lmarena_enabled = (
-        os.getenv("GAAP_ENABLE_LMARENA", "").strip()
-        or _read_var_from_env_file("GAAP_ENABLE_LMARENA")
-        or "1"
-    )
-    if lmarena_enabled == "1":
-        # Trigger dynamic model refresh (gets latest models from arena.ai)
-        _refresh_lmarena_models()
-
-        _lmarena_models = [
-            # (display_name, model_id, context_window)
-            # Tier 1 - Top 5 flagships (dynamic ranks 2-9)
-            ("claude-opus-4.6-thinking (LMArena)", "claude-opus-4-6-thinking", 200_000),
-            ("claude-opus-4.6 (LMArena)", "claude-opus-4-6", 200_000),
-            ("grok-4.1-thinking (LMArena)", "grok-4.1-thinking", 128_000),
-            ("claude-opus-4.5 (LMArena)", "claude-opus-4-5-20251101", 200_000),
-            ("grok-4.1 (LMArena)", "grok-4.1", 128_000),
-            # Tier 2 - Strong reasoning (ranks 10-15)
-            ("gpt-5.1-high (LMArena)", "gpt-5.1-high", 128_000),
-            ("glm-5 (LMArena)", "glm-5", 128_000),
-            ("ernie-5.0 (LMArena)", "ernie-5.0-0110", 128_000),
-            ("claude-sonnet-4.5 (LMArena)", "claude-sonnet-4-5-20250929", 200_000),
-            # Tier 3 - Premium alternatives (ranks 19-30)
-            ("claude-opus-4.1 (LMArena)", "claude-opus-4-1-20250805", 200_000),
-            ("glm-4.7 (LMArena)", "glm-4.7", 128_000),
-            ("kimi-k2.5 (LMArena)", "kimi-k2.5-instant", 128_000),
-            ("gpt-5.2-high (LMArena)", "gpt-5.2-high", 128_000),
-            ("gpt-5-high (LMArena)", "gpt-5-high", 128_000),
-            ("qwen3-max (LMArena)", "qwen3-max-preview", 128_000),
-            ("kimi-k2-thinking (LMArena)", "kimi-k2-thinking-turbo", 128_000),
-            # Tier 4 - Specialist models (ranks 37+)
-            ("deepseek-v3.2 (LMArena)", "deepseek-v3.2", 128_000),
-            ("deepseek-v3.2-thinking (LMArena)", "deepseek-v3.2-thinking", 128_000),
-            ("mistral-large-3 (LMArena)", "mistral-large-3", 128_000),
-        ]
-        for display_name, model_id, ctx in _lmarena_models:
-            chain.append(
-                ModelSlot(
-                    name=display_name,
-                    model_id=model_id,
-                    backend=BackendType.G4F_PROVIDER,
-                    g4f_provider="LMArena",
-                    rpm_per_key=3,  # LMArena is browser-based, conservative
-                    context_window=ctx,
-                    priority=50,  # default; _apply_profile_priorities will adjust
-                )
-            )
-
-    # =========================================================================
-    # WebChat Direct Providers (browser login, free, native features)
-    # =========================================================================
-    # GLM-5 Direct via chat.z.ai (search, tools, thinking)
-    glm_direct_enabled = (
-        os.getenv("GAAP_GLM_DIRECT", "").strip()
-        or _read_var_from_env_file("GAAP_GLM_DIRECT")
-    )
-    if glm_direct_enabled == "1":
-        chain.append(
-            ModelSlot(
-                name="GLM-5 (Direct)",
-                model_id="GLM-5",
-                backend=BackendType.WEBCHAT,
-                g4f_provider="glm",  # reuse field for webchat provider name
-                rpm_per_key=5,
-                context_window=128_000,
-                priority=50,
-            )
-        )
-
-    # Kimi K2.5 Direct via kimi.com (search, tools, thinking)
-    kimi_direct_enabled = (
-        os.getenv("GAAP_KIMI_DIRECT", "").strip()
-        or _read_var_from_env_file("GAAP_KIMI_DIRECT")
-    )
-    if kimi_direct_enabled == "1":
-        chain.append(
-            ModelSlot(
-                name="Kimi K2.5 (Direct)",
-                model_id="kimi",
-                backend=BackendType.WEBCHAT,
-                g4f_provider="kimi",  # reuse field for webchat provider name
-                rpm_per_key=5,
-                context_window=128_000,
-                priority=50,
-            )
-        )
-
-    # DeepSeek V3.2 Direct via chat.deepseek.com (PoW-protected, custom Keccak)
-    deepseek_direct_enabled = (
-        os.getenv("GAAP_DEEPSEEK_DIRECT", "").strip()
-        or _read_var_from_env_file("GAAP_DEEPSEEK_DIRECT")
-    )
-    if deepseek_direct_enabled == "1":
-        chain.append(
-            ModelSlot(
-                name="DeepSeek V3.2 (Direct)",
-                model_id="deepseek",
-                backend=BackendType.WEBCHAT,
-                g4f_provider="deepseek",  # reuse field for webchat provider name
-                rpm_per_key=5,
-                context_window=128_000,
-                priority=50,
-            )
-        )
-
-    # =========================================================================
-    # Cookie-Based Premium Providers (needs browser login)
-    # =========================================================================
-    # OpenaiChat - needs ChatGPT account cookies
-    openai_chat_enabled = (
-        os.getenv("GAAP_OPENAI_CHAT", "").strip()
-        or _read_var_from_env_file("GAAP_OPENAI_CHAT")
-    )
-    if openai_chat_enabled == "1":
-        chain.append(
-            ModelSlot(
-                name="gpt-5.2 (OpenaiChat)",
-                model_id="gpt-5-2",
-                backend=BackendType.G4F_PROVIDER,
-                g4f_provider="OpenaiChat",
-                rpm_per_key=5,
-                context_window=128_000,
-                priority=50,
-            )
-        )
-
-    # Grok - needs X/Twitter account cookies
-    grok_chat_enabled = (
-        os.getenv("GAAP_GROK_CHAT", "").strip()
-        or _read_var_from_env_file("GAAP_GROK_CHAT")
-    )
-    if grok_chat_enabled == "1":
-        chain.append(
-            ModelSlot(
-                name="grok-4 (Grok)",
-                model_id="grok-4",
-                backend=BackendType.G4F_PROVIDER,
-                g4f_provider="Grok",
-                rpm_per_key=5,
-                context_window=128_000,
-                priority=50,
-            )
-        )
-
-    # GithubCopilot - needs GitHub Copilot subscription
-    copilot_enabled = (
-        os.getenv("GAAP_GITHUB_COPILOT", "").strip()
-        or _read_var_from_env_file("GAAP_GITHUB_COPILOT")
-    )
-    if copilot_enabled == "1":
-        chain.append(
-            ModelSlot(
-                name="gpt-5 (GithubCopilot)",
-                model_id="gpt-5",
-                backend=BackendType.G4F_PROVIDER,
-                g4f_provider="GithubCopilot",
-                rpm_per_key=10,
-                context_window=128_000,
-                priority=50,
+                priority=100,
             )
         )
 
