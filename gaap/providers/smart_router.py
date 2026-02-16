@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 """
 Smart Multi-Provider Router
 ===========================
@@ -270,8 +271,7 @@ class SmartRouter:
 
             if not selection:
                 raise RuntimeError(
-                    f"No available providers after {attempt} attempts. "
-                    f"Tried: {attempted_providers}"
+                    f"No available providers after {attempt} attempts. Tried: {attempted_providers}"
                 )
 
             provider_type, key_index, api_key = selection

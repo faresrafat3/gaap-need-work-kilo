@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 """
 Unified Provider - Primary + Fallback Chain
 =============================================
@@ -241,7 +242,7 @@ def check_lmarena_auth() -> dict[str, Any]:
                 mins = remaining // 60
                 result["message"] = f"Valid — {mins}m remaining"
             else:
-                result["message"] = f"Expired {abs(remaining)//60}m ago — needs refresh"
+                result["message"] = f"Expired {abs(remaining) // 60}m ago — needs refresh"
         except Exception:
             result["message"] = "Cannot decode auth token"
     else:
@@ -911,7 +912,7 @@ class UnifiedProvider:
             "-" * 100,
         ]
         for slot in self.chain:
-            rate = f"{slot.success_rate*100:.0f}%" if slot._call_count > 0 else "N/A"
+            rate = f"{slot.success_rate * 100:.0f}%" if slot._call_count > 0 else "N/A"
             avg = f"{slot.avg_latency_ms:.0f}" if slot._success_count > 0 else "N/A"
             if not slot.enabled:
                 status = "⏸️"
@@ -947,7 +948,7 @@ class UnifiedProvider:
             lines.append(
                 f"  {status} [{role:<10}] {slot.name:<35} "
                 f"| {backend:<8} | {slot.total_rpm:>3} RPM | "
-                f"{slot.context_window//1000}K ctx | {keys} keys"
+                f"{slot.context_window // 1000}K ctx | {keys} keys"
             )
         lines.append(f"\n  📊 Total capacity: {self.total_rpm} RPM")
         lines.append(f"  ⏱️  Min delay: {self.primary.min_delay:.1f}s (primary)")

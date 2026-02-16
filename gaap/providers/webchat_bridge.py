@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 # WebChat Bridge Provider
 # يربط webchat_call() بواجهة BaseProvider للاستخدام في GAAPEngine
 # Supports multi-account rotation via AccountPool

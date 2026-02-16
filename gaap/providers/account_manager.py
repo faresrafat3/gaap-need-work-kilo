@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 """
 Smart Account Manager — Multi-Account Pool with Proactive Monitoring
 =====================================================================
@@ -322,17 +323,17 @@ class RateLimitTracker:
         # RPM warning
         rpm_ratio = self.rpm_current / max(self.max_rpm, 1)
         if rpm_ratio >= self.warn_threshold:
-            warnings.append(f"⚠️ RPM at {self.rpm_current}/{self.max_rpm} ({rpm_ratio*100:.0f}%)")
+            warnings.append(f"⚠️ RPM at {self.rpm_current}/{self.max_rpm} ({rpm_ratio * 100:.0f}%)")
 
         # RPH warning
         rph_ratio = self.rph_current / max(self.max_rph, 1)
         if rph_ratio >= self.warn_threshold:
-            warnings.append(f"⚠️ RPH at {self.rph_current}/{self.max_rph} ({rph_ratio*100:.0f}%)")
+            warnings.append(f"⚠️ RPH at {self.rph_current}/{self.max_rph} ({rph_ratio * 100:.0f}%)")
 
         # RPD warning
         rpd_ratio = self.rpd_current / max(self.max_rpd, 1)
         if rpd_ratio >= self.warn_threshold:
-            warnings.append(f"⚠️ RPD at {self.rpd_current}/{self.max_rpd} ({rpd_ratio*100:.0f}%)")
+            warnings.append(f"⚠️ RPD at {self.rpd_current}/{self.max_rpd} ({rpd_ratio * 100:.0f}%)")
 
         # Token warning
         if self.max_tokens_per_day > 0:

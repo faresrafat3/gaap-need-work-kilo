@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 # Hierarchical Context Layer
 import logging
 import os

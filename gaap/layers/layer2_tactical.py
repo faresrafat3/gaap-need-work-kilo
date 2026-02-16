@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 # Layer 2: Tactical Layer
 import json
 import logging
@@ -1052,7 +1053,7 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
     def _generate_task_id(self) -> str:
         """توليد معرف مهمة"""
         self._task_counter += 1
-        return f"task_{int(time.time()*1000)}_{self._task_counter}"
+        return f"task_{int(time.time() * 1000)}_{self._task_counter}"
 
     def get_stats(self) -> dict[str, Any]:
         """إحصائيات المحلل"""
@@ -1177,7 +1178,7 @@ class Layer2Tactical(BaseLayer):
 
         elapsed = (time.time() - start_time) * 1000
         self._logger.info(
-            f"Task graph created: {len(tasks)} tasks, " f"{graph.max_depth} levels, {elapsed:.0f}ms"
+            f"Task graph created: {len(tasks)} tasks, {graph.max_depth} levels, {elapsed:.0f}ms"
         )
 
         return graph

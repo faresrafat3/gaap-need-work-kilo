@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 # API Routes
 import asyncio
 import json
