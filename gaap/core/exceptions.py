@@ -84,7 +84,7 @@ class InvalidConfigValueError(ConfigurationError):
 
     error_code = "GAAP_CFG_002"
 
-    def __init__(self, key: str, value: Any, expected_type: str, **kwargs):
+    def __init__(self, key: str, value: Any, expected_type: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Invalid configuration value for '{key}'",
             details={"key": key, "value": str(value), "expected_type": expected_type},
@@ -98,7 +98,7 @@ class MissingConfigError(ConfigurationError):
 
     error_code = "GAAP_CFG_003"
 
-    def __init__(self, key: str, **kwargs):
+    def __init__(self, key: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Missing required configuration: '{key}'",
             details={"missing_key": key},
@@ -112,7 +112,7 @@ class ConfigLoadError(ConfigurationError):
 
     error_code = "GAAP_CFG_004"
 
-    def __init__(self, config_path: str, reason: str, **kwargs):
+    def __init__(self, config_path: str, reason: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Failed to load configuration from '{config_path}'",
             details={"path": config_path, "reason": reason},
@@ -143,7 +143,7 @@ class ProviderNotFoundError(ProviderError):
 
     error_code = "GAAP_PRV_002"
 
-    def __init__(self, provider_name: str, available_providers: list[str], **kwargs):
+    def __init__(self, provider_name: str, available_providers: list[str], **kwargs: Any) -> None:
         super().__init__(
             message=f"Provider '{provider_name}' not found",
             details={"requested": provider_name, "available": available_providers},
@@ -158,7 +158,7 @@ class ProviderNotAvailableError(ProviderError):
     error_code = "GAAP_PRV_003"
     recoverable = True
 
-    def __init__(self, provider_name: str, reason: str, **kwargs):
+    def __init__(self, provider_name: str, reason: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Provider '{provider_name}' is not available",
             details={"provider": provider_name, "reason": reason},
@@ -177,7 +177,7 @@ class ProviderRateLimitError(ProviderError):
     error_code = "GAAP_PRV_004"
     recoverable = True
 
-    def __init__(self, provider_name: str, retry_after: int | None = None, **kwargs):
+    def __init__(self, provider_name: str, retry_after: int | None = None, **kwargs: Any) -> None:
         details: dict[str, Any] = {"provider": provider_name}
         if retry_after:
             details["retry_after_seconds"] = retry_after
@@ -200,7 +200,7 @@ class ProviderAuthenticationError(ProviderError):
     error_code = "GAAP_PRV_005"
     severity = "critical"
 
-    def __init__(self, provider_name: str, **kwargs):
+    def __init__(self, provider_name: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Authentication failed for provider '{provider_name}'",
             details={"provider": provider_name},
@@ -220,7 +220,7 @@ class ProviderTimeoutError(ProviderError):
     error_code = "GAAP_PRV_006"
     recoverable = True
 
-    def __init__(self, provider_name: str, timeout_seconds: float, **kwargs):
+    def __init__(self, provider_name: str, timeout_seconds: float, **kwargs: Any) -> None:
         super().__init__(
             message=f"Provider '{provider_name}' timed out after {timeout_seconds}s",
             details={"provider": provider_name, "timeout": timeout_seconds},
@@ -238,7 +238,7 @@ class ModelNotFoundError(ProviderError):
 
     error_code = "GAAP_PRV_007"
 
-    def __init__(self, model_name: str, provider_name: str, available_models: list[str], **kwargs):
+    def __init__(self, model_name: str, provider_name: str, available_models: list[str], **kwargs: Any) -> None:
         super().__init__(
             message=f"Model '{model_name}' not found in provider '{provider_name}'",
             details={
@@ -256,7 +256,7 @@ class ProviderResponseError(ProviderError):
 
     error_code = "GAAP_PRV_008"
 
-    def __init__(self, provider_name: str, status_code: int, response_body: str, **kwargs):
+    def __init__(self, provider_name: str, status_code: int, response_body: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Provider '{provider_name}' returned error {status_code}",
             details={
@@ -292,7 +292,7 @@ class NoAvailableProviderError(RoutingError):
     error_code = "GAAP_ROT_002"
     severity = "critical"
 
-    def __init__(self, requirements: dict[str, Any], **kwargs):
+    def __init__(self, requirements: dict[str, Any], **kwargs: Any) -> None:
         super().__init__(
             message="No available provider meets the requirements",
             details={"requirements": requirements},
@@ -312,7 +312,7 @@ class BudgetExceededError(RoutingError):
     error_code = "GAAP_ROT_003"
     severity = "critical"
 
-    def __init__(self, budget: float, required: float, **kwargs):
+    def __init__(self, budget: float, required: float, **kwargs: Any) -> None:
         super().__init__(
             message=f"Budget exceeded: ${required:.2f} required, ${budget:.2f} available",
             details={"budget": budget, "required": required},
@@ -327,7 +327,7 @@ class RoutingConflictError(RoutingError):
 
     error_code = "GAAP_ROT_004"
 
-    def __init__(self, conflicts: list[str], **kwargs):
+    def __init__(self, conflicts: list[str], **kwargs: Any) -> None:
         super().__init__(
             message="Routing conflicts detected",
             details={"conflicts": conflicts},
@@ -354,7 +354,7 @@ class TaskValidationError(TaskError):
 
     error_code = "GAAP_TSK_002"
 
-    def __init__(self, task_id: str, validation_errors: list[str], **kwargs):
+    def __init__(self, task_id: str, validation_errors: list[str], **kwargs: Any) -> None:
         super().__init__(
             message=f"Task '{task_id}' validation failed",
             details={"task_id": task_id, "errors": validation_errors},
@@ -368,7 +368,7 @@ class TaskDependencyError(TaskError):
 
     error_code = "GAAP_TSK_003"
 
-    def __init__(self, task_id: str, missing_dependencies: list[str], **kwargs):
+    def __init__(self, task_id: str, missing_dependencies: list[str], **kwargs: Any) -> None:
         super().__init__(
             message=f"Task '{task_id}' has missing dependencies",
             details={"task_id": task_id, "missing": missing_dependencies},
@@ -386,7 +386,7 @@ class CircularDependencyError(TaskError):
     error_code = "GAAP_TSK_004"
     severity = "critical"
 
-    def __init__(self, cycle: list[str], **kwargs):
+    def __init__(self, cycle: list[str], **kwargs: Any) -> None:
         super().__init__(
             message="Circular dependency detected",
             details={"cycle": " -> ".join(cycle)},
@@ -402,7 +402,7 @@ class TaskTimeoutError(TaskError):
     error_code = "GAAP_TSK_005"
     recoverable = True
 
-    def __init__(self, task_id: str, timeout_seconds: float, **kwargs):
+    def __init__(self, task_id: str, timeout_seconds: float, **kwargs: Any) -> None:
         super().__init__(
             message=f"Task '{task_id}' timed out after {timeout_seconds}s",
             details={"task_id": task_id, "timeout": timeout_seconds},
@@ -437,7 +437,7 @@ class MaxRetriesExceededError(TaskError):
     error_code = "GAAP_TSK_007"
     severity = "critical"
 
-    def __init__(self, task_id: str, max_retries: int, last_error: str, **kwargs):
+    def __init__(self, task_id: str, max_retries: int, last_error: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Task '{task_id}' exceeded max retries ({max_retries})",
             details={"task_id": task_id, "max_retries": max_retries, "last_error": last_error},
@@ -469,7 +469,7 @@ class PromptInjectionError(SecurityError):
 
     error_code = "GAAP_SEC_002"
 
-    def __init__(self, detected_patterns: list[str], risk_score: float, **kwargs):
+    def __init__(self, detected_patterns: list[str], risk_score: float, **kwargs: Any) -> None:
         super().__init__(
             message="Potential prompt injection detected",
             details={"patterns": detected_patterns, "risk_score": risk_score},
@@ -487,7 +487,7 @@ class CapabilityError(SecurityError):
 
     error_code = "GAAP_SEC_003"
 
-    def __init__(self, agent_id: str, resource: str, action: str, **kwargs):
+    def __init__(self, agent_id: str, resource: str, action: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Agent '{agent_id}' lacks capability for '{action}' on '{resource}'",
             details={"agent": agent_id, "resource": resource, "action": action},
@@ -503,7 +503,7 @@ class TokenExpiredError(SecurityError):
     error_code = "GAAP_SEC_004"
     recoverable = True
 
-    def __init__(self, token_id: str, expired_at: datetime, **kwargs):
+    def __init__(self, token_id: str, expired_at: datetime, **kwargs: Any) -> None:
         super().__init__(
             message=f"Capability token '{token_id}' expired at {expired_at}",
             details={"token_id": token_id, "expired_at": expired_at.isoformat()},
@@ -517,7 +517,7 @@ class SecurityScanError(SecurityError):
 
     error_code = "GAAP_SEC_005"
 
-    def __init__(self, scan_type: str, findings: list[str], **kwargs):
+    def __init__(self, scan_type: str, findings: list[str], **kwargs: Any) -> None:
         super().__init__(
             message=f"Security scan '{scan_type}' found issues",
             details={"scan_type": scan_type, "findings": findings},
@@ -532,7 +532,7 @@ class SandboxEscapeError(SecurityError):
     error_code = "GAAP_SEC_006"
     severity = "critical"
 
-    def __init__(self, attempt_details: str, **kwargs):
+    def __init__(self, attempt_details: str, **kwargs: Any) -> None:
         super().__init__(
             message="Sandbox escape attempt detected",
             details={"attempt": attempt_details},
@@ -560,7 +560,7 @@ class ContextOverflowError(ContextError):
 
     error_code = "GAAP_CTX_002"
 
-    def __init__(self, required: int, available: int, **kwargs):
+    def __init__(self, required: int, available: int, **kwargs: Any) -> None:
         super().__init__(
             message=f"Context overflow: {required} tokens required, {available} available",
             details={"required": required, "available": available},
@@ -578,7 +578,7 @@ class ContextLoadError(ContextError):
 
     error_code = "GAAP_CTX_003"
 
-    def __init__(self, source: str, reason: str, **kwargs):
+    def __init__(self, source: str, reason: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Failed to load context from '{source}'",
             details={"source": source, "reason": reason},
@@ -596,7 +596,7 @@ class MemoryAccessError(ContextError):
 
     error_code = "GAAP_CTX_004"
 
-    def __init__(self, memory_type: str, operation: str, **kwargs):
+    def __init__(self, memory_type: str, operation: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Memory access error: {operation} on {memory_type}",
             details={"memory_type": memory_type, "operation": operation},
@@ -623,7 +623,7 @@ class ConsensusNotReachedError(MADError):
 
     error_code = "GAAP_MAD_002"
 
-    def __init__(self, rounds: int, scores: dict[str, float], **kwargs):
+    def __init__(self, rounds: int, scores: dict[str, float], **kwargs: Any) -> None:
         super().__init__(
             message=f"Consensus not reached after {rounds} rounds",
             details={"rounds": rounds, "scores": scores},
@@ -642,7 +642,7 @@ class CriticError(MADError):
 
     error_code = "GAAP_MAD_003"
 
-    def __init__(self, critic_type: str, error: str, **kwargs):
+    def __init__(self, critic_type: str, error: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Critic '{critic_type}' failed: {error}",
             details={"critic_type": critic_type, "error": error},
@@ -670,7 +670,7 @@ class HealingFailedError(HealingError):
     error_code = "GAAP_HLH_002"
     severity = "critical"
 
-    def __init__(self, level: str, attempts: int, last_error: str, **kwargs):
+    def __init__(self, level: str, attempts: int, last_error: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Self-healing failed at level {level} after {attempts} attempts",
             details={"healing_level": level, "attempts": attempts, "last_error": last_error},
@@ -690,7 +690,7 @@ class HumanEscalationError(HealingError):
     error_code = "GAAP_HLH_003"
     severity = "critical"
 
-    def __init__(self, task_id: str, reason: str, **kwargs):
+    def __init__(self, task_id: str, reason: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Task '{task_id}' requires human intervention: {reason}",
             details={"task_id": task_id, "reason": reason},
@@ -722,7 +722,7 @@ class PluginLoadError(PluginError):
 
     error_code = "GAAP_PLG_002"
 
-    def __init__(self, plugin_name: str, reason: str, **kwargs):
+    def __init__(self, plugin_name: str, reason: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Failed to load plugin '{plugin_name}'",
             details={"plugin": plugin_name, "reason": reason},
@@ -740,7 +740,7 @@ class PluginExecutionError(PluginError):
 
     error_code = "GAAP_PLG_003"
 
-    def __init__(self, plugin_name: str, error: str, **kwargs):
+    def __init__(self, plugin_name: str, error: str, **kwargs: Any) -> None:
         super().__init__(
             message=f"Plugin '{plugin_name}' execution failed: {error}",
             details={"plugin": plugin_name, "error": error},

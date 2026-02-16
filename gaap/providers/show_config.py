@@ -6,13 +6,15 @@ Shows clean, filtered configuration for all providers
 Only primary models kept for production use
 """
 
+from typing import Any
+
 from gaap.providers.multi_provider_config import (
     FAILED_PROVIDERS,
     WORKING_PROVIDERS,
 )
 
 
-def print_provider_summary():
+def print_provider_summary() -> None:
     """Print clean provider summary"""
 
     print("=" * 90)
@@ -127,7 +129,7 @@ def print_provider_summary():
     print("=" * 90)
 
 
-def print_model_comparison():
+def print_model_comparison() -> None:
     """Compare models across providers"""
 
     print()

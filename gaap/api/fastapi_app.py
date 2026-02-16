@@ -2,6 +2,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime
+from typing import Any, AsyncIterator
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,7 +28,7 @@ _engine: GAAPEngine | None = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     global _engine
     _engine = create_engine()
     yield
@@ -58,7 +59,7 @@ def get_engine() -> GAAPEngine:
 
 
 @app.get("/health", response_model=HealthResponse)
-async def health():
+async def health() -> HealthResponse:
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now().isoformat(),
@@ -66,7 +67,7 @@ async def health():
 
 
 @app.get("/status", response_model=StatusResponse)
-async def status():
+async def status() -> StatusResponse:
     engine = get_engine()
     return StatusResponse(
         providers={"groq": True, "gemini": True},
@@ -77,7 +78,7 @@ async def status():
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest) -> ChatResponse:
     engine = get_engine()
 
     try:
@@ -107,7 +108,7 @@ async def chat(request: ChatRequest):
 
 
 @app.post("/execute", response_model=ExecuteResponse)
-async def execute(request: ExecuteRequest):
+async def execute(request: ExecuteRequest) -> ExecuteResponse:
     engine = get_engine()
 
     try:
@@ -129,8 +130,8 @@ async def execute(request: ExecuteRequest):
 
 
 @app.get("/providers", response_model=list[ProviderInfo])
-async def list_providers():
-    providers = []
+async def list_providers() -> list[ProviderInfo]:
+    providers: list[ProviderInfo] = []
     for name in ["groq", "gemini", "g4f"]:
         try:
             provider = get_provider(name)
@@ -148,8 +149,8 @@ async def list_providers():
 
 
 @app.get("/providers/{name}/models", response_model=list[str])
-async def list_models(name: str):
-    models_map = {
+async def list_models(name: str) -> list[str]:
+    models_map: dict[str, list[str]] = {
         "groq": ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
         "gemini": ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro"],
         "g4f": ["gpt-3.5-turbo", "gpt-4"],
@@ -162,7 +163,7 @@ async def list_models(name: str):
 
 
 @app.get("/cache/stats", response_model=CacheStatsResponse)
-async def cache_stats():
+async def cache_stats() -> CacheStatsResponse:
     return CacheStatsResponse(
         backend="memory",
         stats={"hits": 0, "misses": 0, "size": 0},
@@ -170,32 +171,32 @@ async def cache_stats():
 
 
 @app.post("/cache/clear")
-async def clear_cache():
+async def clear_cache() -> dict[str, Any]:
     return {"success": True, "message": "Cache cleared"}
 
 
 @app.get("/config", response_model=ConfigGetResponse)
-async def get_config():
+async def get_config_endpoint() -> ConfigGetResponse:
     return ConfigGetResponse(config={"api_key": "***", "providers": ["groq", "gemini"]})
 
 
 @app.post("/config")
-async def set_config(request: ConfigSetRequest):
+async def set_config(request: ConfigSetRequest) -> dict[str, Any]:
     return {"success": True, "message": f"Config updated: {request.key} = {request.value}"}
 
 
 @app.get("/history")
-async def get_history(limit: int = 10):
+async def get_history(limit: int = 10) -> dict[str, Any]:
     return {"history": [], "total": 0}
 
 
 @app.delete("/history/{item_id}")
-async def delete_history(item_id: str):
+async def delete_history(item_id: str) -> dict[str, Any]:
     return {"success": True, "message": f"Deleted {item_id}"}
 
 
 @app.get("/")
-async def root():
+async def root() -> dict[str, Any]:
     return {
         "message": "GAAP API v1.0.0",
         "docs": "/docs",

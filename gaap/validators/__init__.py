@@ -32,7 +32,7 @@ def create_validators(
     fail_on_error: bool = True,
 ) -> dict[QualityGate, BaseValidator]:
     """إنشاء جميع الـ validators"""
-    validators = {}
+    validators: dict[QualityGate, BaseValidator] = {}
 
     if enable_syntax:
         validators[QualityGate.SYNTAX_CHECK] = SyntaxValidator(fail_on_error=fail_on_error)
