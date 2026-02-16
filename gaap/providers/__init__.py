@@ -1,4 +1,6 @@
 # Providers
+from typing import Any
+
 from .base_provider import BaseProvider, ProviderFactory
 from .chat_based.g4f_provider import G4FProvider
 from .free.additional_providers import (
@@ -17,7 +19,7 @@ from .free_tier.groq_provider import GeminiProvider, GroqProvider
 from .unified_gaap_provider import UnifiedGAAPProvider
 
 
-def get_provider(name: str, **kwargs):
+def get_provider(name: str, **kwargs: Any) -> Any:
     """Get provider by name"""
     name = name.lower()
 

@@ -223,7 +223,7 @@ class IntentClassifier:
         "low": ["function", "method", "variable", "helper", "دالة", "متغير"],
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._logger = get_logger("gaap.layer0.classifier")
 
     def classify(self, text: str) -> tuple[IntentType, float]:
@@ -310,7 +310,7 @@ class RequestParser:
         ],
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._logger = get_logger("gaap.layer0.parser")
 
     def parse(self, text: str) -> tuple[list[str], ImplicitRequirements, dict[str, Any]]:
@@ -636,7 +636,7 @@ class Layer0Interface(BaseLayer):
         """توليد معرف طلب"""
         import uuid
 
-        return f"req_{int(time.time()*1000)}_{uuid.uuid4().hex[:8]}"
+        return f"req_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}"
 
     def get_stats(self) -> dict[str, Any]:
         """إحصائيات الطبقة"""

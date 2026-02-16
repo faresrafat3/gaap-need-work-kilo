@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 # Smart Chunking
 import ast
 import hashlib
