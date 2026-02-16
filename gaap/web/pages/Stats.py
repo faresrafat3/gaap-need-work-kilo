@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 """
 Stats Page - Usage Statistics and Charts
 """

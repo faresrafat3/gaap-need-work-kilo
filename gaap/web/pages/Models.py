@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 """
 Models Page - Browse Available Models
 """

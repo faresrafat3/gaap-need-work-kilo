@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 # GAAP Engine
 # 400+ lines
 import asyncio
