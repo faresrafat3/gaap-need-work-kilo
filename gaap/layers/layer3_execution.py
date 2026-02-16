@@ -265,7 +265,7 @@ class MADQualityPanel:
         self.min_score = min_score
         self.unanimous_for_critical = unanimous_for_critical
         self.provider = provider
-        self.critic_model = critic_model or "llama-3.3-70b-versatile"
+        self.critic_model = critic_model
         self._logger = get_logger("gaap.layer3.mad")
 
         # الإحصائيات
@@ -528,12 +528,44 @@ class ExecutorPool:
                     tool_name = tool_call_match.group(1).strip()
                     args_str = tool_call_match.group(2).strip()
 
-                    # محاولة استخراج الوسائط (أكثر قوة)
                     args = {}
                     try:
-                        # Handle both single and double quotes
-                        pairs = re.findall(r"(\w+)\s*=\s*['\"](.*?)['\"]", args_str, re.DOTALL)
-                        args = {k.strip(): v.strip() for k, v in pairs}
+
+                        def parse_tool_args(s: str) -> dict[str, str]:
+                            result = {}
+                            i = 0
+                            while i < len(s):
+                                if s[i].isalpha() or s[i] == "_":
+                                    key_start = i
+                                    while i < len(s) and (s[i].isalnum() or s[i] == "_"):
+                                        i += 1
+                                    key = s[key_start:i]
+                                    while i < len(s) and s[i] in " \t\n":
+                                        i += 1
+                                    if i < len(s) and s[i] == "=":
+                                        i += 1
+                                        while i < len(s) and s[i] in " \t\n":
+                                            i += 1
+                                        if i < len(s) and s[i] in "\"'":
+                                            quote = s[i]
+                                            i += 1
+                                            value_start = i
+                                            while i < len(s):
+                                                if s[i] == "\\" and i + 1 < len(s):
+                                                    i += 2
+                                                elif s[i] == quote:
+                                                    break
+                                                else:
+                                                    i += 1
+                                            value = s[value_start:i]
+                                            if i < len(s):
+                                                i += 1
+                                            result[key] = value
+                                else:
+                                    i += 1
+                            return result
+
+                        args = parse_tool_args(args_str)
                     except Exception as e:
                         self._logger.warning(f"Failed to parse tool args: {e}")
 
@@ -788,12 +820,16 @@ class Layer3Execution(BaseLayer):
         enable_twin: bool = True,
         max_parallel: int = 10,
         quality_threshold: float = 70.0,
+        provider: BaseProvider | None = None,
     ):
         super().__init__(LayerType.EXECUTION)
 
         self.executor_pool = ExecutorPool(router, fallback, max_parallel)
         self.twin_system = GeneticTwin(enabled=enable_twin)
-        self.mad_panel = MADQualityPanel(min_score=quality_threshold)
+        self.mad_panel = MADQualityPanel(
+            min_score=quality_threshold,
+            provider=provider,
+        )
         self.quality_pipeline = QualityPipeline(self.mad_panel, self.twin_system)
 
         self._logger = get_logger("gaap.layer3")

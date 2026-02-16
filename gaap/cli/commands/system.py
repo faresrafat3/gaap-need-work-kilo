@@ -79,17 +79,21 @@ def cmd_doctor(args: Any) -> None:
     required_packages = [
         "aiohttp",
         "httpx",
-        "pyyaml",
+        ("yaml", "pyyaml"),
         "structlog",
     ]
 
     for pkg in required_packages:
+        if isinstance(pkg, tuple):
+            import_name, display_name = pkg
+        else:
+            import_name = display_name = pkg
         try:
-            __import__(pkg)
-            print(f"✅ {pkg} installed")
+            __import__(import_name)
+            print(f"✅ {display_name} installed")
         except ImportError:
-            issues.append(f"{pkg} not installed")
-            print(f"❌ {pkg} not installed")
+            issues.append(f"{display_name} not installed")
+            print(f"❌ {display_name} not installed")
 
     # Check GAAP modules
     try:

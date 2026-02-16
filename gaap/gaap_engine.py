@@ -156,7 +156,11 @@ class GAAPEngine:
         )
 
         self.layer3 = Layer3Execution(
-            router=self.router, fallback=self.fallback, enable_twin=False, max_parallel=3
+            router=self.router,
+            fallback=self.fallback,
+            enable_twin=False,
+            max_parallel=3,
+            provider=providers[0] if providers else None,
         )
 
         # === Memory Safety ===
