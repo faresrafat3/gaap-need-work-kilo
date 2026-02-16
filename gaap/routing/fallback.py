@@ -194,7 +194,7 @@ class FallbackManager:
         primary_provider: str,
         primary_model: str,
         task: Task | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> ChatCompletionResponse:
         """
         تنفيذ مع بدائل تلقائية
@@ -249,7 +249,7 @@ class FallbackManager:
 
             try:
                 self._logger.info(
-                    f"Attempting {provider_name}/{model} " f"(attempt {chain.current_index})"
+                    f"Attempting {provider_name}/{model} (attempt {chain.current_index})"
                 )
 
                 response = await provider.chat_completion(messages=messages, model=model, **kwargs)
@@ -330,7 +330,7 @@ class FallbackManager:
         if self._config.jitter:
             delay = delay * (0.5 + random.random())
 
-        return delay
+        return float(delay)
 
     def _is_provider_available(self, provider_name: str) -> bool:
         """التحقق من توفر المزود"""

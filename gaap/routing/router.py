@@ -232,7 +232,7 @@ class SmartRouter:
         task: Task | None = None,
         preferred_model: str | None = None,
         excluded_providers: list[str] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> RoutingDecision:
         """
         توجيه الطلب لأفضل مزود
@@ -313,22 +313,25 @@ class SmartRouter:
         complexity = task.complexity
 
         # الحصول على التوصيات
-        recommendations = TASK_MODEL_RECOMMENDATIONS.get(
+        recommendations: dict[str, Any] = TASK_MODEL_RECOMMENDATIONS.get(
             task_type, {"recommended_tier": ModelTier.TIER_2_TACTICAL, "min_quality": 0.8}
         )
 
         # تعديل المستوى بناءً على التعقيد
-        base_tier = recommendations["recommended_tier"]
-        complexity_tier = COMPLEXITY_MODEL_TIER.get(complexity, base_tier)
+        rec_tier = recommendations.get("recommended_tier", ModelTier.TIER_2_TACTICAL)
+        base_tier: ModelTier = (
+            rec_tier if isinstance(rec_tier, ModelTier) else ModelTier.TIER_2_TACTICAL
+        )
+        complexity_tier: ModelTier = COMPLEXITY_MODEL_TIER.get(complexity, base_tier) or base_tier
 
         # اختيار الأعلى
-        tier_order = [
+        tier_order: list[ModelTier] = [
             ModelTier.TIER_3_EFFICIENT,
             ModelTier.TIER_4_PRIVATE,
             ModelTier.TIER_2_TACTICAL,
             ModelTier.TIER_1_STRATEGIC,
         ]
-        final_tier = (
+        final_tier: ModelTier = (
             base_tier
             if tier_order.index(base_tier) >= tier_order.index(complexity_tier)
             else complexity_tier
@@ -553,15 +556,15 @@ class SmartRouter:
         if stats.get("requests", 0) == 0:
             return 100  # لا توجد بيانات، نفترض أنه متاح
 
-        success_rate = stats["successes"] / stats["requests"]
+        success_rate: float = float(stats["successes"]) / float(stats["requests"])
         return success_rate * 100
 
     def _build_reasoning(self, best: ProviderScore, task_info: dict[str, Any]) -> str:
         """بناء سبب القرار"""
-        reasons = []
+        reasons: list[str] = []
 
         reasons.append(
-            f"Selected {best.provider_name}/{best.model} " f"with score {best.final_score:.1f}/100"
+            f"Selected {best.provider_name}/{best.model} with score {best.final_score:.1f}/100"
         )
 
         if best.quality_score >= 90:
