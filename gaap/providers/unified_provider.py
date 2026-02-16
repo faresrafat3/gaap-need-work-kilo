@@ -667,7 +667,7 @@ class UnifiedProvider:
 
     def __init__(
         self,
-        chain: list[ModelSlot] = None,
+        chain: list[ModelSlot] | None = None,
         profile: str = "quality",
         min_delay: float = 0.0,  # Override minimum delay (0 = auto)
         verbose: bool = True,
@@ -702,14 +702,14 @@ class UnifiedProvider:
         """Total capacity across all slots."""
         return sum(s.total_rpm for s in self.chain if s.enabled)
 
-    def _get_g4f_client(self):
+    def _get_g4f_client(self) -> Any:
         if self._g4f_client is None:
             from g4f.client import Client as G4FClient
 
             self._g4f_client = G4FClient()
         return self._g4f_client
 
-    def _resolve_g4f_provider(self, provider_name: str):
+    def _resolve_g4f_provider(self, provider_name: str) -> Any:
         """Resolve a g4f provider class by name."""
         import g4f.Provider as gp
 
@@ -718,7 +718,7 @@ class UnifiedProvider:
             raise ValueError(f"Unknown g4f provider: {provider_name}")
         return cls
 
-    def _get_openai_client(self, slot: ModelSlot):
+    def _get_openai_client(self, slot: ModelSlot) -> Any:
         key = slot.next_api_key()
         cache_key = f"{slot.base_url}:{key[:8]}"
         if cache_key not in self._openai_clients:
@@ -727,7 +727,7 @@ class UnifiedProvider:
             self._openai_clients[cache_key] = openai.OpenAI(api_key=key, base_url=slot.base_url)
         return self._openai_clients[cache_key]
 
-    def _wait_rate_limit(self, slot: ModelSlot):
+    def _wait_rate_limit(self, slot: ModelSlot) -> None:
         """Wait to stay within rate limits."""
         min_delay = self.min_delay_override or slot.min_delay
         elapsed = time.time() - slot._last_call_time
@@ -763,7 +763,7 @@ class UnifiedProvider:
             return "model_unavailable"
         return "unknown"
 
-    def _apply_cooldown(self, slot: ModelSlot, error: Exception):
+    def _apply_cooldown(self, slot: ModelSlot, error: Exception) -> None:
         error_type = self._classify_error(error)
         seconds = self.cooldowns.get(error_type, self.cooldowns["unknown"])
         slot._cooldown_until = max(slot._cooldown_until, time.time() + seconds)
@@ -772,7 +772,7 @@ class UnifiedProvider:
             print(f"    🧯 Cooldown {slot.name}: {error_type} for {seconds}s")
 
     def _call_slot(
-        self, slot: ModelSlot, prompt: str, system: str = None, timeout: int = 60
+        self, slot: ModelSlot, prompt: str, system: str | None = None, timeout: int = 60
     ) -> tuple[str, float]:
         """Call a single model slot. Returns (text, latency_ms)."""
         self._wait_rate_limit(slot)
@@ -853,7 +853,7 @@ class UnifiedProvider:
     def call(
         self,
         prompt: str,
-        system: str = None,
+        system: str | None = None,
         timeout: int = 60,
         max_retries_per_slot: int = 1,
     ) -> tuple[str, str, float]:

@@ -213,7 +213,7 @@ def parse_architecture_critic_response(
 
 
 def fallback_architecture_evaluation(
-    critic_type: ArchitectureCriticType, spec, intent
+    critic_type: ArchitectureCriticType, spec: Any, intent: Any
 ) -> dict[str, Any]:
     """
     Fallback evaluation when LLM fails for architecture critics.

@@ -4,7 +4,7 @@
 import asyncio
 import gc
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from typing import Any
 
 from gaap.core.exceptions import ProviderResponseError
@@ -64,8 +64,12 @@ class WebChatBridgeProvider(BaseProvider):
     """
 
     def __init__(
-        self, webchat_provider: str = "kimi", account: str = "default", timeout: int = 120, **kwargs
-    ):
+        self,
+        webchat_provider: str = "kimi",
+        account: str = "default",
+        timeout: int = 120,
+        **kwargs: Any,
+    ) -> None:
         self._webchat_provider = webchat_provider
         self._account = account  # preferred account (fallback to others)
         self._webchat_timeout = timeout
@@ -86,9 +90,10 @@ class WebChatBridgeProvider(BaseProvider):
 
         # الحصول على تكوين المزود
         config = WEBCHAT_MODELS.get(webchat_provider, WEBCHAT_MODELS["kimi"])
-        models = config["models"]
-        default_model = config["default"]
-        self._model_tier = config["tier"]
+        models_raw = config["models"]
+        models = list(models_raw) if isinstance(models_raw, (list, tuple)) else [str(models_raw)]
+        default_model = str(config["default"])
+        self._model_tier = ModelTier(config["tier"])
 
         super().__init__(
             name=f"webchat_{webchat_provider}",
@@ -154,7 +159,7 @@ class WebChatBridgeProvider(BaseProvider):
         latency_ms: float = 0,
         tokens_used: int = 0,
         error_msg: str = "",
-    ):
+    ) -> None:
         """Record call result in AccountPool and detect hard cooldowns."""
         if not self._pool:
             return
@@ -199,7 +204,9 @@ class WebChatBridgeProvider(BaseProvider):
         """كل نماذج webchat تعتبر TIER_1 أو TIER_2"""
         return self._model_tier
 
-    async def _make_request(self, messages: list[Message], model: str, **kwargs) -> dict[str, Any]:
+    async def _make_request(
+        self, messages: list[Message], model: str, **kwargs: Any
+    ) -> dict[str, Any]:
         """تنفيذ الطلب عبر webchat_call() مع إدارة ذاكرة + retry + multi-account"""
         # Memory check before making LLM call
         guard = get_guard()
@@ -389,8 +396,8 @@ class WebChatBridgeProvider(BaseProvider):
         )
 
     async def _stream_request(
-        self, messages: list[Message], model: str, **kwargs
-    ) -> AsyncIterator[str]:
+        self, messages: list[Message], model: str, **kwargs: Any
+    ) -> AsyncGenerator[str, None]:
         """WebChat لا يدعم التدفق — نستخدم الطلب العادي"""
         response = await self._make_request(messages, model, **kwargs)
         content = response["choices"][0]["message"]["content"]

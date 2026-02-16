@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 
-def main():
+def main() -> None:
     st.title("GAAP - General-purpose AI Architecture Platform")
     st.markdown("---")
 

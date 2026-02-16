@@ -4,7 +4,7 @@ Model Commands
 
 from typing import Any
 
-MODELS_INFO = {
+MODELS_INFO: dict[str, dict[str, Any]] = {
     "strategic": {
         "tier": "Tier 1 - Strategic",
         "models": [
@@ -66,7 +66,7 @@ def _list_models(tier: str | None = None) -> None:
         print(f"\n📁 {tier_info['tier']}")
         print("-" * 50)
 
-        for model in tier_info["models"]:
+        for model in list(tier_info["models"]):
             context_str = _format_context(model["context"])
             print(f"  • {model['name']}")
             print(f"    Context: {context_str} | Cost: {model['cost']}")
@@ -101,7 +101,7 @@ def _show_model_info(model_name: str | None = None) -> None:
         return
 
     for _tier_key, tier_info in MODELS_INFO.items():
-        for model in tier_info["models"]:
+        for model in list(tier_info["models"]):
             if model["name"] == model_name:
                 print(f"\n🤖 {model['name']}")
                 print("=" * 50)

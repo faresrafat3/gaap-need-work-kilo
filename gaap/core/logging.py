@@ -8,7 +8,6 @@ Provides unified logging configuration with:
 - Correlation IDs for request tracing
 """
 
-
 import logging
 import os
 import sys
@@ -66,6 +65,7 @@ class GAAPLogger:
 
         handler = logging.StreamHandler(sys.stdout)
 
+        formatter: logging.Formatter
         if self.json_format:
             formatter = JSONFormatter()
         else:
@@ -139,12 +139,11 @@ class JSONFormatter(logging.Formatter):
             log_data["exception"] = self.formatException(record.exc_info)
 
         if hasattr(JSON_LIB, "dumps"):
-            return (
-                JSON_LIB.dumps(log_data).decode()
-                if isinstance(JSON_LIB.dumps(log_data), bytes)
-                else JSON_LIB.dumps(log_data)
-            )
-        return JSON_LIB.dumps(log_data)
+            result = JSON_LIB.dumps(log_data)
+            if isinstance(result, bytes):
+                return result.decode()
+            return str(result)
+        return str(JSON_LIB.dumps(log_data))
 
 
 @lru_cache(maxsize=128)
@@ -195,6 +194,7 @@ def configure_logging(
 
     handler = logging.StreamHandler(sys.stdout)
 
+    formatter: logging.Formatter
     if json_format:
         formatter = JSONFormatter()
     else:

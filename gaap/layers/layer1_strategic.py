@@ -240,16 +240,16 @@ class ToTStrategic:
 
     def _generate_options(self, level: int, intent: StructuredIntent) -> list[str]:
         """توليد الخيارات حسب المستوى"""
-        options_map = {
-            0: list(ArchitectureParadigm),  # النمط المعماري
-            1: list(DataStrategy),  # استراتيجية البيانات
-            2: list(CommunicationPattern),  # نمط الاتصال
-            3: ["kubernetes", "docker", "serverless", "vm"],  # البنية التحتية
-            4: ["prometheus", "datadog", "cloudwatch", "custom"],  # المراقبة
+        options_map: dict[int, list[Any]] = {
+            0: list(ArchitectureParadigm),
+            1: list(DataStrategy),
+            2: list(CommunicationPattern),
+            3: ["kubernetes", "docker", "serverless", "vm"],
+            4: ["prometheus", "datadog", "cloudwatch", "custom"],
         }
 
         options = options_map.get(level, [])
-        return [opt.value if hasattr(opt, "value") else opt for opt in options]
+        return [opt.value if hasattr(opt, "value") else str(opt) for opt in options]
 
     def _evaluate_option(self, option: str, level: int, intent: StructuredIntent) -> float:
         """تقييم خيار"""
@@ -357,9 +357,9 @@ class MADArchitecturePanel:
         self,
         max_rounds: int = 3,
         consensus_threshold: float = 0.85,
-        provider=None,
+        provider: Any = None,
         critic_model: str | None = None,
-    ):
+    ) -> None:
         self.max_rounds = max_rounds
         self.consensus_threshold = consensus_threshold
         self.provider = provider
@@ -558,7 +558,7 @@ class MADArchitecturePanel:
     def _robustness_eval(self, spec: ArchitectureSpec, intent: StructuredIntent) -> dict[str, Any]:
         """تقييم المتانة"""
         score = 0.6
-        issues = []
+        issues: list[str] = []
 
         if intent.implicit_requirements and intent.implicit_requirements.security:
             score += 0.2
@@ -609,12 +609,12 @@ class MADArchitecturePanel:
 class StrategicPlanner:
     """المخطط الاستراتيجي"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._logger = get_logger("gaap.layer1.planner")
 
     async def create_plan(self, spec: ArchitectureSpec, intent: StructuredIntent) -> dict[str, Any]:
         """إنشاء خطة"""
-        plan = {
+        plan: dict[str, Any] = {
             "phases": [],
             "milestones": [],
             "resource_allocation": {},
@@ -780,8 +780,8 @@ Return ONLY the JSON object, no markdown fences, no explanation."""
         tot_branching: int = 4,
         mad_rounds: int = 3,
         consensus_threshold: float = 0.85,
-        provider=None,
-    ):
+        provider: Any = None,
+    ) -> None:
         super().__init__(LayerType.STRATEGIC)
 
         self._provider = provider
@@ -1052,7 +1052,7 @@ Return ONLY the JSON object, no markdown fences, no explanation."""
 
 
 def create_strategic_layer(
-    tot_depth: int = 5, mad_rounds: int = 3, provider=None
+    tot_depth: int = 5, mad_rounds: int = 3, provider: Any = None
 ) -> Layer1Strategic:
     """إنشاء طبقة استراتيجية"""
     return Layer1Strategic(tot_depth=tot_depth, mad_rounds=mad_rounds, provider=provider)

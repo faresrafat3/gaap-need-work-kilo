@@ -1,6 +1,7 @@
 import logging
 import os
 from collections.abc import Callable
+from typing import Any
 
 from fastapi import HTTPException, Request, Response
 from fastapi.security import APIKeyHeader
@@ -12,7 +13,7 @@ API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, api_key: str | None = None):
+    def __init__(self, app: Any, api_key: str | None = None) -> None:
         super().__init__(app)
         self.api_key = api_key or os.environ.get("GAAP_API_KEY")
         self.enabled = bool(self.api_key)
@@ -49,8 +50,8 @@ async def verify_api_key(api_key: str | None = API_KEY_HEADER) -> str:
     return api_key
 
 
-def require_auth(api_key: str | None = None):
-    async def dependency():
+def require_auth(api_key: str | None = None) -> Callable[[], Any]:
+    async def dependency() -> str:
         return await verify_api_key(api_key)
 
     return dependency

@@ -88,7 +88,7 @@ class GraphEdge:
 class KnowledgeGraph:
     """الرسم البياني المعرفي"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.nodes: dict[str, GraphNode] = {}
         self.edges: list[GraphEdge] = []
         self._node_index: dict[str, set[str]] = {}  # type -> node_ids
@@ -266,7 +266,7 @@ class PKGAgent:
         self._is_built = True
 
         self._logger.info(
-            f"Graph built: {len(self.graph.nodes)} nodes, " f"{len(self.graph.edges)} edges"
+            f"Graph built: {len(self.graph.nodes)} nodes, {len(self.graph.edges)} edges"
         )
 
         return self.graph
@@ -356,7 +356,7 @@ class PKGAgent:
                     )
                 )
 
-    async def _add_function_node(self, node, file_path: str) -> None:
+    async def _add_function_node(self, node: Any, file_path: str) -> None:
         """إضافة عقدة Function"""
         func_id = f"func:{file_path}:{node.name}:{node.lineno}"
 
@@ -385,7 +385,7 @@ class PKGAgent:
             GraphEdge(source_id=f"file:{file_path}", target_id=func_id, edge_type=EdgeType.CONTAINS)
         )
 
-    async def _add_import_node(self, node, file_path: str) -> None:
+    async def _add_import_node(self, node: Any, file_path: str) -> None:
         """إضافة عقدة Import"""
         if isinstance(node, ast.Import):
             for alias in node.names:

@@ -3,7 +3,7 @@ import asyncio
 
 # استيراد من المسار النسبي
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from typing import Any
 
 from gaap.core.exceptions import (
@@ -74,12 +74,12 @@ class G4FProvider(BaseProvider):
 
     def __init__(
         self,
-        api_key: str | None = None,  # غير مطلوب لـ g4f
+        api_key: str | None = None,
         base_url: str | None = None,
         default_model: str = "gpt-4o-mini",
-        provider: str | None = None,  # مزود محدد (اختياري)
-        **kwargs,
-    ):
+        provider: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         # استخراج النماذج المدعومة
         models = list(G4F_MODELS.keys())
 
@@ -112,11 +112,13 @@ class G4FProvider(BaseProvider):
             self._g4f_module = g4f
             self._logger.info("g4f library loaded successfully")
         except ImportError:
-            self._logger.warning("g4f library not installed. " "Install with: pip install g4f")
+            self._logger.warning("g4f library not installed. Install with: pip install g4f")
             # سنستخدم وضع المحاكاة
             self._g4f_module = None
 
-    async def _make_request(self, messages: list[Message], model: str, **kwargs) -> dict[str, Any]:
+    async def _make_request(
+        self, messages: list[Message], model: str, **kwargs: Any
+    ) -> dict[str, Any]:
         """تنفيذ الطلب باستخدام g4f"""
         await self._ensure_g4f_loaded()
 
@@ -179,7 +181,7 @@ class G4FProvider(BaseProvider):
         عندما تكون مكتبة g4f غير متوفرة
         """
         self._logger.warning(
-            f"Using simulation mode for model {model}. " "Install g4f for real responses."
+            f"Using simulation mode for model {model}. Install g4f for real responses."
         )
 
         # استخراج آخر رسالة مستخدم
@@ -218,8 +220,8 @@ class G4FProvider(BaseProvider):
         }
 
     async def _stream_request(
-        self, messages: list[Message], model: str, **kwargs
-    ) -> AsyncIterator[str]:
+        self, messages: list[Message], model: str, **kwargs: Any
+    ) -> AsyncGenerator[str, None]:
         """تدفق الاستجابة"""
         await self._ensure_g4f_loaded()
 

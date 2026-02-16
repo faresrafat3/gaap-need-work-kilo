@@ -2,9 +2,11 @@
 Models Page - Browse Available Models
 """
 
+from typing import Any
+
 import streamlit as st
 
-MODELS_INFO = {
+MODELS_INFO: dict[str, dict[str, Any]] = {
     "strategic": {
         "tier": "Tier 1 - Strategic",
         "description": "For complex planning, architecture decisions, and critical tasks",
@@ -52,7 +54,7 @@ def format_context(tokens: int) -> str:
     return str(tokens)
 
 
-def main():
+def main() -> None:
     st.title(":books: Models")
     st.markdown("---")
 

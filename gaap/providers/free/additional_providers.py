@@ -73,7 +73,7 @@ class PuterProvider:
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> SimpleChatResponse:
         model = model or self.DEFAULT_MODEL
         payload = {
@@ -99,9 +99,13 @@ class PuterProvider:
                 error=f"HTTP {status}: {err}",
             )
 
-        content = result.get("text", "") if isinstance(result, dict) else ""
-        if not content and isinstance(result, dict):
-            content = result.get("message", {}).get("content", "")
+        content = ""
+        if isinstance(result, dict):
+            content = result.get("text", "")
+            if not content:
+                msg = result.get("message")
+                if isinstance(msg, dict):
+                    content = msg.get("content", "")
         return SimpleChatResponse(
             id="puter-" + str(hash(str(messages)))[:8],
             content=content,
@@ -140,7 +144,7 @@ class ScitelyProvider:
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> SimpleChatResponse:
         model = model or self.DEFAULT_MODEL
         payload = {
@@ -167,9 +171,17 @@ class ScitelyProvider:
                 error=f"HTTP {status}: {err}",
             )
 
-        content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+        content = ""
+        resp_id = "scitely-" + str(hash(str(messages)))[:8]
+        if isinstance(result, dict):
+            choices = result.get("choices", [{}])
+            if choices and isinstance(choices[0], dict):
+                msg = choices[0].get("message")
+                if isinstance(msg, dict):
+                    content = msg.get("content", "")
+            resp_id = result.get("id", resp_id)
         return SimpleChatResponse(
-            id=result.get("id", "scitely-" + str(hash(str(messages)))[:8]),
+            id=resp_id,
             content=content,
             model=model,
             provider="scitely",
@@ -210,11 +222,11 @@ class OllamaProvider:
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> SimpleChatResponse:
         model = model or self.DEFAULT_MODEL
         prompt = "\n".join(f"{msg['role']}: {msg['content']}" for msg in messages)
-        payload = {
+        payload: dict[str, Any] = {
             "model": model,
             "prompt": prompt,
             "temperature": temperature,
@@ -248,7 +260,7 @@ class OllamaProvider:
                 error=f"HTTP {status}: {err}",
             )
 
-        content = result.get("response", "")
+        content = result.get("response", "") if isinstance(result, dict) else ""
         return SimpleChatResponse(
             id="ollama-" + str(hash(str(messages)))[:8],
             content=content,
@@ -275,11 +287,11 @@ class MLvocaProvider:
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> SimpleChatResponse:
         model = model or self.DEFAULT_MODEL
         prompt = "\n".join(f"{msg['role']}: {msg['content']}" for msg in messages)
-        payload = {
+        payload: dict[str, Any] = {
             "model": model,
             "prompt": prompt,
             "stream": False,
@@ -287,8 +299,11 @@ class MLvocaProvider:
         if temperature:
             payload["options"] = {"temperature": temperature}
         if max_tokens:
-            payload["options"] = payload.get("options", {})
-            payload["options"]["num_predict"] = max_tokens
+            opts = payload.get("options")
+            if isinstance(opts, dict):
+                opts["num_predict"] = max_tokens
+            else:
+                payload["options"] = {"num_predict": max_tokens}
 
         status, result = await _make_request(
             f"{self.BASE_URL}/api/generate", payload, timeout=self.timeout
@@ -305,7 +320,7 @@ class MLvocaProvider:
                 error=f"HTTP {status}: {err}",
             )
 
-        content = result.get("response", "")
+        content = result.get("response", "") if isinstance(result, dict) else ""
         return SimpleChatResponse(
             id="mlvoca-" + str(hash(str(messages)))[:8],
             content=content,
@@ -348,11 +363,11 @@ class OllamaFreeAPIProvider:
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> SimpleChatResponse:
         model = model or self.DEFAULT_MODEL
         prompt = "\n".join(f"{msg['role']}: {msg['content']}" for msg in messages)
-        payload = {
+        payload: dict[str, Any] = {
             "model": model,
             "prompt": prompt,
             "stream": False,
@@ -360,8 +375,11 @@ class OllamaFreeAPIProvider:
         if temperature:
             payload["options"] = {"temperature": temperature}
         if max_tokens:
-            payload["options"] = payload.get("options", {})
-            payload["options"]["num_predict"] = max_tokens
+            opts = payload.get("options")
+            if isinstance(opts, dict):
+                opts["num_predict"] = max_tokens
+            else:
+                payload["options"] = {"num_predict": max_tokens}
 
         status, result = await _make_request(
             f"{self.BASE_URL}/api/generate", payload, timeout=self.timeout
@@ -378,7 +396,7 @@ class OllamaFreeAPIProvider:
                 error=f"HTTP {status}: {err}",
             )
 
-        content = result.get("response", "")
+        content = result.get("response", "") if isinstance(result, dict) else ""
         return SimpleChatResponse(
             id="ollamafree-" + str(hash(str(messages)))[:8],
             content=content,
@@ -418,7 +436,7 @@ class OpenRouterProvider:
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> SimpleChatResponse:
         model = model or self.DEFAULT_MODEL
         payload = {
@@ -445,14 +463,25 @@ class OpenRouterProvider:
                 error=f"HTTP {status}: {err}",
             )
 
-        content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-        usage = result.get("usage", {})
+        content = ""
+        tokens_used = 0
+        resp_id = "or-" + str(hash(str(messages)))[:8]
+        if isinstance(result, dict):
+            choices = result.get("choices", [{}])
+            if choices and isinstance(choices[0], dict):
+                msg = choices[0].get("message")
+                if isinstance(msg, dict):
+                    content = msg.get("content", "")
+            usage = result.get("usage")
+            if isinstance(usage, dict):
+                tokens_used = usage.get("total_tokens", 0)
+            resp_id = result.get("id", resp_id)
         return SimpleChatResponse(
-            id=result.get("id", "or-" + str(hash(str(messages)))[:8]),
+            id=resp_id,
             content=content,
             model=model,
             provider="openrouter",
-            tokens_used=usage.get("total_tokens", 0),
+            tokens_used=tokens_used,
         )
 
 
@@ -482,7 +511,7 @@ class HuggingChatProvider:
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> SimpleChatResponse:
         model = model or self.DEFAULT_MODEL
         payload = {
@@ -508,9 +537,17 @@ class HuggingChatProvider:
                 error=f"HTTP {status}: {err}",
             )
 
-        content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+        content = ""
+        resp_id = "hc-" + str(hash(str(messages)))[:8]
+        if isinstance(result, dict):
+            choices = result.get("choices", [{}])
+            if choices and isinstance(choices[0], dict):
+                msg = choices[0].get("message")
+                if isinstance(msg, dict):
+                    content = msg.get("content", "")
+            resp_id = result.get("id", resp_id)
         return SimpleChatResponse(
-            id=result.get("id", "hc-" + str(hash(str(messages)))[:8]),
+            id=resp_id,
             content=content,
             model=model,
             provider="huggingchat",
@@ -544,7 +581,7 @@ class PoeProvider:
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> SimpleChatResponse:
         model = model or self.DEFAULT_MODEL
 
@@ -625,7 +662,7 @@ class YouChatProvider:
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> SimpleChatResponse:
         model = model or self.DEFAULT_MODEL
 
@@ -647,7 +684,11 @@ class YouChatProvider:
                 error=f"HTTP {status}: {err}",
             )
 
-        content = result.get("choices", [{}])[0].get("text", "")
+        content = ""
+        if isinstance(result, dict):
+            choices = result.get("choices", [{}])
+            if choices and isinstance(choices[0], dict):
+                content = choices[0].get("text", "")
         return SimpleChatResponse(
             id="yc-" + str(hash(str(messages)))[:8],
             content=content,

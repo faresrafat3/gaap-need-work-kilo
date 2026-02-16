@@ -7,7 +7,6 @@ Provides comprehensive observability for the GAAP system:
 - Automatic instrumentation helpers
 """
 
-
 import asyncio
 import time
 from collections.abc import Callable
@@ -29,8 +28,8 @@ try:
     OTEL_AVAILABLE = True
 except ImportError:
     OTEL_AVAILABLE = False
-    trace = None  # type: ignore[misc,assignment]
-    Span = None  # type: ignore[misc,assignment]
+    trace = None  # type: ignore[assignment]
+    Span = object  # type: ignore[misc,assignment]
 
 try:
     from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, Info
@@ -108,7 +107,7 @@ class Tracer:
             return
 
         self.config = config or TracingConfig()
-        self._tracer = None
+        self._tracer: Any = None
         self._provider: Any = None
 
         if OTEL_AVAILABLE:
@@ -120,19 +119,19 @@ class Tracer:
         """Initialize OpenTelemetry tracer"""
         if not OTEL_AVAILABLE:
             return
-        resource = Resource.create(  # type: ignore[misc]
+        resource = Resource.create(
             {
-                SERVICE_NAME: self.config.service_name,  # type: ignore[misc]
+                SERVICE_NAME: self.config.service_name,
                 "service.version": self.config.service_version,
                 "deployment.environment": self.config.environment,
             }
         )
 
-        self._provider = TracerProvider(resource=resource)  # type: ignore[misc]
+        self._provider = TracerProvider(resource=resource)
 
         if self.config.enable_console_export:
-            console_exporter = ConsoleSpanExporter()  # type: ignore[misc]
-            self._provider.add_span_processor(BatchSpanProcessor(console_exporter))  # type: ignore[misc]
+            console_exporter = ConsoleSpanExporter()
+            self._provider.add_span_processor(BatchSpanProcessor(console_exporter))
 
         if self.config.enable_otlp_export and self.config.otlp_endpoint:
             try:
@@ -141,12 +140,12 @@ class Tracer:
                 )
 
                 otlp_exporter = OTLPSpanExporter(endpoint=self.config.otlp_endpoint)
-                self._provider.add_span_processor(BatchSpanProcessor(otlp_exporter))  # type: ignore[misc]
+                self._provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
             except ImportError:
                 pass
 
-        trace.set_tracer_provider(self._provider)  # type: ignore[misc]
-        self._tracer = trace.get_tracer(self.config.service_name, self.config.service_version)  # type: ignore[misc]
+        trace.set_tracer_provider(self._provider)
+        self._tracer = trace.get_tracer(self.config.service_name, self.config.service_version)
 
     @property
     def tracer(self) -> Any:
@@ -163,18 +162,18 @@ class Tracer:
         if not OTEL_AVAILABLE or self._tracer is None:
 
             @contextmanager
-            def noop_span():
+            def noop_span() -> Any:
                 yield None
 
             return noop_span()
 
-        return self._tracer.start_as_current_span(name, attributes=attributes, kind=kind)
+        return self._tracer.start_as_current_span(name, attributes=attributes, kind=kind)  # type: ignore[no-any-return]
 
     def record_exception(self, span: Any, exception: Exception) -> None:
         """Record an exception in a span"""
         if span is not None and OTEL_AVAILABLE:
             span.record_exception(exception)
-            span.set_status(Status(StatusCode.ERROR, str(exception)))  # type: ignore[misc]
+            span.set_status(Status(StatusCode.ERROR, str(exception)))
 
     def add_event(self, span: Any, name: str, attributes: dict[str, Any] | None = None) -> None:
         """Add an event to a span"""
@@ -219,14 +218,14 @@ class Metrics:
         ns = self.config.namespace
         sub = self.config.subsystem
 
-        self._metrics["requests_total"] = Counter(  # type: ignore[misc]
+        self._metrics["requests_total"] = Counter(
             f"{ns}_requests_total",
             "Total number of requests processed",
             ["layer", "provider", "model", "status"],
             subsystem=sub,
         )
 
-        self._metrics["request_duration_seconds"] = Histogram(  # type: ignore[misc]
+        self._metrics["request_duration_seconds"] = Histogram(
             f"{ns}_request_duration_seconds",
             "Request duration in seconds",
             ["layer", "provider", "operation"],
@@ -234,56 +233,56 @@ class Metrics:
             buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0],
         )
 
-        self._metrics["active_requests"] = Gauge(  # type: ignore[misc]
+        self._metrics["active_requests"] = Gauge(
             f"{ns}_active_requests",
             "Number of active requests being processed",
             ["layer"],
             subsystem=sub,
         )
 
-        self._metrics["tokens_total"] = Counter(  # type: ignore[misc]
+        self._metrics["tokens_total"] = Counter(
             f"{ns}_tokens_total",
             "Total number of tokens processed",
             ["provider", "model", "type"],
             subsystem=sub,
         )
 
-        self._metrics["cost_dollars"] = Counter(  # type: ignore[misc]
+        self._metrics["cost_dollars"] = Counter(
             f"{ns}_cost_dollars",
             "Total cost in dollars",
             ["provider", "model"],
             subsystem=sub,
         )
 
-        self._metrics["errors_total"] = Counter(  # type: ignore[misc]
+        self._metrics["errors_total"] = Counter(
             f"{ns}_errors_total",
             "Total number of errors",
             ["layer", "error_type", "severity"],
             subsystem=sub,
         )
 
-        self._metrics["healing_attempts_total"] = Counter(  # type: ignore[misc]
+        self._metrics["healing_attempts_total"] = Counter(
             f"{ns}_healing_attempts_total",
             "Total number of healing attempts",
             ["level", "success"],
             subsystem=sub,
         )
 
-        self._metrics["llm_calls_total"] = Counter(  # type: ignore[misc]
+        self._metrics["llm_calls_total"] = Counter(
             f"{ns}_llm_calls_total",
             "Total number of LLM API calls",
             ["provider", "model", "status"],
             subsystem=sub,
         )
 
-        self._metrics["queue_size"] = Gauge(  # type: ignore[misc]
+        self._metrics["queue_size"] = Gauge(
             f"{ns}_queue_size",
             "Current queue size",
             ["queue_name"],
             subsystem=sub,
         )
 
-        self._metrics["memory_usage_bytes"] = Gauge(  # type: ignore[misc]
+        self._metrics["memory_usage_bytes"] = Gauge(
             f"{ns}_memory_usage_bytes",
             "Memory usage in bytes",
             ["tier"],

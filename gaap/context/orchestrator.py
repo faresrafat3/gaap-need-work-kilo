@@ -175,12 +175,10 @@ class ContextOrchestrator:
         self._territories: dict[str, AgentTerritory] = {}
         self._context_cache: dict[str, ContextWindow] = {}
         self._decision_history: list[ContextDecision] = []
-
-        # المكونات الفرعية (ستُحمّل عند الحاجة)
-        self._hcl = None
-        self._pkg_agent = None
-        self._smart_chunker = None
-        self._external_brain = None
+        self._hcl: Any = None
+        self._pkg_agent: Any = None
+        self._smart_chunker: Any = None
+        self._external_brain: Any = None
 
     # =========================================================================
     # Project Analysis
@@ -298,8 +296,8 @@ class ContextOrchestrator:
         # تحليل المشروع إذا لم يكن تم
         if not self._project_profile:
             await self.analyze_project()
+            assert self._project_profile is not None
 
-        # تحليل المهمة
         task_scope = self._analyze_task_scope(task)
 
         # حساب الميزانية
@@ -310,7 +308,6 @@ class ContextOrchestrator:
         if budget_override:
             budget_amount = budget_override
 
-        # تحديد الاستراتيجية المثلى
         strategy, reasoning = self._select_strategy(
             project_size=self._project_profile.size,
             task_scope=task_scope,
@@ -323,7 +320,6 @@ class ContextOrchestrator:
             strategy=strategy, task_scope=task_scope, task=task
         )
 
-        # بناء القرار
         budget = ContextBudget(total=budget_amount, level=self._get_context_level(task_scope))
 
         decision = ContextDecision(
@@ -502,10 +498,10 @@ class ContextOrchestrator:
         if self._hcl is None:
             from gaap.context.hcl import HierarchicalContextLoader
 
-            self._hcl = HierarchicalContextLoader(self.project_path)
+            self._hcl = HierarchicalContextLoader(self.project_path)  # type: ignore[arg-type]
 
-        # تحميل المستوى 0 دائماً
-        overview = await self._hcl.load_level(ContextLevel.LEVEL_0_OVERVIEW)
+        hcl = self._hcl
+        overview = await hcl.load_level(ContextLevel.LEVEL_0_OVERVIEW)
         if overview:
             window = ContextWindow(
                 id="project_overview",
@@ -516,10 +512,9 @@ class ContextOrchestrator:
             )
             manager.add_window(window)
 
-        # تحميل الملفات المطلوبة
         if focus_files:
-            for file_path in focus_files[:5]:  # حد أقصى 5 ملفات
-                node = await self._hcl.load_file_context(file_path)
+            for file_path in focus_files[:5]:
+                node = await hcl.load_file_context(file_path)
                 if node:
                     window = ContextWindow(
                         id=f"file_{file_path}",
@@ -537,11 +532,12 @@ class ContextOrchestrator:
         if self._smart_chunker is None:
             from gaap.context.smart_chunking import SmartChunker
 
-            self._smart_chunker = SmartChunker(self.project_path)
+            self._smart_chunker = SmartChunker(self.project_path)  # type: ignore[arg-type]
 
+        smart_chunker = self._smart_chunker
         if focus_files:
             for file_path in focus_files[:3]:
-                chunks = await self._smart_chunker.chunk_file(file_path)
+                chunks = await smart_chunker.chunk_file(file_path)
                 for chunk in chunks[:10]:  # حد أقصى 10 chunks
                     window = ContextWindow(
                         id=f"chunk_{chunk.id}",
@@ -558,11 +554,11 @@ class ContextOrchestrator:
         if self._external_brain is None:
             from gaap.context.external_brain import ExternalBrain
 
-            self._external_brain = ExternalBrain(self.project_path)
+            self._external_brain = ExternalBrain(self.project_path)  # type: ignore[arg-type]
 
-        # البحث عن السياق ذي الصلة
+        external_brain = self._external_brain
         query = task.description
-        results = await self._external_brain.search(query, limit=5)
+        results = await external_brain.search(query, limit=5)
 
         for result in results:
             window = ContextWindow(
@@ -590,7 +586,7 @@ class ContextOrchestrator:
 
                             window = ContextWindow(
                                 id=f"territory_{file_path}",
-                                content=content[:50000],  # حد
+                                content=content[:50000],
                                 token_count=int(tokens),
                                 level=ContextLevel.LEVEL_2_FILE,
                                 source=file_path,
@@ -604,16 +600,16 @@ class ContextOrchestrator:
         if self._pkg_agent is None:
             from gaap.context.pkg_agent import PKGAgent
 
-            self._pkg_agent = PKGAgent(self.project_path)
+            self._pkg_agent = PKGAgent(self.project_path)  # type: ignore[arg-type]
 
-        # الحصول على الرسم البياني ذي الصلة
-        relevant_nodes = await self._pkg_agent.find_relevant_nodes(task.description)
+        pkg_agent = self._pkg_agent
+        relevant_nodes = await pkg_agent.find_relevant_nodes(task.description)
 
         for node in relevant_nodes[:20]:
             window = ContextWindow(
                 id=f"pkg_{node.id}",
                 content=node.summary or node.name,
-                token_count=len((node.summary or node.name).split()) * 1.5,
+                token_count=int(len((node.summary or node.name).split()) * 1.5),
                 level=ContextLevel.LEVEL_1_MODULE,
                 source=node.file_path,
                 metadata={"node_type": node.node_type},
@@ -652,12 +648,11 @@ class ContextOrchestrator:
             agent_id=agent_id, zone_name=zone_name, files=files, interfaces=interfaces or []
         )
 
-        # تقدير الرموز
         total_tokens = 0
         for file_path in files:
             try:
                 with open(file_path) as f:
-                    total_tokens += len(f.read().split()) * 1.5
+                    total_tokens += int(len(f.read().split()) * 1.5)
             except Exception:
                 pass
 

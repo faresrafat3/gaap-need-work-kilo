@@ -58,7 +58,7 @@ def get_engine() -> GAAPEngine:
     return _engine
 
 
-@app.get("/health", response_model=HealthResponse)
+@app.get("/health", response_model=HealthResponse)  # type: ignore[untyped-decorator]
 async def health() -> HealthResponse:
     return HealthResponse(
         status="healthy",
@@ -66,7 +66,7 @@ async def health() -> HealthResponse:
     )
 
 
-@app.get("/status", response_model=StatusResponse)
+@app.get("/status", response_model=StatusResponse)  # type: ignore[untyped-decorator]
 async def status() -> StatusResponse:
     engine = get_engine()
     return StatusResponse(
@@ -77,25 +77,19 @@ async def status() -> StatusResponse:
     )
 
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post("/chat", response_model=ChatResponse)  # type: ignore[untyped-decorator]
 async def chat(request: ChatRequest) -> ChatResponse:
     engine = get_engine()
 
     try:
         result = await engine.chat(
             message=request.message,
-            model=request.model,
-            provider=request.provider,
         )
 
         return ChatResponse(
             success=True,
             message=request.message,
-            response=result.get("response"),
-            model=result.get("model"),
-            provider=result.get("provider"),
-            tokens_used=result.get("tokens_used"),
-            cost_usd=result.get("cost_usd"),
+            response=str(result),
         )
 
     except Exception as e:
@@ -107,17 +101,20 @@ async def chat(request: ChatRequest) -> ChatResponse:
         )
 
 
-@app.post("/execute", response_model=ExecuteResponse)
+@app.post("/execute", response_model=ExecuteResponse)  # type: ignore[untyped-decorator]
 async def execute(request: ExecuteRequest) -> ExecuteResponse:
     engine = get_engine()
 
     try:
-        result = await engine.execute(task=request.task, priority=request.priority)
+        from gaap.gaap_engine import GAAPRequest
+
+        gaap_request = GAAPRequest(text=request.task)
+        result: Any = await engine.process(gaap_request)
 
         return ExecuteResponse(
             success=True,
-            task_id=result.get("task_id", ""),
-            result=result.get("output"),
+            task_id="",
+            result=str(result),
         )
 
     except Exception as e:
@@ -129,7 +126,7 @@ async def execute(request: ExecuteRequest) -> ExecuteResponse:
         )
 
 
-@app.get("/providers", response_model=list[ProviderInfo])
+@app.get("/providers", response_model=list[ProviderInfo])  # type: ignore[untyped-decorator]
 async def list_providers() -> list[ProviderInfo]:
     providers: list[ProviderInfo] = []
     for name in ["groq", "gemini", "g4f"]:
@@ -148,7 +145,7 @@ async def list_providers() -> list[ProviderInfo]:
     return providers
 
 
-@app.get("/providers/{name}/models", response_model=list[str])
+@app.get("/providers/{name}/models", response_model=list[str])  # type: ignore[untyped-decorator]
 async def list_models(name: str) -> list[str]:
     models_map: dict[str, list[str]] = {
         "groq": ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
@@ -162,7 +159,7 @@ async def list_models(name: str) -> list[str]:
     return models_map[name]
 
 
-@app.get("/cache/stats", response_model=CacheStatsResponse)
+@app.get("/cache/stats", response_model=CacheStatsResponse)  # type: ignore[untyped-decorator]
 async def cache_stats() -> CacheStatsResponse:
     return CacheStatsResponse(
         backend="memory",
@@ -170,32 +167,32 @@ async def cache_stats() -> CacheStatsResponse:
     )
 
 
-@app.post("/cache/clear")
+@app.post("/cache/clear")  # type: ignore[untyped-decorator]
 async def clear_cache() -> dict[str, Any]:
     return {"success": True, "message": "Cache cleared"}
 
 
-@app.get("/config", response_model=ConfigGetResponse)
+@app.get("/config", response_model=ConfigGetResponse)  # type: ignore[untyped-decorator]
 async def get_config_endpoint() -> ConfigGetResponse:
     return ConfigGetResponse(config={"api_key": "***", "providers": ["groq", "gemini"]})
 
 
-@app.post("/config")
+@app.post("/config")  # type: ignore[untyped-decorator]
 async def set_config(request: ConfigSetRequest) -> dict[str, Any]:
     return {"success": True, "message": f"Config updated: {request.key} = {request.value}"}
 
 
-@app.get("/history")
+@app.get("/history")  # type: ignore[untyped-decorator]
 async def get_history(limit: int = 10) -> dict[str, Any]:
     return {"history": [], "total": 0}
 
 
-@app.delete("/history/{item_id}")
+@app.delete("/history/{item_id}")  # type: ignore[untyped-decorator]
 async def delete_history(item_id: str) -> dict[str, Any]:
     return {"success": True, "message": f"Deleted {item_id}"}
 
 
-@app.get("/")
+@app.get("/")  # type: ignore[untyped-decorator]
 async def root() -> dict[str, Any]:
     return {
         "message": "GAAP API v1.0.0",

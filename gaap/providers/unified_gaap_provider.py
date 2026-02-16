@@ -26,8 +26,8 @@ class UnifiedGAAPProvider(BaseProvider):
         base_url: str | None = None,
         default_model: str = "kimi",
         profile: str = "quality",
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         # We don't call super().__init__ with all models yet because they are dynamic
         models = ["kimi", "deepseek", "glm", "gemini-2.5-flash"]
 
@@ -47,7 +47,9 @@ class UnifiedGAAPProvider(BaseProvider):
         self._unified = UnifiedProvider(profile=profile, verbose=True)
         self._logger.info(f"UnifiedGAAPProvider initialized with profile: {profile}")
 
-    async def _make_request(self, messages: list[Message], model: str, **kwargs) -> dict[str, Any]:
+    async def _make_request(
+        self, messages: list[Message], model: str, **kwargs: Any
+    ) -> dict[str, Any]:
         """Execute request via UnifiedProvider fallback chain (Kimi -> DeepSeek -> etc.)"""
 
         # Convert Message objects to simple dicts
@@ -62,10 +64,9 @@ class UnifiedGAAPProvider(BaseProvider):
 
         full_prompt = "\n\n".join(prompt_parts)
 
-        # Call the unified provider (blocking call run in thread)
-        def sync_call():
+        def sync_call() -> tuple[str, str, float]:
             return self._unified.call(
-                prompt=full_prompt, system=system_content, timeout=int(self.timeout)
+                prompt=full_prompt, system=system_content or "", timeout=int(self.timeout)
             )
 
         try:
@@ -93,7 +94,7 @@ class UnifiedGAAPProvider(BaseProvider):
             raise
 
     async def _stream_request(
-        self, messages: list[Message], model: str, **kwargs
+        self, messages: list[Message], model: str, **kwargs: Any
     ) -> AsyncGenerator[str, None]:
         """Streaming is not natively supported by the unified bridge yet,
         so we yield the full response as a single chunk."""

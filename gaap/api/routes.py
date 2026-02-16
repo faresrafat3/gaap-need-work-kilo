@@ -25,7 +25,8 @@ class Request:
 
     def json(self) -> dict[str, Any]:
         try:
-            return json.loads(self.body)
+            result = json.loads(self.body)
+            return result if isinstance(result, dict) else {}
         except Exception:
             return {}
 
@@ -33,7 +34,7 @@ class Request:
 class Response:
     """استجابة HTTP"""
 
-    def __init__(self, status: int = 200, body: Any = None, headers: dict[str, str] = None):
+    def __init__(self, status: int = 200, body: Any = None, headers: dict[str, str] | None = None):
         self.status = status
         self.body = body or {}
         self.headers = headers or {"Content-Type": "application/json"}
@@ -153,9 +154,9 @@ class GAPAPIRouter:
             return Response(status=400, body={"error": "Missing 'tasks' list"})
 
         results = []
-        for task_text in data["tasks"][:10]:  # حد 10 مهام
-            request = GAAPRequest(text=task_text)
-            response = await self.engine.process(request)
+        for task_text in data["tasks"][:10]:
+            gaap_req = GAAPRequest(text=task_text)
+            response = await self.engine.process(gaap_req)
             results.append(
                 {
                     "task": task_text[:50],
@@ -183,7 +184,7 @@ class GAAPAPIServer:
         self.router = GAPAPIRouter(engine)
         self._logger = logging.getLogger("gaap.api.server")
 
-    async def start(self):
+    async def start(self) -> None:
         """بدء الخادم"""
         import asyncio
 
@@ -194,7 +195,7 @@ class GAAPAPIServer:
         async with server:
             await server.serve_forever()
 
-    async def _handle_connection(self, reader, writer):
+    async def _handle_connection(self, reader: Any, writer: Any) -> None:
         """معالجة الاتصال"""
         try:
             # قراءة الطلب
@@ -247,7 +248,7 @@ class GAAPAPIServer:
 # =============================================================================
 
 
-async def run_server(host: str = "0.0.0.0", port: int = 8080, budget: float = 100.0):
+async def run_server(host: str = "0.0.0.0", port: int = 8080, budget: float = 100.0) -> None:
     """تشغيل الخادم"""
     # إنشاء المحرك
     engine = create_engine(
@@ -261,7 +262,7 @@ async def run_server(host: str = "0.0.0.0", port: int = 8080, budget: float = 10
     await server.start()
 
 
-def main():
+def main() -> None:
     """نقطة الدخول"""
     import argparse
 

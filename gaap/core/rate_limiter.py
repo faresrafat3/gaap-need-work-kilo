@@ -449,7 +449,7 @@ class AdaptiveRateLimiter(BaseRateLimiter):
 
 def create_rate_limiter(config: RateLimitConfig) -> BaseRateLimiter:
     """Factory function to create a rate limiter"""
-    limiters = {
+    limiters: dict[RateLimitStrategy, type[BaseRateLimiter]] = {
         RateLimitStrategy.TOKEN_BUCKET: TokenBucketRateLimiter,
         RateLimitStrategy.SLIDING_WINDOW: SlidingWindowRateLimiter,
         RateLimitStrategy.LEAKY_BUCKET: LeakyBucketRateLimiter,

@@ -22,7 +22,7 @@ def load_env() -> None:
     """Load env vars from .gaap_env file"""
     from pathlib import Path
 
-    def parse_lines(lines):
+    def parse_lines(lines: list[str]) -> None:
         for line in lines:
             raw = line.strip()
             if not raw or raw.startswith("#") or "=" not in raw:
@@ -116,7 +116,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main():
+def main() -> None:
     """Main entry point"""
     load_env()
     parser = create_parser()

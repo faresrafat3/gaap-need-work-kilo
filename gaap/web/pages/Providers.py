@@ -3,10 +3,11 @@ Providers Page - Manage LLM Providers
 """
 
 import os
+from typing import Any
 
 import streamlit as st
 
-PROVIDERS_INFO = {
+PROVIDERS_INFO: dict[str, dict[str, Any]] = {
     "groq": {
         "name": "Groq",
         "type": "Free Tier",
@@ -56,7 +57,7 @@ def get_provider_status(env_key: str) -> tuple[bool, str]:
     return False, "Not configured"
 
 
-def main():
+def main() -> None:
     st.title(":outbox_tray: Providers")
     st.markdown("---")
 

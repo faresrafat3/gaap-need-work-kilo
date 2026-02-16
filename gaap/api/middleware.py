@@ -12,10 +12,10 @@ logger = logging.getLogger("gaap.api.ratelimit")
 class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(
         self,
-        app,
+        app: Callable,
         requests_per_minute: int = 60,
         requests_per_hour: int = 1000,
-    ):
+    ) -> None:
         super().__init__(app)
         self.requests_per_minute = requests_per_minute
         self.requests_per_hour = requests_per_hour
@@ -86,8 +86,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             self._last_cleanup = current_time
 
 
-def rate_limit(requests_per_minute: int = 60, requests_per_hour: int = 1000):
-    def decorator(func: Callable):
+def rate_limit(requests_per_minute: int = 60, requests_per_hour: int = 1000) -> Callable:
+    def decorator(func: Callable) -> Callable:
         return func
 
     return decorator

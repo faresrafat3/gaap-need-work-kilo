@@ -252,7 +252,7 @@ class TaskGraph:
         self.critical_path = path
         return path
 
-    def detect_cycles(self) -> list[str]:
+    def detect_cycles(self) -> list[list[str]]:
         """كشف الدورات"""
         WHITE, GRAY, BLACK = 0, 1, 2
         color = dict.fromkeys(self.all_nodes, WHITE)
@@ -297,7 +297,7 @@ class TaskGraph:
 class DependencyResolver:
     """حل التبعيات"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._logger = get_logger("gaap.layer2.resolver")
 
     def resolve(self, tasks: list[AtomicTask]) -> TaskGraph:
@@ -447,7 +447,7 @@ CRITICAL: Tasks must be SPECIFIC to "{original_text}". Do NOT generate generic t
 
 Return ONLY the JSON array, no markdown fences, no explanation."""
 
-    def __init__(self, max_subtasks: int = 50, provider=None):
+    def __init__(self, max_subtasks: int = 50, provider: Any = None) -> None:
         self.max_subtasks = max_subtasks
         self._provider = provider
         self._logger = get_logger("gaap.layer2.decomposer")
@@ -531,10 +531,48 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
 
         return tasks
 
-    def _parse_llm_response(self, raw: str) -> list[dict] | None:
+    def _parse_llm_response(self, raw: str) -> list[dict[str, Any]] | None:
         """تنظيف واستخراج JSON من رد الـ LLM"""
         if not raw:
             return None
+
+        cleaned = raw.strip()
+
+        thinking_pattern = re.compile(r"orca:.*?action", re.DOTALL)
+        cleaned = thinking_pattern.sub("", cleaned).strip()
+
+        if cleaned.startswith("```"):
+            lines = cleaned.split("\n")
+            start_idx = 1
+            end_idx = len(lines)
+            for i in range(len(lines) - 1, 0, -1):
+                if lines[i].strip() == "```":
+                    end_idx = i
+                    break
+            cleaned = "\n".join(lines[start_idx:end_idx])
+
+        try:
+            data = json.loads(cleaned)
+            if isinstance(data, list):
+                return data
+            elif isinstance(data, dict) and "tasks" in data:
+                tasks = data["tasks"]
+                if isinstance(tasks, list):
+                    return tasks
+        except json.JSONDecodeError:
+            pass
+
+        bracket_match = re.search(r"\[[\s\S]*\]", cleaned)
+        if bracket_match:
+            try:
+                data = json.loads(bracket_match.group())
+                if isinstance(data, list):
+                    return data
+            except json.JSONDecodeError:
+                pass
+
+        self._logger.error(f"Could not parse LLM response: {cleaned[:200]}...")
+        return None
 
         # إزالة أي markdown fences
         cleaned = raw.strip()
@@ -677,7 +715,7 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
             stack.discard(task_id)
             return False
 
-        visited = set()
+        visited: set[str] = set()
         for task in tasks:
             if task.id not in visited:
                 has_cycle(task.id, visited, set())
@@ -1135,7 +1173,9 @@ class Layer2Tactical(BaseLayer):
     - تقدير الموارد
     """
 
-    def __init__(self, max_subtasks: int = 50, max_parallel: int = 10, provider=None):
+    def __init__(
+        self, max_subtasks: int = 50, max_parallel: int = 10, provider: Any = None
+    ) -> None:
         super().__init__(LayerType.TACTICAL)
 
         self.decomposer = TacticalDecomposer(max_subtasks=max_subtasks, provider=provider)
@@ -1152,12 +1192,17 @@ class Layer2Tactical(BaseLayer):
         """معالجة المدخل"""
         start_time = time.time()
 
-        # استخراج البيانات
+        spec: ArchitectureSpec
+        goals: list[str]
+
         if isinstance(input_data, ArchitectureSpec):
             spec = input_data
             goals = spec.metadata.get("plan", {}).get("phases", [])
         elif isinstance(input_data, dict):
-            spec = input_data.get("spec")
+            spec_data = input_data.get("spec")
+            if not isinstance(spec_data, ArchitectureSpec):
+                raise ValueError("Expected ArchitectureSpec in dict['spec']")
+            spec = spec_data
             goals = input_data.get("goals", [])
         else:
             raise ValueError("Expected ArchitectureSpec or dict")
@@ -1215,7 +1260,7 @@ class Layer2Tactical(BaseLayer):
 
 
 def create_tactical_layer(
-    max_subtasks: int = 50, max_parallel: int = 10, provider=None
+    max_subtasks: int = 50, max_parallel: int = 10, provider: Any = None
 ) -> Layer2Tactical:
     """إنشاء طبقة تكتيكية"""
     return Layer2Tactical(max_subtasks=max_subtasks, max_parallel=max_parallel, provider=provider)

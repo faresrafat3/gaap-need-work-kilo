@@ -688,7 +688,9 @@ class QualityPipeline:
 
         gate_results = await self._run_validators(artifact, context, is_critical)
 
-        errors = [r for r in gate_results if not r.passed and r.severity == ValidatorSeverity.ERROR]
+        errors = [
+            r for r in gate_results if not r.is_passed and r.severity == ValidatorSeverity.ERROR
+        ]
         if errors:
             self._validation_failures += 1
 
@@ -816,9 +818,15 @@ class Layer3Execution(BaseLayer):
 
         # تنفيذ مع توأم جيني
         if self.twin_system.enabled and (is_critical or not self.twin_system.for_critical_only):
-            result, agreement, twin_used = await self.twin_system.execute_with_twin(
+            twin_result, agreement, twin_used = await self.twin_system.execute_with_twin(
                 task, self.executor_pool.execute
             )
+            if isinstance(twin_result, ExecutionResult):
+                result = twin_result
+            else:
+                result = ExecutionResult(
+                    task_id=task.id, success=False, error="Invalid twin result"
+                )
         else:
             result = await self.executor_pool.execute(task)
             agreement = 1.0

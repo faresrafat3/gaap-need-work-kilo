@@ -32,14 +32,14 @@ def load_config() -> dict:
         return DEFAULT_CONFIG.copy()
 
 
-def save_config(key: str, value: Any):
+def save_config(key: str, value: Any) -> None:
     """Save configuration value"""
     from gaap.storage import save_config as _save
 
     _save(key, value)
 
 
-def main():
+def main() -> None:
     st.title(":gear: Configuration")
     st.markdown("---")
 

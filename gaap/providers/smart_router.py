@@ -13,6 +13,7 @@ Intelligent routing across multiple free-tier providers with:
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -38,21 +39,21 @@ class KeyState:
     consecutive_errors: int = 0
     is_exhausted: bool = False
 
-    def reset_minute_if_needed(self):
+    def reset_minute_if_needed(self) -> None:
         """Reset minute counter if window passed"""
         now = time.time()
         if now - self.minute_window_start >= 60:
             self.requests_this_minute = 0
             self.minute_window_start = now
 
-    def reset_day_if_needed(self):
+    def reset_day_if_needed(self) -> None:
         """Reset day counter if day passed"""
         now = time.time()
         if now - self.day_start >= 86400:
             self.requests_today = 0
             self.day_start = now
 
-    def can_use(self, limits) -> bool:
+    def can_use(self, limits: Any) -> bool:
         """Check if key can be used"""
         self.reset_minute_if_needed()
         self.reset_day_if_needed()
@@ -68,7 +69,7 @@ class KeyState:
 
         return not (limits.requests_per_day > 0 and self.requests_today >= limits.requests_per_day)
 
-    def mark_used(self):
+    def mark_used(self) -> None:
         """Mark key as used"""
         self.reset_minute_if_needed()
         self.reset_day_if_needed()
@@ -77,13 +78,13 @@ class KeyState:
         self.requests_today += 1
         self.consecutive_errors = 0
 
-    def mark_error(self):
+    def mark_error(self) -> None:
         """Mark an error occurred"""
         self.consecutive_errors += 1
         if self.consecutive_errors >= 3:
             self.is_exhausted = True
 
-    def mark_rate_limited(self):
+    def mark_rate_limited(self) -> None:
         """Mark key as rate limited"""
         self.is_exhausted = True
         # Auto-reset after cooldown period (handled by provider)
@@ -101,7 +102,7 @@ class ProviderState:
     is_healthy: bool = True
     last_health_check: float = field(default_factory=time.time)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.key_states:
             self.key_states = [KeyState(key_index=i) for i in range(len(self.config.api_keys))]
 
@@ -126,7 +127,7 @@ class ProviderState:
 
         return key_index, self.config.api_keys[key_index]
 
-    def _reset_exhausted_keys(self):
+    def _reset_exhausted_keys(self) -> None:
         """Reset exhausted keys after cooldown"""
         now = time.time()
         cooldown = self.config.limits.cooldown_window
@@ -136,7 +137,7 @@ class ProviderState:
                 state.is_exhausted = False
                 state.consecutive_errors = 0
 
-    def mark_request(self, key_index: int, success: bool, cost: float = 0.0):
+    def mark_request(self, key_index: int, success: bool, cost: float = 0.0) -> None:
         """Mark a request attempt"""
         self.total_requests += 1
 
@@ -163,7 +164,7 @@ class SmartRouter:
     - Health tracking
     """
 
-    def __init__(self, enabled_provider_types: list[ProviderType] | None = None):
+    def __init__(self, enabled_provider_types: list[ProviderType] | None = None) -> None:
         """
         Initialize router
 
@@ -235,7 +236,7 @@ class SmartRouter:
         success: bool,
         cost: float = 0.0,
         rate_limited: bool = False,
-    ):
+    ) -> None:
         """Mark request result"""
         if provider_type not in self.provider_states:
             return
@@ -246,7 +247,9 @@ class SmartRouter:
         if rate_limited:
             state.key_states[key_index].mark_rate_limited()
 
-    async def execute_with_retry(self, call_fn, max_provider_attempts: int = 3, **kwargs):
+    async def execute_with_retry(
+        self, call_fn: Callable, max_provider_attempts: int = 3, **kwargs: Any
+    ) -> Any:
         """
         Execute a function with automatic provider retry
 
@@ -261,7 +264,7 @@ class SmartRouter:
         Raises:
             Exception if all providers exhausted
         """
-        attempted_providers = []
+        attempted_providers: list[ProviderType] = []
         last_error = None
 
         for attempt in range(max_provider_attempts):
@@ -317,7 +320,7 @@ class SmartRouter:
 
     def get_stats(self) -> dict[str, Any]:
         """Get router statistics"""
-        stats = {
+        stats: dict[str, Any] = {
             "total_providers": len(self.provider_states),
             "healthy_providers": sum(1 for s in self.provider_states.values() if s.is_healthy),
             "total_requests": sum(s.total_requests for s in self.provider_states.values()),
@@ -343,7 +346,7 @@ class SmartRouter:
 
         return stats
 
-    def print_stats(self):
+    def print_stats(self) -> None:
         """Print router statistics"""
         stats = self.get_stats()
 
@@ -369,7 +372,7 @@ class SmartRouter:
 
 
 # Example usage
-async def example_usage():
+async def example_usage() -> None:
     """Example of how to use SmartRouter"""
 
     # Initialize router with specific providers
@@ -382,7 +385,7 @@ async def example_usage():
     )
 
     # Example call function
-    async def make_api_call(provider_type: ProviderType, api_key: str):
+    async def make_api_call(provider_type: ProviderType, api_key: str) -> dict[str, str]:
         # This would be your actual API call
         print(f"Calling {provider_type.value} with key {api_key[:20]}...")
         await asyncio.sleep(0.1)  # Simulate API call

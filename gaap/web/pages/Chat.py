@@ -5,15 +5,16 @@ Chat Page - Interactive AI Chat with Streaming
 import asyncio
 import contextlib
 import os
+from typing import Any
 
 import streamlit as st
 
 
-def load_env():
+def load_env() -> None:
     """Load environment variables"""
     from pathlib import Path
 
-    def parse_lines(lines):
+    def parse_lines(lines: list[str]) -> None:
         for line in lines:
             raw = line.strip()
             if not raw or raw.startswith("#") or "=" not in raw:
@@ -33,7 +34,7 @@ def load_env():
                 continue
 
 
-def init_session_state():
+def init_session_state() -> None:
     """Initialize session state"""
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -41,7 +42,7 @@ def init_session_state():
         st.session_state.engine = None
 
 
-async def get_engine():
+async def get_engine() -> Any:
     """Get or create GAAP engine"""
     if st.session_state.engine is None:
         from gaap.gaap_engine import create_engine
@@ -55,7 +56,7 @@ async def get_engine():
     return st.session_state.engine
 
 
-def main():
+def main() -> None:
     st.title(":speech_balloon: Chat")
     st.markdown("---")
 

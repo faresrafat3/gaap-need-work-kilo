@@ -65,7 +65,7 @@ class SimpleEmbedding:
     للتشابه الدلالي دون نماذج خارجية
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.vocabulary: dict[str, int] = {}
         self.idf: dict[str, float] = {}
         self.doc_count = 0
@@ -310,7 +310,7 @@ class ExternalBrain:
             content=content[:50000],  # حد الحجم
             source=file_path,
             content_type="file",
-            token_count=len(content.split()) * 1.5,
+            token_count=int(len(content.split()) * 1.5),
             keywords=keywords,
             metadata={
                 "file_name": os.path.basename(file_path),
@@ -390,7 +390,7 @@ class ExternalBrain:
         return indices
 
     def _create_component_index(
-        self, file_path: str, content: str, node, content_type: str, name: str
+        self, file_path: str, content: str, node: Any, content_type: str, name: str
     ) -> BrainIndex:
         """إنشاء فهرس مكون"""
         start_line = node.lineno
@@ -407,7 +407,7 @@ class ExternalBrain:
             content=component_content[:10000],
             source=file_path,
             content_type=content_type,
-            token_count=len(component_content.split()) * 1.5,
+            token_count=int(len(component_content.split()) * 1.5),
             keywords=self._extract_keywords(component_content),
             metadata={
                 "name": name,
@@ -545,7 +545,7 @@ class ExternalBrain:
             content=content,
             source="knowledge_store",
             content_type="pattern",
-            token_count=len(content.split()) * 1.5,
+            token_count=int(len(content.split()) * 1.5),
             keywords=self._extract_keywords(content),
             metadata=metadata or {},
         )

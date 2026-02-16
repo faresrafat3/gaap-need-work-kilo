@@ -19,6 +19,7 @@ from gaap.layers.layer3_execution import ExecutionResult, Layer3Execution
 from gaap.memory.hierarchical import HierarchicalMemory
 from gaap.providers.free_tier import GeminiProvider, GroqProvider
 from gaap.providers.unified_gaap_provider import UnifiedGAAPProvider
+from gaap.providers.base_provider import BaseProvider
 from gaap.routing.fallback import FallbackManager
 from gaap.routing.router import RoutingStrategy, SmartRouter
 from gaap.security.firewall import AuditTrail, PromptFirewall
@@ -172,7 +173,7 @@ class GAAPEngine:
     async def process(self, request: GAAPRequest) -> GAAPResponse:
         """معالجة طلب كامل"""
         start_time = time.time()
-        request_id = f"req_{int(time.time()*1000)}"
+        request_id = f"req_{int(time.time() * 1000)}"
 
         self._logger.info(f"Processing request {request_id}")
         self._requests_processed += 1
@@ -276,9 +277,8 @@ class GAAPEngine:
                         self._memory_guard.check(context=f"after task {task.id}")
                         await asyncio.sleep(2)
 
-                # تجميع النتائج
                 outputs = [r.output for r in response.execution_results if r.success and r.output]
-                response.output = "\n\n".join(str(o) for o in outputs[:5])  # أول 5 نتائج
+                response.output = "\n\n".join(str(o) for o in outputs[:5])
                 response.success = any(r.success for r in response.execution_results)
 
             # تسجيل في الـ Audit Trail
@@ -327,7 +327,7 @@ class GAAPEngine:
         """تنفيذ مباشر للطلبات البسيطة"""
         # إنشاء مهمة بسيطة
         task = AtomicTask(
-            id=f"direct_{int(time.time()*1000)}",
+            id=f"direct_{int(time.time() * 1000)}",
             name="Direct Execution",
             description=request.text,
             category=TaskCategory.SETUP,
@@ -341,7 +341,7 @@ class GAAPEngine:
     async def _execute_with_healing(self, task: AtomicTask) -> ExecutionResult:
         """تنفيذ مع تعافي ذاتي"""
 
-        async def execute_func(t):
+        async def execute_func(t: AtomicTask) -> ExecutionResult:
             return await self.layer3.process(t)
 
         # محاولة التنفيذ
@@ -425,14 +425,11 @@ def create_engine(
     project_path: str | None = None,
     enable_all: bool = True,
 ) -> GAAPEngine:
-    """إنشاء محرك GAAP"""
-    providers = []
+    providers: list[BaseProvider] = []
 
-    # Groq
     if groq_api_key:
         providers.append(GroqProvider(api_key=groq_api_key))
 
-    # Gemini (single key + key pool)
     if gemini_api_keys is None:
         env_keys_raw = os.environ.get("GEMINI_API_KEYS", "")
         gemini_api_keys = [k.strip() for k in env_keys_raw.split(",") if k.strip()]
@@ -448,7 +445,6 @@ def create_engine(
             )
         )
 
-    # Fallback مجاني (Kimi-first) فقط إذا لا توجد مفاتيح مزودات حقيقية
     if not providers:
         providers.append(UnifiedGAAPProvider())
 

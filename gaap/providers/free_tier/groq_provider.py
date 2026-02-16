@@ -145,10 +145,11 @@ class GroqProvider(BaseProvider):
             and self._daily_tokens < FREE_TIER_LIMITS["tokens_per_day"]
         )
 
-    async def _make_request(self, messages: list[Message], model: str, **kwargs) -> dict[str, Any]:
+    async def _make_request(
+        self, messages: list[Message], model: str, **kwargs: Any
+    ) -> dict[str, Any]:
         """تنفيذ الطلب لـ Groq API"""
 
-        # التحقق من الحدود اليومية
         if not self._check_daily_limits():
             raise ProviderRateLimitError(provider_name=self.name, retry_after=86400)  # غداً
 
@@ -192,21 +193,20 @@ class GroqProvider(BaseProvider):
                         response_body=error_body,
                     )
 
-                data = await response.json()
+                data: dict[str, Any] = await response.json()
 
-                # تحديث الاستخدام اليومي
                 usage = data.get("usage", {})
                 self._daily_requests += 1
                 self._daily_tokens += usage.get("total_tokens", 0)
 
-                return data
+                return dict(data)
 
         except aiohttp.ClientError as e:
             raise ProviderNotAvailableError(provider_name=self.name, reason=str(e))
 
     async def _stream_request(
-        self, messages: list[Message], model: str, **kwargs
-    ) -> AsyncIterator[str]:
+        self, messages: list[Message], model: str, **kwargs: Any
+    ) -> AsyncGenerator[str, None]:
         """تدفق الاستجابة من Groq"""
 
         actual_model = MODEL_ALIASES.get(model, model)
@@ -236,13 +236,13 @@ class GroqProvider(BaseProvider):
                     )
 
                 async for line in response.content:
-                    line = line.decode("utf-8").strip()
+                    decoded_line = line.decode("utf-8").strip()
 
-                    if not line or line == "data: [DONE]":
+                    if not decoded_line or decoded_line == "data: [DONE]":
                         continue
 
-                    if line.startswith("data: "):
-                        json_str = line[6:]
+                    if decoded_line.startswith("data: "):
+                        json_str = decoded_line[6:]
                         try:
                             chunk = json.loads(json_str)
                             content = (
@@ -299,16 +299,6 @@ class GroqProvider(BaseProvider):
         asyncio.create_task(self.close())
         super().shutdown()
 
-    def shutdown(self) -> None:
-        """إيقاف المزود"""
-        asyncio.create_task(self.close())
-        super().shutdown()
-
-
-# =============================================================================
-# Convenience Functions
-# =============================================================================
-
 
 def create_groq_provider(
     api_key: str | None = None, default_model: str = "llama-3.1-8b-instant"
@@ -364,8 +354,8 @@ class GeminiProvider(BaseProvider):
         api_key: str | None = None,
         api_keys: list[str] | None = None,
         default_model: str = "gemini-2.5-flash",
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         env_keys_raw = os.environ.get("GEMINI_API_KEYS", "")
         env_keys = [k.strip() for k in env_keys_raw.split(",") if k.strip()]
 
@@ -460,7 +450,9 @@ class GeminiProvider(BaseProvider):
             self._session = aiohttp.ClientSession()
         return self._session
 
-    async def _make_request(self, messages: list[Message], model: str, **kwargs) -> dict[str, Any]:
+    async def _make_request(
+        self, messages: list[Message], model: str, **kwargs: Any
+    ) -> dict[str, Any]:
         """تنفيذ الطلب لـ Gemini API"""
 
         session = await self._get_session()
@@ -564,9 +556,9 @@ class GeminiProvider(BaseProvider):
             },
         }
 
-    async def _stream_request(
-        self, messages: list[Message], model: str, **kwargs
-    ) -> AsyncIterator[str]:
+    def _stream_request(
+        self, messages: list[Message], model: str, **kwargs: Any
+    ) -> AsyncGenerator[str, None]:
         """تدفق الاستجابة - NotImplemented للمختصر"""
         raise NotImplementedError("Gemini streaming not implemented in this version")
 

@@ -2,6 +2,8 @@ import hashlib
 import logging
 from typing import Any
 
+from typing import Any, Union
+
 from gaap.cache.disk_cache import DiskCache
 from gaap.cache.memory_cache import MemoryCache
 
@@ -19,7 +21,7 @@ class ResponseCache:
         self.backend_name = backend
 
         if backend == "disk":
-            self._cache = DiskCache(
+            self._cache: Union[DiskCache, MemoryCache] = DiskCache(
                 storage_path=storage_path,
                 ttl_seconds=ttl_seconds,
                 max_size=max_size,
@@ -38,7 +40,7 @@ class ResponseCache:
         model: str,
         temperature: float = 0.7,
         provider: str = "",
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         """إنشاء مفتاح التخزين المؤقت"""
         key_parts = [
@@ -60,7 +62,7 @@ class ResponseCache:
         model: str,
         temperature: float = 0.7,
         provider: str = "",
-        **kwargs,
+        **kwargs: Any,
     ) -> dict[str, Any] | None:
         """الحصول على استجابة مخزنة"""
         cache_key = self.get_cache_key(prompt, model, temperature, provider, **kwargs)
@@ -68,7 +70,7 @@ class ResponseCache:
 
         if cached:
             self._logger.debug(f"Cache hit for key: {cache_key[:16]}...")
-            return cached
+            return dict(cached)
 
         self._logger.debug(f"Cache miss for key: {cache_key[:16]}...")
         return None
@@ -81,7 +83,7 @@ class ResponseCache:
         temperature: float = 0.7,
         provider: str = "",
         ttl_seconds: int | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """تخزين استجابة"""
         cache_key = self.get_cache_key(prompt, model, temperature, provider, **kwargs)

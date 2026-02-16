@@ -49,7 +49,7 @@ ACCOUNTS_DIR = Path.home() / ".config" / "gaap" / "accounts"
 USAGE_DIR = Path.home() / ".config" / "gaap" / "usage"
 
 
-def _ensure_dirs():
+def _ensure_dirs() -> None:
     ACCOUNTS_DIR.mkdir(parents=True, exist_ok=True)
     USAGE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -152,12 +152,12 @@ class RateLimitTracker:
         self._cooldown_until: float = 0.0
         self._cooldown_reason: str = ""
 
-    def _prune_old(self):
+    def _prune_old(self) -> None:
         """Remove timestamps older than 24h."""
         cutoff = time.time() - 86400
         self._call_times = [t for t in self._call_times if t > cutoff]
 
-    def _reset_daily_tokens(self):
+    def _reset_daily_tokens(self) -> None:
         """Reset daily token counter if new day."""
         now = time.time()
         if now - self._tokens_day_start > 86400:
@@ -166,7 +166,7 @@ class RateLimitTracker:
 
     def record_call(
         self, success: bool, latency_ms: float = 0, tokens_used: int = 0, error_msg: str = ""
-    ):
+    ) -> None:
         """Record a call result."""
         now = time.time()
         self._call_times.append(now)
@@ -229,7 +229,7 @@ class RateLimitTracker:
         self._reset_daily_tokens()
         return max(0, self.max_tokens_per_day - self._tokens_today)
 
-    def set_hard_cooldown(self, seconds: float, reason: str = ""):
+    def set_hard_cooldown(self, seconds: float, reason: str = "") -> None:
         """Set an explicit cooldown (e.g., provider-imposed 3-hour ban).
 
         Unlike the auto-cooldown from consecutive errors, this represents
@@ -415,7 +415,7 @@ class SessionTracker:
         self.max_messages_per_session = max_messages_per_session
         self._sessions: dict[str, dict] = {}  # session_id → {created, messages, last_used}
 
-    def create_session(self, session_id: str):
+    def create_session(self, session_id: str) -> None:
         """Register a new session."""
         self._sessions[session_id] = {
             "created": time.time(),
@@ -427,7 +427,7 @@ class SessionTracker:
             oldest = min(self._sessions, key=lambda k: self._sessions[k]["last_used"])
             del self._sessions[oldest]
 
-    def record_message(self, session_id: str):
+    def record_message(self, session_id: str) -> None:
         """Record a message sent in a session."""
         if session_id in self._sessions:
             self._sessions[session_id]["messages"] += 1
@@ -440,8 +440,8 @@ class SessionTracker:
         s = self._sessions[session_id]
         if s["messages"] >= self.max_messages_per_session:
             return True
-        # Rotate if session is older than 2 hours
-        return time.time() - s["created"] > 7200
+        created: float = s["created"]
+        return time.time() - created > 7200
 
     @property
     def active_count(self) -> int:
@@ -506,22 +506,20 @@ class AccountSlot:
     created_at: float = 0.0
 
     # Runtime (not serialized)
-    rate_tracker: RateLimitTracker = field(default=None, repr=False)
-    session_tracker: SessionTracker = field(default=None, repr=False)
+    rate_tracker: RateLimitTracker = field(init=False, repr=False)
+    session_tracker: SessionTracker = field(init=False, repr=False)
     _enabled: bool = True
 
-    def __post_init__(self):
-        if self.rate_tracker is None:
-            self.rate_tracker = RateLimitTracker(
-                max_rpm=self.max_rpm,
-                max_rph=self.max_rph,
-                max_rpd=self.max_rpd,
-                max_tokens_per_day=self.max_tokens_per_day,
-            )
-        if self.session_tracker is None:
-            self.session_tracker = SessionTracker(
-                max_messages_per_session=self.max_messages_per_session,
-            )
+    def __post_init__(self) -> None:
+        self.rate_tracker = RateLimitTracker(
+            max_rpm=self.max_rpm,
+            max_rph=self.max_rph,
+            max_rpd=self.max_rpd,
+            max_tokens_per_day=self.max_tokens_per_day,
+        )
+        self.session_tracker = SessionTracker(
+            max_messages_per_session=self.max_messages_per_session,
+        )
         if self.created_at <= 0:
             self.created_at = time.time()
 
@@ -578,7 +576,7 @@ class AccountSlot:
         tokens_used: int = 0,
         error_msg: str = "",
         session_id: str = "",
-    ):
+    ) -> None:
         """Record a call result."""
         self.rate_tracker.record_call(success, latency_ms, tokens_used, error_msg)
         if session_id:
@@ -774,7 +772,7 @@ class AccountPool:
         # Load saved config
         self._load_config()
 
-    def _load_config(self):
+    def _load_config(self) -> None:
         """Load account pool config from disk."""
         _ensure_dirs()
         if self._config_path.exists():
@@ -786,7 +784,7 @@ class AccountPool:
             except (OSError, json.JSONDecodeError, KeyError) as e:
                 print(f"  ⚠️ Failed to load {self.provider} pool config: {e}")
 
-    def _save_config(self):
+    def _save_config(self) -> None:
         """Persist account pool config to disk."""
         _ensure_dirs()
         data = {
@@ -804,9 +802,9 @@ class AccountPool:
         label: str = "default",
         email: str = "",
         account_type: str = "free",
-        models: list[str] = None,
+        models: list[str] | None = None,
         notes: str = "",
-        **overrides,
+        **overrides: Any,
     ) -> AccountSlot:
         """
         Add an account to the pool.
@@ -906,7 +904,7 @@ class AccountPool:
         tokens_used: int = 0,
         error_msg: str = "",
         session_id: str = "",
-    ):
+    ) -> None:
         """Record a call result for a specific account."""
         acct = self._accounts.get(label)
         if acct:
@@ -1046,7 +1044,7 @@ class PoolManager:
     _instance: Optional["PoolManager"] = None
     _lock = threading.Lock()
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._pools: dict[str, AccountPool] = {}
 
     @classmethod
@@ -1125,6 +1123,7 @@ class PoolManager:
         if not should:
             raise RuntimeError(f"[{provider}] Cannot call: {reason}")
 
+        assert acct_label is not None
         acct = pool.get_account(acct_label)
         if not acct:
             raise RuntimeError(f"[{provider}] Account '{acct_label}' not found")
@@ -1266,7 +1265,7 @@ def bootstrap_pools() -> str:
 # =============================================================================
 
 
-def _cli():
+def _cli() -> None:
     """Command-line interface for account management."""
     import sys
 

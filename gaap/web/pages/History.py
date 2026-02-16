@@ -2,10 +2,12 @@
 History Page - View Conversation History
 """
 
+from typing import Any
+
 import streamlit as st
 
 
-def load_history(limit: int = 100):
+def load_history(limit: int = 100) -> list[dict[str, Any]]:
     """Load conversation history"""
     try:
         from gaap.storage import load_history as _load
@@ -15,7 +17,7 @@ def load_history(limit: int = 100):
         return []
 
 
-def main():
+def main() -> None:
     st.title(":clipboard: Conversation History")
     st.markdown("---")
 
@@ -31,9 +33,10 @@ def main():
 
         if st.button("Clear History", type="secondary", use_container_width=True):
             if st.session_state.get("confirm_clear"):
-                from gaap.storage import clear_history
+                from gaap.storage import get_store
 
-                clear_history()
+                store = get_store()
+                store.clear("history")
                 st.session_state.confirm_clear = False
                 st.success("History cleared!")
                 st.rerun()

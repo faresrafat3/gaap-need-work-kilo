@@ -71,7 +71,7 @@ async def cmd_chat(args: Any) -> None:
         engine.shutdown()
 
 
-async def cmd_interactive(args):
+async def cmd_interactive(args: Any) -> None:
     """Interactive chat REPL"""
     load_env()
 

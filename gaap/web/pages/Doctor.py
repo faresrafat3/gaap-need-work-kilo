@@ -9,7 +9,7 @@ import sys
 import streamlit as st
 
 
-def run_diagnostics():
+def run_diagnostics() -> tuple[list[str], list[tuple[str, bool, str]]]:
     """Run all diagnostics"""
     issues = []
     results = []
@@ -75,7 +75,7 @@ def run_diagnostics():
     return issues, results
 
 
-def main():
+def main() -> None:
     st.title(":wrench: System Diagnostics")
     st.markdown("---")
 

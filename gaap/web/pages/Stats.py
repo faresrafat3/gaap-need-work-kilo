@@ -26,7 +26,7 @@ def load_stats() -> dict[str, Any]:
         }
 
 
-def main():
+def main() -> None:
     st.title(":bar_chart: Statistics")
     st.markdown("---")
 

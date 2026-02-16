@@ -6,7 +6,7 @@ import asyncio
 import os
 from typing import Any
 
-PROVIDERS_INFO = {
+PROVIDERS_INFO: dict[str, dict[str, Any]] = {
     "groq": {
         "name": "Groq",
         "type": "Free Tier",
@@ -117,16 +117,17 @@ def _test_provider(provider_name: str | None = None) -> None:
 
     print(f"\n🔍 Testing {info['name']}...")
 
-    async def test():
+    async def test() -> None:
         try:
+            prov: Any = None
             if provider_name == "groq":
                 from gaap.providers.free_tier import GroqProvider
 
-                provider = GroqProvider(api_key=os.environ.get("GROQ_API_KEY"))
+                prov = GroqProvider(api_key=os.environ.get("GROQ_API_KEY"))
             elif provider_name == "gemini":
                 from gaap.providers.free_tier import GeminiProvider
 
-                provider = GeminiProvider(api_key=os.environ.get("GEMINI_API_KEY"))
+                prov = GeminiProvider(api_key=os.environ.get("GEMINI_API_KEY"))
             else:
                 print("⚠️  Test not implemented for this provider")
                 return
@@ -134,7 +135,7 @@ def _test_provider(provider_name: str | None = None) -> None:
             from gaap.core.types import Message, MessageRole
 
             messages = [Message(role=MessageRole.USER, content="Hi")]
-            response = await provider.chat_completion(messages, model=info["models"][0])
+            response = await prov.chat_completion(messages, model=info["models"][0])
             print("✅ Connection successful!")
             print(f"   Response: {response.choices[0].message.content[:50]}...")
         except Exception as e:

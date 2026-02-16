@@ -114,13 +114,12 @@ class HierarchicalContextLoader:
     ) -> ContextNode | None:
         """تحميل مستوى معين"""
         if node_id is None:
-            # تحميل من الجذر
             if level == ContextLevel.LEVEL_0_OVERVIEW:
                 return await self._load_project_overview()
             elif level == ContextLevel.LEVEL_1_MODULE:
                 return await self._load_module_overview()
+            return None
 
-        # تحميل عقدة محددة
         return await self._load_node(node_id, level)
 
     async def _load_project_overview(self) -> ContextNode:

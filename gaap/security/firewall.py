@@ -54,6 +54,15 @@ class FirewallResult:
     scan_time_ms: float = 0.0
     layer_scores: dict[str, float] = field(default_factory=dict)
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "is_safe": self.is_safe,
+            "risk_level": self.risk_level.name,
+            "detected_patterns": self.detected_patterns,
+            "recommendations": self.recommendations,
+            "scan_time_ms": self.scan_time_ms,
+        }
+
 
 class PromptFirewall:
     """
@@ -189,7 +198,7 @@ class PromptFirewall:
         if not result.is_safe:
             self._blocked_count += 1
             self._logger.warning(
-                f"Blocked input with risk level {risk_level.name}: " f"{detected_patterns[:3]}"
+                f"Blocked input with risk level {risk_level.name}: {detected_patterns[:3]}"
             )
 
         return result
