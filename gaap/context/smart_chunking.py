@@ -91,7 +91,9 @@ class SmartChunker:
     # Chunking Methods
     # =========================================================================
 
-    async def chunk_file(self, file_path: str, max_chunk_size: int = None) -> list[CodeChunk]:
+    async def chunk_file(
+        self, file_path: str, max_chunk_size: int | None = None
+    ) -> list[CodeChunk]:
         """تقسيم ملف إلى قطع"""
         max_chunk_size = max_chunk_size or self.MAX_CHUNK_TOKENS
 
@@ -465,9 +467,9 @@ class SmartChunker:
                     chunk_content = "\n".join(chunk_lines)
                     chunks.append(
                         CodeChunk(
-                            id=self._generate_id(file_path, f"chunk_{start_line}_{i-1}"),
+                            id=self._generate_id(file_path, f"chunk_{start_line}_{i - 1}"),
                             chunk_type=ChunkType.LOGICAL_BLOCK,
-                            name=f"lines_{start_line}_{i-1}",
+                            name=f"lines_{start_line}_{i - 1}",
                             content=chunk_content,
                             token_count=current_tokens,
                             file_path=file_path,

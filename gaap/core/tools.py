@@ -25,7 +25,7 @@ class ToolRegistry:
         self.tools: dict[str, ToolDefinition] = {}
         self._register_default_tools()
 
-    def _register_default_tools(self):
+    def _register_default_tools(self) -> None:
         """Register basic file system and system tools"""
         self.register(
             "list_dir",
@@ -49,7 +49,9 @@ class ToolRegistry:
             self.run_command,
         )
 
-    def register(self, name: str, description: str, parameters: dict[str, Any], func: Callable):
+    def register(
+        self, name: str, description: str, parameters: dict[str, Any], func: Callable
+    ) -> None:
         self.tools[name] = ToolDefinition(name, description, parameters, func)
 
     def _safe_path(self, path_str: str) -> Path:
@@ -66,7 +68,7 @@ class ToolRegistry:
             target = self._safe_path(path)
             items = os.listdir(target)
             return "\n".join(
-                [f"{'[DIR] ' if os.path.isdir(target/i) else '      '}{i}" for i in items]
+                [f"{'[DIR] ' if os.path.isdir(target / i) else '      '}{i}" for i in items]
             )
         except Exception as e:
             return f"Error: {str(e)}"
@@ -102,13 +104,14 @@ class ToolRegistry:
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def execute(self, name: str, **kwargs) -> str:
+    def execute(self, name: str, **kwargs: Any) -> str:
         """Execute a tool by name with parameters"""
         if name not in self.tools:
             return f"Error: Tool '{name}' not found."
 
         logger.info(f"Executing tool: {name} with args: {kwargs}")
-        return self.tools[name].func(**kwargs)
+        result: str = self.tools[name].func(**kwargs)
+        return result
 
     def get_instructions(self) -> str:
         """Returns a STRICT One-Shot instruction block for the LLM."""
@@ -135,6 +138,6 @@ class ToolRegistry:
 
         instr += "### AVAILABLE TOOLS ###\n"
         for t in self.tools.values():
-            instr += f"- {t.name}: {t.description}\n  Usage: CALL: {t.name}({', '.join([f'{k}=\'...\"' for k in t.parameters])})\n"
+            instr += f"- {t.name}: {t.description}\n  Usage: CALL: {t.name}({', '.join([f'{k}=\'..."' for k in t.parameters])})\n"
         instr += "#" * 60 + "\n"
         return instr

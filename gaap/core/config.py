@@ -266,7 +266,7 @@ class GAAPConfig:
     def to_dict(self) -> dict[str, Any]:
         """تحويل التكوين إلى قاموس"""
 
-        def dataclass_to_dict(obj):
+        def dataclass_to_dict(obj: Any) -> Any:
             if hasattr(obj, "__dataclass_fields__"):
                 return {k: dataclass_to_dict(v) for k, v in asdict(obj).items()}
             elif isinstance(obj, list):
@@ -276,7 +276,8 @@ class GAAPConfig:
             else:
                 return obj
 
-        return dataclass_to_dict(self)
+        result = dataclass_to_dict(self)
+        return result if isinstance(result, dict) else {}
 
 
 # =============================================================================
@@ -297,10 +298,11 @@ class ConfigManager:
     - خيط آمن (Thread-safe)
     """
 
-    _instance = None
+    _instance: "ConfigManager | None" = None
     _lock = threading.Lock()
+    _initialized: bool = False
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args: Any, **kwargs: Any) -> "ConfigManager":
         """نمط Singleton للتأكد من وجود مدير تكوين واحد"""
         if cls._instance is None:
             with cls._lock:
@@ -361,7 +363,7 @@ class ConfigManager:
             if file_path.suffix.lower() in (".yaml", ".yml"):
                 return yaml.safe_load(content) or {}
             elif file_path.suffix.lower() == ".json":
-                return json.loads(content)
+                return dict(json.loads(content))
             else:
                 raise ConfigLoadError(
                     config_path=path, reason=f"Unsupported file format: {file_path.suffix}"
@@ -501,8 +503,7 @@ class ConfigManager:
         valid_log_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
         if config.system.log_level.upper() not in valid_log_levels:
             errors.append(
-                f"Invalid log_level: {config.system.log_level}. "
-                f"Must be one of: {valid_log_levels}"
+                f"Invalid log_level: {config.system.log_level}. Must be one of: {valid_log_levels}"
             )
 
         # التحقق من الميزانية
@@ -548,7 +549,7 @@ class ConfigManager:
         self._load_config()
 
         # إشعار المراقبين
-        if old_config != self._config:
+        if old_config != self._config and self._config is not None:
             for watcher in self._watchers:
                 watcher(self._config)
 
@@ -577,6 +578,10 @@ class ConfigManager:
         """الحصول على التكوين الحالي"""
         if self._config is None:
             self._load_config()
+        if self._config is None:
+            raise ConfigLoadError(
+                config_path=self._config_path or "", reason="Failed to load config"
+            )
         return self._config
 
     def get(self, path: str, default: Any = None) -> Any:
@@ -664,7 +669,7 @@ class ConfigBuilder:
             .build())
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._config_dict: dict[str, Any] = {}
 
     def with_system(

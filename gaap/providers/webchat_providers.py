@@ -196,12 +196,12 @@ class WebChatProvider(ABC):
             ),
         }
 
-    def invalidate(self):
+    def invalidate(self) -> None:
         """Clear cached auth."""
         invalidate_auth(self.PROVIDER_NAME, self.account)
         self._auth = None
 
-    async def browser_login(self, proxy: str = None, timeout: int = 180) -> WebChatAuth:
+    async def browser_login(self, proxy: str | None = None, timeout: int = 180) -> WebChatAuth:
         """
         Open browser for user login and capture auth token.
 
@@ -216,14 +216,13 @@ class WebChatProvider(ABC):
             from g4f.requests import get_nodriver
         except ImportError:
             raise RuntimeError(
-                "zendriver required for browser auth. "
-                "Install: pip install zendriver platformdirs"
+                "zendriver required for browser auth. Install: pip install zendriver platformdirs"
             )
 
         try:
             import nodriver  # g4f aliases zendriver → nodriver
         except ImportError:
-            import zendriver as nodriver  # type: ignore[import-untyped]
+            import zendriver as nodriver
 
         print(f"  🌐 Opening {self.URL} for login...")
         print(f"  ⏳ Please log in. Timeout: {timeout}s")
@@ -231,7 +230,7 @@ class WebChatProvider(ABC):
         # Each account gets its own browser profile so sessions don't conflict
         browser_profile = f"gaap_{self.PROVIDER_NAME}_{self.account}"
         browser, stop_browser = await get_nodriver(
-            proxy=proxy, timeout=timeout, user_data_dir=browser_profile
+            proxy=proxy or "", timeout=timeout, user_data_dir=browser_profile
         )
 
         try:
@@ -246,9 +245,12 @@ class WebChatProvider(ABC):
                     break
                 await asyncio.sleep(1)
 
-            user_agent = await page.evaluate("window.navigator.userAgent", return_by_value=True)
+            user_agent: Any = await page.evaluate(
+                "window.navigator.userAgent", return_by_value=True
+            )
+            if not isinstance(user_agent, str):
+                user_agent = ""
 
-            # Provider-specific auth capture
             auth = await self._capture_auth(page, nodriver, timeout)
             auth.user_agent = user_agent
             auth.captured_at = time.time()
@@ -271,7 +273,7 @@ class WebChatProvider(ABC):
             await stop_browser()
 
     @abstractmethod
-    async def _capture_auth(self, page, nodriver_module, timeout: int) -> WebChatAuth:
+    async def _capture_auth(self, page: Any, nodriver_module: Any, timeout: int) -> WebChatAuth:
         """Provider-specific auth capture from browser page."""
         ...
 
@@ -286,7 +288,9 @@ class WebChatProvider(ABC):
         """Send a chat completion request. Returns response text."""
         ...
 
-    def warmup(self, proxy: str = None, force: bool = False, timeout: int = 300):
+    def warmup(
+        self, proxy: str | None = None, force: bool = False, timeout: int = 300
+    ) -> dict[str, Any]:
         """Synchronous warmup: check auth and login if needed."""
         status = self.check_auth()
         if status["valid"] and not force:
@@ -344,7 +348,7 @@ class GLMWebChat(WebChatProvider):
     }
 
     @staticmethod
-    def _is_real_user_token(token: str, cookies: dict = None) -> dict:
+    def _is_real_user_token(token: str, cookies: dict[str, str] | None = None) -> dict[str, Any]:
         """
         Validate token against /api/v1/auths/ and check it's not a guest.
         Returns {'valid': bool, 'role': str, 'user_id': str, 'token': str}.
@@ -372,12 +376,12 @@ class GLMWebChat(WebChatProvider):
             pass
         return {"valid": False, "role": "unknown", "user_id": "", "token": token}
 
-    async def _capture_auth(self, page, nodriver_module, timeout: int) -> WebChatAuth:
+    async def _capture_auth(self, page: Any, nodriver_module: Any, timeout: int) -> WebChatAuth:
         """Capture auth token from chat.z.ai logged-in session."""
-        captured = {"token": None, "user_id": None}
+        captured: dict[str, Any] = {"token": None, "user_id": None}
 
         # Intercept API requests to grab Authorization header
-        async def on_request(event):
+        async def on_request(event: Any) -> None:
             url = event.request.url if hasattr(event.request, "url") else ""
             headers = event.request.headers if hasattr(event.request, "headers") else {}
             if "chat.z.ai/api" in url:
@@ -432,7 +436,7 @@ class GLMWebChat(WebChatProvider):
 
         if not captured["token"]:
             raise RuntimeError(
-                "مقدرتش أمسك token مسجل. تأكد إنك سجلت دخول في chat.z.ai " "وبعت رسالة في الشات."
+                "مقدرتش أمسك token مسجل. تأكد إنك سجلت دخول في chat.z.ai وبعت رسالة في الشات."
             )
 
         # Get user ID if not captured from validation
@@ -628,7 +632,7 @@ class GLMWebChat(WebChatProvider):
     # Maximum response text size (512KB) to prevent OOM
     _MAX_RESPONSE_BYTES = 512 * 1024
 
-    def _parse_sse_stream(self, response) -> str:
+    def _parse_sse_stream(self, response: Any) -> str:
         """Parse SSE stream from chat.z.ai into plain text (streaming)."""
         result_parts = []
         total_len = 0
@@ -749,15 +753,15 @@ class KimiWebChat(WebChatProvider):
             # Pad base64
             payload_b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
             payload = json.loads(base64.urlsafe_b64decode(payload_b64))
-            return payload.get("sub", "")
+            return str(payload.get("sub", ""))
         except Exception:
             return ""
 
-    async def _capture_auth(self, page, nodriver_module, timeout: int) -> WebChatAuth:
+    async def _capture_auth(self, page: Any, nodriver_module: Any, timeout: int) -> WebChatAuth:
         """Capture auth from kimi.com by intercepting requests or localStorage."""
-        captured = {"token": None, "user_id": None}
+        captured: dict[str, Any] = {"token": None, "user_id": None}
 
-        async def on_request(event):
+        async def on_request(event: Any) -> None:
             url = event.request.url if hasattr(event.request, "url") else ""
             headers = event.request.headers if hasattr(event.request, "headers") else {}
             if "kimi.com/api" in url or "kimi.com/apiv2" in url:
@@ -966,7 +970,7 @@ class KimiWebChat(WebChatProvider):
 
         if r.status_code in (401, 403):
             raise PermissionError(
-                f"Kimi auth rejected ({r.status_code}). " f"Run --webchat-login kimi to re-login."
+                f"Kimi auth rejected ({r.status_code}). Run --webchat-login kimi to re-login."
             )
 
         if r.status_code != 200:
@@ -1085,11 +1089,11 @@ class DeepSeekWebChat(WebChatProvider):
         "Referer": "https://chat.deepseek.com/",
     }
 
-    async def _capture_auth(self, page, nodriver_module, timeout: int) -> WebChatAuth:
+    async def _capture_auth(self, page: Any, nodriver_module: Any, timeout: int) -> WebChatAuth:
         """Capture Bearer token from chat.deepseek.com requests."""
-        captured = {"token": None}
+        captured: dict[str, Any] = {"token": None}
 
-        async def on_request(event):
+        async def on_request(event: Any) -> None:
             url = event.request.url if hasattr(event.request, "url") else ""
             headers = event.request.headers if hasattr(event.request, "headers") else {}
             if "chat.deepseek.com/api" in url:
@@ -1178,14 +1182,14 @@ class DeepSeekWebChat(WebChatProvider):
         if r.status_code != 200:
             raise RuntimeError(f"DeepSeek session create error {r.status_code}: {r.text[:200]}")
 
-        data = r.json()
-        biz_data = data.get("data", {}).get("biz_data", data.get("data", {}))
-        session_id = biz_data.get("id", "")
+        data: dict[str, Any] = r.json()
+        biz_data: dict[str, Any] = data.get("data", {}).get("biz_data", data.get("data", {}))
+        session_id: str = biz_data.get("id", "") or ""
         if not session_id:
             raise RuntimeError(f"No session_id in response: {r.text[:300]}")
         return session_id
 
-    def _get_pow_challenge(self) -> dict:
+    def _get_pow_challenge(self) -> dict[str, Any]:
         """Get PoW challenge from server. Returns challenge dict."""
         from curl_cffi import requests as cf_requests
 
@@ -1202,12 +1206,12 @@ class DeepSeekWebChat(WebChatProvider):
             raise RuntimeError(f"DeepSeek PoW challenge error {r.status_code}: {r.text[:200]}")
 
         data = r.json()
-        challenge = data.get("data", {}).get("biz_data", {}).get("challenge", {})
+        challenge: dict[str, Any] = data.get("data", {}).get("biz_data", {}).get("challenge", {})
         if not challenge or not challenge.get("challenge"):
             raise RuntimeError(f"No challenge in PoW response: {r.text[:300]}")
         return challenge
 
-    def _solve_pow(self, challenge: dict) -> dict:
+    def _solve_pow(self, challenge: dict[str, Any]) -> dict[str, Any]:
         """Solve PoW challenge via Node.js subprocess. Returns {answer, ...}."""
         solver_path = str(self._POW_SOLVER_PATH)
         if not os.path.exists(solver_path):
@@ -1234,7 +1238,7 @@ class DeepSeekWebChat(WebChatProvider):
         if result.returncode != 0:
             raise RuntimeError(f"PoW solver failed: {result.stderr}")
 
-        solution = json.loads(result.stdout.strip())
+        solution: dict[str, Any] = json.loads(result.stdout.strip())
         if "error" in solution:
             raise RuntimeError(f"PoW solver error: {solution['error']}")
 
@@ -1336,7 +1340,7 @@ class DeepSeekWebChat(WebChatProvider):
     # Maximum response text size (512KB) to prevent OOM
     _MAX_RESPONSE_BYTES = 512 * 1024
 
-    def _parse_sse_stream(self, response, include_thinking: bool = False) -> str:
+    def _parse_sse_stream(self, response: Any, include_thinking: bool = False) -> str:
         """Parse DeepSeek's custom SSE stream into plain text.
 
         SSE format uses a JSON patch protocol:
@@ -1496,7 +1500,7 @@ class CopilotWebChat(WebChatProvider):
 
     # ── Auth: OAuth Device Flow ──────────────────────────────────────────
 
-    async def browser_login(self, proxy: str = None, timeout: int = 300) -> WebChatAuth:
+    async def browser_login(self, proxy: str | None = None, timeout: int = 300) -> WebChatAuth:
         """
         GitHub OAuth device flow — no browser scraping needed.
 
@@ -1606,7 +1610,7 @@ class CopilotWebChat(WebChatProvider):
 
         raise RuntimeError("OAuth timeout — no authorization received")
 
-    async def _capture_auth(self, page, nodriver_module, timeout: int) -> WebChatAuth:
+    async def _capture_auth(self, page: Any, nodriver_module: Any, timeout: int) -> WebChatAuth:
         """Not used — Copilot uses OAuth device flow instead of browser scraping."""
         raise NotImplementedError(
             "CopilotWebChat uses OAuth device flow. Call browser_login() directly."
@@ -1641,8 +1645,8 @@ class CopilotWebChat(WebChatProvider):
         if r.status_code != 200:
             raise RuntimeError(f"Copilot token exchange failed: {r.status_code} — {r.text[:200]}")
 
-        data = r.json()
-        token = data.get("token", "")
+        data: dict[str, Any] = r.json()
+        token: str = data.get("token", "") or ""
         if not token:
             raise RuntimeError(f"No token in Copilot exchange response: {r.text[:200]}")
 
@@ -1750,7 +1754,7 @@ class CopilotWebChat(WebChatProvider):
     # Maximum response text size (512KB) to prevent OOM
     _MAX_RESPONSE_BYTES = 512 * 1024
 
-    def _parse_openai_sse(self, response) -> str:
+    def _parse_openai_sse(self, response: Any) -> str:
         """Parse standard OpenAI SSE streaming response.
 
         Format:
@@ -1945,7 +1949,7 @@ def check_all_webchat_auth() -> dict[str, list[dict[str, Any]]]:
 # =============================================================================
 
 
-def _cli():
+def _cli() -> None:
     import sys
 
     usage = """

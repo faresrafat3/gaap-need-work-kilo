@@ -1,4 +1,5 @@
 from enum import Enum, auto
+from typing import Any
 
 from gaap.core.types import CriticType
 
@@ -189,7 +190,7 @@ Do not include any other text in your response.""",
 }
 
 
-def build_user_prompt(artifact: str, task) -> str:
+def build_user_prompt(artifact: str, task: Any) -> str:
     """Build the user prompt for critic evaluation."""
     task_desc = (
         f"Task: {task.description}"
@@ -403,7 +404,7 @@ Do not include any other text in your response.""",
 }
 
 
-def build_architecture_prompt(spec, intent) -> str:
+def build_architecture_prompt(spec: Any, intent: Any) -> str:
     """Build user prompt for architecture evaluation."""
     paradigm = getattr(spec, "paradigm", "unknown")
     data_strategy = getattr(spec, "data_strategy", "unknown")
