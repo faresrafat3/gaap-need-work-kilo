@@ -29,6 +29,7 @@ from gaap.mad.response_parser import (
     fallback_evaluation,
     parse_critic_response,
 )
+from gaap.memory import VECTOR_MEMORY_AVAILABLE, LessonStore
 from gaap.providers.base_provider import BaseProvider
 from gaap.routing.fallback import FallbackManager
 from gaap.routing.router import SmartRouter
@@ -821,6 +822,7 @@ class Layer3Execution(BaseLayer):
         max_parallel: int = 10,
         quality_threshold: float = 70.0,
         provider: BaseProvider | None = None,
+        enable_vector_memory: bool = True,
     ):
         super().__init__(LayerType.EXECUTION)
 
@@ -834,7 +836,14 @@ class Layer3Execution(BaseLayer):
 
         self._logger = get_logger("gaap.layer3")
 
-        # الإحصائيات
+        if enable_vector_memory and VECTOR_MEMORY_AVAILABLE:
+            self._lesson_store = LessonStore()
+            self._logger.info("Vector memory enabled for lesson learning")
+        else:
+            self._lesson_store = None
+            if enable_vector_memory:
+                self._logger.warning("Vector memory requested but chromadb not available")
+
         self._artifacts_produced = 0
 
     async def process(self, input_data: Any) -> ExecutionResult:
@@ -881,9 +890,43 @@ class Layer3Execution(BaseLayer):
 
             self._artifacts_produced += 1
 
+            if self._lesson_store:
+                await self._learn_from_execution(task, result, evaluations)
+
         result.latency_ms = (time.time() - start_time) * 1000
 
         return result
+
+    async def _learn_from_execution(
+        self,
+        task: AtomicTask,
+        result: "ExecutionResult",
+        evaluations: list[CriticEvaluation],
+    ) -> None:
+        """Learn lessons from successful execution"""
+        try:
+            issues = []
+            suggestions = []
+            for eval_result in evaluations:
+                if eval_result.issues:
+                    issues.extend(eval_result.issues)
+                if eval_result.suggestions:
+                    suggestions.extend(eval_result.suggestions)
+
+            if issues or suggestions:
+                lesson = f"Task '{task.name}': "
+                if issues:
+                    lesson += f"Issues to avoid: {'; '.join(issues[:3])}. "
+                if suggestions:
+                    lesson += f"Improvements: {'; '.join(suggestions[:3])}."
+                self._lesson_store.add_lesson(
+                    lesson=lesson,
+                    category="execution",
+                    task_type=task.task_type if hasattr(task, "task_type") else "general",
+                    success=result.success,
+                )
+        except Exception as e:
+            self._logger.debug(f"Failed to store lesson: {e}")
 
     async def execute_batch(self, tasks: list[AtomicTask]) -> list[ExecutionResult]:
         """تنفيذ دفعة مهام"""
