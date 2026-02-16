@@ -581,40 +581,33 @@ class ExecutorPool:
                     continue
 
                 elif python_code_match:
-                    # اكتشاف كود بايثون تلقائياً وتنفيذه
+                    # اكتشاف كود بايثون تلقائياً وتنفيذه في sandbox
                     code = python_code_match.group(1).strip()
-                    self._logger.info("Detected Python code block, executing autonomously...")
+                    self._logger.info("Detected Python code block, executing in sandbox...")
 
-                    # حفظ الكود في ملف مؤقت وتشغيله
-                    temp_file = f"temp_exec_{int(time.time())}.py"
                     try:
-                        with open(temp_file, "w") as f:
-                            f.write(code)
+                        from gaap.security.sandbox import get_sandbox
 
-                        import subprocess
+                        sandbox = get_sandbox(use_docker=True)
+                        result = await sandbox.execute(code, language="python")
 
-                        proc = subprocess.run(
-                            [sys.executable, temp_file], capture_output=True, text=True, timeout=30
-                        )
-
-                        exec_result = f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
-                        if proc.returncode != 0:
-                            exec_result = f"FAILED (Exit {proc.returncode}):\n{exec_result}"
+                        exec_result = f"STDOUT:\n{result.output}\nSTDERR:\n{result.error}"
+                        if not result.success:
+                            exec_result = f"FAILED (Exit {result.exit_code}):\n{exec_result}"
 
                         messages.append(
                             Message(
                                 role=MessageRole.USER,
-                                content=f"System: AUTO-EXECUTION RESULT:\n{exec_result}",
+                                content=f"System: SANDBOX EXECUTION RESULT:\n{exec_result}",
                             )
                         )
-                        self._logger.info("Auto-execution complete, returning results to LLM.")
+                        self._logger.info(
+                            f"Sandbox execution complete ({result.execution_time_ms:.0f}ms)"
+                        )
                     except Exception as e:
                         messages.append(
                             Message(role=MessageRole.USER, content=f"System: Execution Error: {e}")
                         )
-                    finally:
-                        if os.path.exists(temp_file):
-                            os.remove(temp_file)
                     continue
 
                 else:
