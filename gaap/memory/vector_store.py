@@ -300,5 +300,5 @@ class LessonStore(VectorMemoryStore):
         return self.search(
             query="security vulnerability exploit attack",
             n=n,
-            where={"type": "lesson", "category": "security"},
+            where={"$and": [{"type": "lesson"}, {"category": "security"}]},
         )
