@@ -18,7 +18,7 @@ class StyleValidator(BaseValidator):
         artifact_str = str(artifact) if artifact else ""
 
         if not artifact_str.strip():
-            return self._record_result(ValidationResult.passed("Empty artifact"))
+            return self._record_result(ValidationResult.success("Empty artifact"))
 
         language = context.get("language", "python") if context else "python"
 
@@ -27,7 +27,7 @@ class StyleValidator(BaseValidator):
         elif language in ("javascript", "typescript"):
             return self._record_result(self._validate_js(artifact_str))
 
-        return self._record_result(ValidationResult.passed("Language not supported"))
+        return self._record_result(ValidationResult.success("Language not supported"))
 
     def _validate_python(self, code: str) -> ValidationResult:
         """تحليل أسلوب Python"""
@@ -74,7 +74,7 @@ class StyleValidator(BaseValidator):
                 details={"issues": issues[:10]},
             )
 
-        return ValidationResult.passed("Code style looks good")
+        return ValidationResult.success("Code style looks good")
 
     def _validate_js(self, code: str) -> ValidationResult:
         """تحليل أسلوب JavaScript"""
@@ -113,4 +113,4 @@ class StyleValidator(BaseValidator):
                 details={"issues": issues[:10]},
             )
 
-        return ValidationResult.passed("Code style looks good")
+        return ValidationResult.success("Code style looks good")

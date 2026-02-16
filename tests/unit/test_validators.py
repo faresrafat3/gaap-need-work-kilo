@@ -18,22 +18,22 @@ class MockValidator(BaseValidator):
         elif isinstance(artifact, str) and len(artifact) == 0:
             result = ValidationResult.failed("Empty artifact", suggestions=["Provide content"])
         else:
-            result = ValidationResult.passed("Valid")
+            result = ValidationResult.success("Valid")
         return self._record_result(result)
 
 
 class TestValidationResult:
     def test_passed_factory(self):
-        result = ValidationResult.passed("All good")
+        result = ValidationResult.success("All good")
 
-        assert result.passed is True
+        assert result.is_passed is True
         assert result.severity == Severity.INFO
         assert result.message == "All good"
 
     def test_warning_factory(self):
         result = ValidationResult.warning("Minor issue", suggestions=["Fix this"])
 
-        assert result.passed is True
+        assert result.is_passed is True
         assert result.severity == Severity.WARNING
         assert result.message == "Minor issue"
         assert result.suggestions == ["Fix this"]
@@ -41,13 +41,13 @@ class TestValidationResult:
     def test_failed_factory(self):
         result = ValidationResult.failed("Critical error", suggestions=["Check input"])
 
-        assert result.passed is False
+        assert result.is_passed is False
         assert result.severity == Severity.ERROR
         assert result.message == "Critical error"
         assert result.suggestions == ["Check input"]
 
     def test_with_details(self):
-        result = ValidationResult.passed("OK", details={"count": 5})
+        result = ValidationResult.success("OK", details={"count": 5})
 
         assert result.details["count"] == 5
 
@@ -68,20 +68,20 @@ class TestBaseValidator:
     async def test_validate_valid(self, validator):
         result = await validator.validate("Some content")
 
-        assert result.passed is True
+        assert result.is_passed is True
 
     @pytest.mark.asyncio
     async def test_validate_invalid(self, validator):
         result = await validator.validate(None)
 
-        assert result.passed is False
+        assert result.is_passed is False
         assert "None" in result.message
 
     @pytest.mark.asyncio
     async def test_validate_with_suggestions(self, validator):
         result = await validator.validate("")
 
-        assert result.passed is False
+        assert result.is_passed is False
         assert len(result.suggestions) > 0
 
     def test_stats(self, validator):

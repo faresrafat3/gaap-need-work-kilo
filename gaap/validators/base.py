@@ -26,22 +26,22 @@ class QualityGate(Enum):
 class ValidationResult:
     """نتيجة التحقق"""
 
-    passed: bool
+    is_passed: bool
     severity: Severity = Severity.INFO
     message: str = ""
     suggestions: list[str] = field(default_factory=list)
     details: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def passed(cls, message: str = "Validation passed", **kwargs) -> "ValidationResult":
-        return cls(passed=True, severity=Severity.INFO, message=message, **kwargs)
+    def success(cls, message: str = "Validation passed", **kwargs: Any) -> "ValidationResult":
+        return cls(is_passed=True, severity=Severity.INFO, message=message, **kwargs)
 
     @classmethod
     def warning(
-        cls, message: str, suggestions: list[str] | None = None, **kwargs
+        cls, message: str, suggestions: list[str] | None = None, **kwargs: Any
     ) -> "ValidationResult":
         return cls(
-            passed=True,
+            is_passed=True,
             severity=Severity.WARNING,
             message=message,
             suggestions=suggestions or [],
@@ -50,10 +50,10 @@ class ValidationResult:
 
     @classmethod
     def failed(
-        cls, message: str, suggestions: list[str] | None = None, **kwargs
+        cls, message: str, suggestions: list[str] | None = None, **kwargs: Any
     ) -> "ValidationResult":
         return cls(
-            passed=False,
+            is_passed=False,
             severity=Severity.ERROR,
             message=message,
             suggestions=suggestions or [],
@@ -94,6 +94,6 @@ class BaseValidator(ABC):
 
     def _record_result(self, result: ValidationResult) -> ValidationResult:
         self._validation_count += 1
-        if not result.passed:
+        if not result.is_passed:
             self._failures += 1
         return result
