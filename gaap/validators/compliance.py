@@ -64,7 +64,7 @@ class ComplianceValidator(BaseValidator):
         artifact_str = str(artifact) if artifact else ""
 
         if not artifact_str.strip():
-            return self._record_result(ValidationResult.passed("Empty artifact"))
+            return self._record_result(ValidationResult.success("Empty artifact"))
 
         issues = []
         suggestions = []
@@ -103,4 +103,4 @@ class ComplianceValidator(BaseValidator):
                 details={"warnings": warnings},
             )
 
-        return self._record_result(ValidationResult.passed("No compliance issues detected"))
+        return self._record_result(ValidationResult.success("No compliance issues detected"))

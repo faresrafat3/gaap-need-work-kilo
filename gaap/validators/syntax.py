@@ -35,7 +35,7 @@ class SyntaxValidator(BaseValidator):
             return self._record_result(self._validate_generic(artifact_str, language))
 
         return self._record_result(
-            ValidationResult.passed("Language not supported for syntax check")
+            ValidationResult.success("Language not supported for syntax check")
         )
 
     def _validate_python(self, code: str) -> ValidationResult:
@@ -60,7 +60,7 @@ class SyntaxValidator(BaseValidator):
                 suggestions=["Review code for hidden characters or encoding issues"],
             )
 
-        return ValidationResult.passed("Python syntax is valid")
+        return ValidationResult.success("Python syntax is valid")
 
     def _validate_js(self, code: str) -> ValidationResult:
         """التحقق من صيغة JavaScript/TypeScript"""
@@ -111,7 +111,7 @@ class SyntaxValidator(BaseValidator):
                 details={"errors": errors},
             )
 
-        return ValidationResult.passed("JavaScript syntax appears valid")
+        return ValidationResult.success("JavaScript syntax appears valid")
 
     def _validate_generic(self, code: str, language: str) -> ValidationResult:
         """التحقق العام للصيغ"""
@@ -147,4 +147,4 @@ class SyntaxValidator(BaseValidator):
                 details={"errors": errors},
             )
 
-        return ValidationResult.passed(f"{language.upper()} syntax is valid")
+        return ValidationResult.success(f"{language.upper()} syntax is valid")

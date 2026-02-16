@@ -19,7 +19,7 @@ class PerformanceValidator(BaseValidator):
         artifact_str = str(artifact) if artifact else ""
 
         if not artifact_str.strip():
-            return self._record_result(ValidationResult.passed("Empty artifact"))
+            return self._record_result(ValidationResult.success("Empty artifact"))
 
         language = context.get("language", "python") if context else "python"
 
@@ -28,7 +28,7 @@ class PerformanceValidator(BaseValidator):
         elif language in ("javascript", "typescript"):
             return self._record_result(self._validate_js(artifact_str))
 
-        return self._record_result(ValidationResult.passed("Language not supported"))
+        return self._record_result(ValidationResult.success("Language not supported"))
 
     def _validate_python(self, code: str) -> ValidationResult:
         """تحليل أداء Python"""
@@ -70,7 +70,7 @@ class PerformanceValidator(BaseValidator):
                 details={"issues": issues},
             )
 
-        return ValidationResult.passed("No performance issues detected")
+        return ValidationResult.success("No performance issues detected")
 
     def _validate_js(self, code: str) -> ValidationResult:
         """تحليل أداء JavaScript"""
@@ -101,7 +101,7 @@ class PerformanceValidator(BaseValidator):
                 details={"issues": issues},
             )
 
-        return ValidationResult.passed("No performance issues detected")
+        return ValidationResult.success("No performance issues detected")
 
     def _count_nested_loops(self, code: str) -> int:
         """عدد الـ nested loops"""

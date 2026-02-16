@@ -133,7 +133,7 @@ class SecurityValidator(BaseValidator):
 
         if not artifact_str.strip():
             return self._record_result(
-                ValidationResult.passed("Empty artifact - no security check needed")
+                ValidationResult.success("Empty artifact - no security check needed")
             )
 
         issues = []
@@ -165,4 +165,4 @@ class SecurityValidator(BaseValidator):
                 )
             )
 
-        return self._record_result(ValidationResult.passed("No security issues detected"))
+        return self._record_result(ValidationResult.success("No security issues detected"))
