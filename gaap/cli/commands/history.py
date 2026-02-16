@@ -4,9 +4,10 @@ History Commands
 
 import json
 from datetime import datetime
+from typing import Any
 
 
-def cmd_history(args):
+def cmd_history(args: Any) -> None:
     """History management commands"""
     action = args.action if hasattr(args, "action") else "list"
 
@@ -24,7 +25,7 @@ def cmd_history(args):
         _list_history()
 
 
-def _list_history(limit: int = 20):
+def _list_history(limit: int = 20) -> None:
     """List conversation history"""
     from gaap.storage import load_history
 
@@ -55,7 +56,7 @@ def _list_history(limit: int = 20):
     print(f"Total messages: {len(history)}")
 
 
-def _show_item(item_id: str = None):
+def _show_item(item_id: str | None = None) -> None:
     """Show a specific history item"""
     if not item_id:
         print("❌ Item ID required: gaap history show <id>")
@@ -89,21 +90,22 @@ def _show_item(item_id: str = None):
         print(f"  Cost: ${item['cost']:.4f}")
 
 
-def _clear_history():
+def _clear_history() -> None:
     """Clear all history"""
-    from gaap.storage import clear_history
+    from gaap.storage import get_store
 
     print("\n⚠️  This will delete all conversation history.")
     confirm = input("Are you sure? (yes/no): ")
 
     if confirm.lower() == "yes":
-        clear_history()
+        store = get_store()
+        store.save("history", [])
         print("✅ History cleared")
     else:
         print("❌ Cancelled")
 
 
-def _search_history(query: str = None):
+def _search_history(query: str | None = None) -> None:
     """Search history"""
     if not query:
         print("❌ Query required: gaap history search <query>")
@@ -135,7 +137,7 @@ def _search_history(query: str = None):
         print(f"   {content[:80]}...")
 
 
-def _export_history(file_path: str = None):
+def _export_history(file_path: str | None = None) -> None:
     """Export history to file"""
     from pathlib import Path
 

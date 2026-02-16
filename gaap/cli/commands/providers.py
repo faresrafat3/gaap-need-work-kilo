@@ -4,6 +4,7 @@ Provider Commands
 
 import asyncio
 import os
+from typing import Any
 
 PROVIDERS_INFO = {
     "groq": {
@@ -44,7 +45,7 @@ PROVIDERS_INFO = {
 }
 
 
-def cmd_providers(args):
+def cmd_providers(args: Any) -> None:
     """Provider management commands"""
     action = args.action if hasattr(args, "action") else "list"
 
@@ -62,7 +63,7 @@ def cmd_providers(args):
         _list_providers()
 
 
-def _list_providers():
+def _list_providers() -> None:
     """List all providers"""
     print("\n🔌 Available Providers")
     print("=" * 60)
@@ -77,7 +78,7 @@ def _list_providers():
     print("\n" + "=" * 60)
 
 
-def _show_status():
+def _show_status() -> None:
     """Show detailed provider status"""
     print("\n📊 Provider Status")
     print("=" * 60)
@@ -96,7 +97,7 @@ def _show_status():
     print("\n" + "=" * 60)
 
 
-def _test_provider(provider_name: str):
+def _test_provider(provider_name: str | None = None) -> None:
     """Test a provider connection"""
     if not provider_name:
         print("❌ Provider name required: gaap providers test <name>")
@@ -142,7 +143,7 @@ def _test_provider(provider_name: str):
     asyncio.run(test())
 
 
-def _enable_provider(provider_name: str):
+def _enable_provider(provider_name: str | None = None) -> None:
     """Enable a provider"""
     if not provider_name:
         print("❌ Provider name required: gaap providers enable <name>")
@@ -154,7 +155,7 @@ def _enable_provider(provider_name: str):
     print(f"✅ Provider '{provider_name}' enabled")
 
 
-def _disable_provider(provider_name: str):
+def _disable_provider(provider_name: str | None = None) -> None:
     """Disable a provider"""
     if not provider_name:
         print("❌ Provider name required: gaap providers disable <name>")

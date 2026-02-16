@@ -19,7 +19,7 @@ DEFAULT_CONFIG = {
 }
 
 
-def cmd_config(args):
+def cmd_config(args: Any) -> None:
     """Configuration management commands"""
     action = args.action if hasattr(args, "action") else "show"
 
@@ -42,7 +42,7 @@ def cmd_config(args):
         _show_config()
 
 
-def _show_config():
+def _show_config() -> None:
     """Show all configuration"""
     from gaap.storage import load_config
 
@@ -69,7 +69,7 @@ def _show_config():
     print("Use 'gaap config set <key> <value>' to update")
 
 
-def _get_config(key: str = None):
+def _get_config(key: str | None = None) -> None:
     """Get a specific config value"""
     if not key:
         print("❌ Key required: gaap config get <key>")
@@ -93,7 +93,7 @@ def _get_config(key: str = None):
         print(f"{key}: {value}")
 
 
-def _set_config(key: str = None, value: str = None):
+def _set_config(key: str | None = None, value: str | None = None) -> None:
     """Set a config value"""
     if not key or value is None:
         print("❌ Key and value required: gaap config set <key> <value>")
@@ -108,7 +108,7 @@ def _set_config(key: str = None, value: str = None):
     print(f"✅ Set {key} = {parsed_value}")
 
 
-def _reset_config():
+def _reset_config() -> None:
     """Reset configuration to defaults"""
     from gaap.storage import get_store
 
@@ -119,7 +119,7 @@ def _reset_config():
     _show_config()
 
 
-def _export_config():
+def _export_config() -> None:
     """Export configuration to JSON"""
     from gaap.storage import load_config
 
@@ -127,7 +127,7 @@ def _export_config():
     print(json.dumps(config, indent=2))
 
 
-def _import_config(file_path: str = None):
+def _import_config(file_path: str | None = None) -> None:
     """Import configuration from file"""
     if not file_path:
         print("❌ File path required: gaap config import <file>")

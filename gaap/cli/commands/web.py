@@ -5,9 +5,10 @@ Web Command - Launch Streamlit UI
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 
-def cmd_web(args):
+def cmd_web(args: Any) -> None:
     """Launch GAAP Web UI"""
     port = getattr(args, "port", 8501) if args else 8501
 

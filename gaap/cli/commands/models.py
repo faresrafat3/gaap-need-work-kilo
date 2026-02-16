@@ -2,6 +2,8 @@
 Model Commands
 """
 
+from typing import Any
+
 MODELS_INFO = {
     "strategic": {
         "tier": "Tier 1 - Strategic",
@@ -37,7 +39,7 @@ MODELS_INFO = {
 }
 
 
-def cmd_models(args):
+def cmd_models(args: Any) -> None:
     """Model management commands"""
     action = args.action if hasattr(args, "action") else "list"
     tier = args.tier if hasattr(args, "tier") else None
@@ -52,7 +54,7 @@ def cmd_models(args):
         _list_models(tier)
 
 
-def _list_models(tier: str = None):
+def _list_models(tier: str | None = None) -> None:
     """List all models"""
     print("\n🤖 Available Models")
     print("=" * 70)
@@ -72,7 +74,7 @@ def _list_models(tier: str = None):
     print("\n" + "=" * 70)
 
 
-def _show_tiers():
+def _show_tiers() -> None:
     """Show model tier information"""
     print("\n📊 Model Tiers")
     print("=" * 70)
@@ -92,7 +94,7 @@ def _show_tiers():
     print("\n" + "=" * 70)
 
 
-def _show_model_info(model_name: str = None):
+def _show_model_info(model_name: str | None = None) -> None:
     """Show detailed model info"""
     if not model_name:
         print("❌ Model name required: gaap models info <name>")

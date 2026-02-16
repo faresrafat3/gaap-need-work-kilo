@@ -4,6 +4,7 @@ Storage Module - JSON-based data persistence
 
 from .json_store import (
     JSONStore,
+    get_config,
     get_store,
     load_config,
     load_history,
@@ -15,6 +16,7 @@ from .json_store import (
 
 __all__ = [
     "JSONStore",
+    "get_config",
     "get_store",
     "save_history",
     "load_history",

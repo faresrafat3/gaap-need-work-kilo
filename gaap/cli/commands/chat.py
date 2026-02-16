@@ -4,13 +4,14 @@ Chat Commands
 
 import contextlib
 import os
+from typing import Any
 
 
 def load_env() -> None:
     """Load environment variables from .gaap_env"""
     from pathlib import Path
 
-    def parse_lines(lines):
+    def parse_lines(lines: list[str]) -> None:
         for line in lines:
             raw = line.strip()
             if not raw or raw.startswith("#") or "=" not in raw:
@@ -33,7 +34,7 @@ def load_env() -> None:
                 continue
 
 
-async def cmd_chat(args):
+async def cmd_chat(args: Any) -> None:
     """Quick chat command"""
     load_env()
 

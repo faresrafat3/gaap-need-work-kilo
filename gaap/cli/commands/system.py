@@ -5,9 +5,10 @@ System Commands
 import os
 import platform
 import sys
+from typing import Any
 
 
-def cmd_version(args):
+def cmd_version(args: Any) -> None:
     """Show version information"""
     print("\n🤖 GAAP System")
     print("=" * 50)
@@ -18,7 +19,7 @@ def cmd_version(args):
     print("=" * 50)
 
 
-def cmd_status(args):
+def cmd_status(args: Any) -> None:
     """Show system status"""
     print("\n📊 GAAP System Status")
     print("=" * 50)
@@ -60,7 +61,7 @@ def cmd_status(args):
     print("\n" + "=" * 50)
 
 
-def cmd_doctor(args):
+def cmd_doctor(args: Any) -> None:
     """Run system diagnostics"""
     print("\n🔍 GAAP System Diagnostics")
     print("=" * 50)
