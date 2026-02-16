@@ -328,9 +328,9 @@ class BaseProvider(BaseComponent):
             "request_count": self._request_count,
             "error_count": self._error_count,
             "total_tokens": self._total_tokens_used,
-            "last_request": self._last_request_time.isoformat()
-            if self._last_request_time
-            else None,
+            "last_request": (
+                self._last_request_time.isoformat() if self._last_request_time else None
+            ),
             "models": self.models,
         }
 

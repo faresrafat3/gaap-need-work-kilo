@@ -2,19 +2,13 @@
 Unit tests for Layer 3 - Execution Layer
 """
 
-import pytest
 import asyncio
-from unittest.mock import MagicMock, AsyncMock
-from typing import Dict, Any, List
+
+import pytest
 
 from gaap.core.types import (
-    Task,
-    TaskPriority,
-    TaskType,
-    TaskResult,
-    ExecutionStatus,
     HealingLevel,
-    CriticType,
+    TaskResult,
 )
 
 

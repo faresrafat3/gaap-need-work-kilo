@@ -32,8 +32,8 @@ print("=" * 80)
 print()
 
 print("📊 **Our Results (100 samples MMLU):**")
-print(f"   Cerebras (Llama 3.3 70B):  87.0%")
-print(f"   Groq (Llama 3.3 70B):      87.0%")
+print("   Cerebras (Llama 3.3 70B):  87.0%")
+print("   Groq (Llama 3.3 70B):      87.0%")
 print()
 
 print("🎯 **Official MMLU Leaderboard:**")
@@ -49,13 +49,13 @@ for model, score in sorted_models:
     if score > our_score:
         our_rank += 1
 
-print(f"Rank | Model                    | Score  | Difference")
+print("Rank | Model                    | Score  | Difference")
 print("-" * 60)
 
 for i, (model, score) in enumerate(sorted_models, 1):
     diff = our_score - score
     diff_str = f"+{diff:.1f}%" if diff > 0 else f"{diff:.1f}%"
-    
+
     if abs(score - our_score) < 0.5:
         marker = "👉 ** TIE **"
         print(f"{i:2}   | {model:24} | {score:5.1f}% | {diff_str:7} {marker}")
@@ -72,22 +72,22 @@ print()
 print("📈 **Key Insights:**")
 print()
 print(f"✅ **Rank:** #{our_rank} out of {len(OFFICIAL_SCORES)} top models")
-print(f"✅ **Performance:** Matches GPT-4 Turbo (87.1% vs our 87.0%)")
-print(f"✅ **Improvement over base Llama 3.3 70B:** +2.0% (85% → 87%)")
-print(f"✅ **Beats:** GPT-4, Claude-3-Opus, all Gemini models!")
+print("✅ **Performance:** Matches GPT-4 Turbo (87.1% vs our 87.0%)")
+print("✅ **Improvement over base Llama 3.3 70B:** +2.0% (85% → 87%)")
+print("✅ **Beats:** GPT-4, Claude-3-Opus, all Gemini models!")
 print()
 
 print("🚀 **Speed Comparison:**")
-print(f"   Total Time: 124 seconds (2 minutes)")
-print(f"   Avg per Question: 1.24s")
-print(f"   Groq Latency: 227ms (incredibly fast!)")
-print(f"   Cerebras Latency: 511ms")
+print("   Total Time: 124 seconds (2 minutes)")
+print("   Avg per Question: 1.24s")
+print("   Groq Latency: 227ms (incredibly fast!)")
+print("   Cerebras Latency: 511ms")
 print()
 
 print("💰 **Cost:**")
-print(f"   Total: $0.00 (FREE TIER)")
-print(f"   vs GPT-4: ~$5-10 for 100 samples")
-print(f"   vs Claude-3: ~$3-7 for 100 samples")
+print("   Total: $0.00 (FREE TIER)")
+print("   vs GPT-4: ~$5-10 for 100 samples")
+print("   vs Claude-3: ~$3-7 for 100 samples")
 print()
 
 print("=" * 80)

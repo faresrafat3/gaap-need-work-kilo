@@ -22,9 +22,8 @@ from .context import (
 # =============================================================================
 # Core Imports
 # =============================================================================
-from .core import (
+from .core import (  # Base; Config; Exceptions; Types
     BaseAgent,
-    # Base
     BaseComponent,
     BaseProvider,
     ChatCompletionRequest,
@@ -37,9 +36,7 @@ from .core import (
     CriticType,
     ExecutionMetrics,
     ExecutionStatus,
-    # Config
     GAAPConfig,
-    # Exceptions
     GAAPException,
     HealingLevel,
     LayerType,
@@ -50,7 +47,6 @@ from .core import (
     ProviderError,
     ProviderType,
     RoutingError,
-    # Types
     Task,
     TaskComplexity,
     TaskContext,
@@ -88,12 +84,10 @@ from .healing import (
 # =============================================================================
 # Layer Imports
 # =============================================================================
-from .layers import (
+from .layers import (  # Layer 1; Layer 3; Layer 0; Layer 2
     ArchitectureParadigm,
-    # Layer 1
     ArchitectureSpec,
     AtomicTask,
-    # Layer 3
     ExecutionResult,
     GeneticTwin,
     IntentType,
@@ -102,9 +96,7 @@ from .layers import (
     Layer2Tactical,
     Layer3Execution,
     MADQualityPanel,
-    # Layer 0
     StructuredIntent,
-    # Layer 2
     TaskGraph,
 )
 
@@ -123,6 +115,7 @@ from .providers import (
     G4FProvider,
     GeminiProvider,
     GroqProvider,
+    UnifiedGAAPProvider,
 )
 
 # =============================================================================
@@ -194,6 +187,7 @@ __all__ = [
     "G4FProvider",
     "GroqProvider",
     "GeminiProvider",
+    "UnifiedGAAPProvider",
     # Routing
     "SmartRouter",
     "RoutingStrategy",

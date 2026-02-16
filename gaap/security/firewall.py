@@ -13,8 +13,10 @@ from typing import Any
 # Enums
 # =============================================================================
 
+
 class RiskLevel(Enum):
     """مستويات الخطر"""
+
     SAFE = auto()
     LOW = auto()
     MEDIUM = auto()
@@ -25,6 +27,7 @@ class RiskLevel(Enum):
 
 class AttackType(Enum):
     """أنواع الهجمات"""
+
     PROMPT_INJECTION = auto()
     JAILBREAK = auto()
     DATA_EXFILTRATION = auto()
@@ -38,9 +41,11 @@ class AttackType(Enum):
 # Prompt Firewall
 # =============================================================================
 
+
 @dataclass
 class FirewallResult:
     """نتيجة فحص الجدار الناري"""
+
     is_safe: bool
     risk_level: RiskLevel
     detected_patterns: list[str] = field(default_factory=list)
@@ -53,7 +58,7 @@ class FirewallResult:
 class PromptFirewall:
     """
     جدار الحماية للتعليمات
-    
+
     7 طبقات دفاع:
     - L1: Surface Inspection
     - L2: Lexical Analysis
@@ -67,43 +72,38 @@ class PromptFirewall:
     # أنماط الحقن المعروفة
     INJECTION_PATTERNS = [
         # محاولات تجاهل التعليمات
-        (r'ignore\s+(previous|all|above)\s+(instructions?|prompts?)', AttackType.PROMPT_INJECTION),
-        (r'disregard\s+(all|any|previous)', AttackType.PROMPT_INJECTION),
-        (r'forget\s+(everything|all|previous)', AttackType.PROMPT_INJECTION),
-
+        (r"ignore\s+(previous|all|above)\s+(instructions?|prompts?)", AttackType.PROMPT_INJECTION),
+        (r"disregard\s+(all|any|previous)", AttackType.PROMPT_INJECTION),
+        (r"forget\s+(everything|all|previous)", AttackType.PROMPT_INJECTION),
         # محاولات Role Play
-        (r'you\s+are\s+now\s+(a|an)\s+\w+', AttackType.ROLE_CONFUSION),
-        (r'act\s+as\s+(if|though|a)', AttackType.ROLE_CONFUSION),
-        (r'pretend\s+(to\s+be|that)', AttackType.ROLE_CONFUSION),
-
+        (r"you\s+are\s+now\s+(a|an)\s+\w+", AttackType.ROLE_CONFUSION),
+        (r"act\s+as\s+(if|though|a)", AttackType.ROLE_CONFUSION),
+        (r"pretend\s+(to\s+be|that)", AttackType.ROLE_CONFUSION),
         # محاولات Jailbreak
-        (r'(developer|admin|system)\s+mode', AttackType.JAILBREAK),
-        (r'bypass\s+(all\s+)?(restrictions?|filters?|safety)', AttackType.JAILBREAK),
-        (r'DAN\s*(mode|prompt)?', AttackType.JAILBREAK),
-
+        (r"(developer|admin|system)\s+mode", AttackType.JAILBREAK),
+        (r"bypass\s+(all\s+)?(restrictions?|filters?|safety)", AttackType.JAILBREAK),
+        (r"DAN\s*(mode|prompt)?", AttackType.JAILBREAK),
         # حقن كود
-        (r'<script[^>]*>', AttackType.CODE_INJECTION),
-        (r'javascript:', AttackType.CODE_INJECTION),
-        (r'on\w+\s*=', AttackType.CODE_INJECTION),
-
+        (r"<script[^>]*>", AttackType.CODE_INJECTION),
+        (r"javascript:", AttackType.CODE_INJECTION),
+        (r"on\w+\s*=", AttackType.CODE_INJECTION),
         # استخراج بيانات
-        (r'reveal\s+(your|the)\s+(instructions?|prompt)', AttackType.DATA_EXFILTRATION),
-        (r'show\s+me\s+(your|the)\s+(system|developer)', AttackType.DATA_EXFILTRATION),
-        (r'print\s+(your|the)\s+(instructions?|prompt)', AttackType.DATA_EXFILTRATION),
-
+        (r"reveal\s+(your|the)\s+(instructions?|prompt)", AttackType.DATA_EXFILTRATION),
+        (r"show\s+me\s+(your|the)\s+(system|developer)", AttackType.DATA_EXFILTRATION),
+        (r"print\s+(your|the)\s+(instructions?|prompt)", AttackType.DATA_EXFILTRATION),
         # تعليمات خفية
-        (r'\[SYSTEM\]', AttackType.MALICIOUS_INSTRUCTION),
-        (r'\[INST\]', AttackType.MALICIOUS_INSTRUCTION),
-        (r'<<<.*>>>', AttackType.MALICIOUS_INSTRUCTION),
+        (r"\[SYSTEM\]", AttackType.MALICIOUS_INSTRUCTION),
+        (r"\[INST\]", AttackType.MALICIOUS_INSTRUCTION),
+        (r"<<<.*>>>", AttackType.MALICIOUS_INSTRUCTION),
     ]
 
     # أنماط التشويش
     OBFUSCATION_PATTERNS = [
-        r'\\x[0-9a-fA-F]{2}',      # Hex encoding
-        r'\\u[0-9a-fA-F]{4}',      # Unicode escapes
-        r'%[0-9a-fA-F]{2}',        # URL encoding
-        r'&#[0-9]+;',              # HTML entities
-        r'\\[nrtu]',               # Escape sequences
+        r"\\x[0-9a-fA-F]{2}",  # Hex encoding
+        r"\\u[0-9a-fA-F]{4}",  # Unicode escapes
+        r"%[0-9a-fA-F]{2}",  # URL encoding
+        r"&#[0-9]+;",  # HTML entities
+        r"\\[nrtu]",  # Escape sequences
     ]
 
     def __init__(self, strictness: str = "high"):
@@ -149,17 +149,16 @@ class PromptFirewall:
         # Pattern-based scoring alone is too low because weights dilute the signal.
         # If we detected explicit JAILBREAK / PROMPT_INJECTION / DATA_EXFILTRATION
         # patterns, force-escalate the risk score regardless of weighted total.
-        _CRITICAL_ATTACK_TYPES = {'JAILBREAK', 'PROMPT_INJECTION', 'DATA_EXFILTRATION'}
+        _CRITICAL_ATTACK_TYPES = {"JAILBREAK", "PROMPT_INJECTION", "DATA_EXFILTRATION"}
         detected_critical = [
-            p for p in detected_patterns
-            if any(at in p for at in _CRITICAL_ATTACK_TYPES)
+            p for p in detected_patterns if any(at in p for at in _CRITICAL_ATTACK_TYPES)
         ]
         if len(detected_critical) >= 3:
-            risk_score = max(risk_score, 0.90)   # CRITICAL
+            risk_score = max(risk_score, 0.90)  # CRITICAL
         elif len(detected_critical) >= 2:
-            risk_score = max(risk_score, 0.75)   # CRITICAL
+            risk_score = max(risk_score, 0.75)  # CRITICAL
         elif len(detected_critical) >= 1:
-            risk_score = max(risk_score, 0.55)   # HIGH
+            risk_score = max(risk_score, 0.55)  # HIGH
 
         layer_scores["escalation_critical_patterns"] = len(detected_critical)
 
@@ -182,7 +181,7 @@ class PromptFirewall:
             sanitized_input=sanitized,
             recommendations=self._get_recommendations(risk_level, detected_patterns),
             scan_time_ms=scan_time,
-            layer_scores=layer_scores
+            layer_scores=layer_scores,
         )
 
         self._scan_history.append(result)
@@ -190,8 +189,7 @@ class PromptFirewall:
         if not result.is_safe:
             self._blocked_count += 1
             self._logger.warning(
-                f"Blocked input with risk level {risk_level.name}: "
-                f"{detected_patterns[:3]}"
+                f"Blocked input with risk level {risk_level.name}: " f"{detected_patterns[:3]}"
             )
 
         return result
@@ -219,7 +217,7 @@ class PromptFirewall:
                 score += 0.1 * len(matches)
 
         # فحص الأحرف غير المرئية
-        invisible_chars = len(re.findall(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', text))
+        invisible_chars = len(re.findall(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", text))
         if invisible_chars > 0:
             detected.append(f"L2:invisible_chars:{invisible_chars}")
             score += 0.2
@@ -231,32 +229,33 @@ class PromptFirewall:
         score = 0.0
 
         # تعليمات متداخلة
-        nested_brackets = len(re.findall(r'\[.*\[.*\].*\]', text))
+        nested_brackets = len(re.findall(r"\[.*\[.*\].*\]", text))
         if nested_brackets > 0:
             detected.append(f"L3:nested_instructions:{nested_brackets}")
             score += 0.2
 
         # تعليقات مشبوهة
-        suspicious_comments = len(re.findall(r'(/\*.*\*/|<!--.*-->|#.*$)', text, re.MULTILINE))
+        suspicious_comments = len(re.findall(r"(/\*.*\*/|<!--.*-->|#.*$)", text, re.MULTILINE))
         if suspicious_comments > 2:
             detected.append(f"L3:suspicious_comments:{suspicious_comments}")
             score += 0.1
 
         return min(score, 1.0)
 
-    def _layer4_scan(
-        self,
-        text: str,
-        detected: list[str],
-        context: dict[str, Any] | None
-    ) -> float:
+    def _layer4_scan(self, text: str, detected: list[str], context: dict[str, Any] | None) -> float:
         """فحص دلالي"""
         score = 0.0
 
         # كلمات مفتاحية خطيرة
         danger_keywords = [
-            'override', 'bypass', 'exploit', 'hack',
-            'unauthorized', 'secret', 'password', 'token'
+            "override",
+            "bypass",
+            "exploit",
+            "hack",
+            "unauthorized",
+            "secret",
+            "password",
+            "token",
         ]
 
         text_lower = text.lower()
@@ -268,7 +267,7 @@ class PromptFirewall:
 
         # سياق المشروع
         if context:
-            allowed_topics = context.get('allowed_topics', [])
+            context.get("allowed_topics", [])
             # فحص إذا كان النص خارج الموضوع المسموح
             # ...
 
@@ -280,11 +279,11 @@ class PromptFirewall:
 
         # التحقق من تطابق السياق
         if context:
-            user_role = context.get('user_role', 'user')
+            user_role = context.get("user_role", "user")
 
             # طلبات إدارية من مستخدم عادي
-            if user_role == 'user':
-                admin_patterns = ['admin', 'root', 'sudo', 'elevated']
+            if user_role == "user":
+                admin_patterns = ["admin", "root", "sudo", "elevated"]
                 if any(p in text.lower() for p in admin_patterns):
                     score += 0.3
 
@@ -309,18 +308,14 @@ class PromptFirewall:
 
         # إزالة الأنماط الخطيرة
         for pattern, _ in self.INJECTION_PATTERNS:
-            sanitized = re.sub(pattern, '[REDACTED]', sanitized, flags=re.IGNORECASE)
+            sanitized = re.sub(pattern, "[REDACTED]", sanitized, flags=re.IGNORECASE)
 
         # إزالة الأحرف غير المرئية
-        sanitized = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', sanitized)
+        sanitized = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", sanitized)
 
         return sanitized
 
-    def _get_recommendations(
-        self,
-        risk_level: RiskLevel,
-        patterns: list[str]
-    ) -> list[str]:
+    def _get_recommendations(self, risk_level: RiskLevel, patterns: list[str]) -> list[str]:
         """توصيات"""
         recommendations = []
 
@@ -331,10 +326,10 @@ class PromptFirewall:
         elif risk_level == RiskLevel.MEDIUM:
             recommendations.append("Consider sanitizing input")
 
-        if any('injection' in p.lower() for p in patterns):
+        if any("injection" in p.lower() for p in patterns):
             recommendations.append("Potential prompt injection detected")
 
-        if any('obfuscation' in p.lower() for p in patterns):
+        if any("obfuscation" in p.lower() for p in patterns):
             recommendations.append("Obfuscation techniques detected")
 
         return recommendations
@@ -344,7 +339,9 @@ class PromptFirewall:
         return {
             "total_scans": len(self._scan_history),
             "blocked": self._blocked_count,
-            "block_rate": self._blocked_count / len(self._scan_history) if self._scan_history else 0,
+            "block_rate": (
+                self._blocked_count / len(self._scan_history) if self._scan_history else 0
+            ),
         }
 
 
@@ -352,9 +349,11 @@ class PromptFirewall:
 # Audit Trail
 # =============================================================================
 
+
 @dataclass
 class AuditEntry:
     """سجل تدقيق"""
+
     id: str
     timestamp: datetime
     action: str
@@ -369,7 +368,7 @@ class AuditEntry:
 class AuditTrail:
     """
     سجل التدقيق - غير قابل للتزوير
-    
+
     يستخدم سلسلة hash لضمان النزاهة
     """
 
@@ -384,13 +383,11 @@ class AuditTrail:
         agent_id: str,
         resource: str,
         result: str,
-        details: dict[str, Any] | None = None
+        details: dict[str, Any] | None = None,
     ) -> AuditEntry:
         """تسجيل حدث"""
         # إنشاء المدخل
-        entry_id = hashlib.sha256(
-            f"{action}:{agent_id}:{time.time()}".encode()
-        ).hexdigest()[:16]
+        entry_id = hashlib.sha256(f"{action}:{agent_id}:{time.time()}".encode()).hexdigest()[:16]
 
         previous_hash = self._chain[-1].hash if self._chain else "genesis"
 
@@ -402,7 +399,7 @@ class AuditTrail:
             resource=resource,
             result=result,
             details=details or {},
-            previous_hash=previous_hash
+            previous_hash=previous_hash,
         )
 
         # حساب hash
@@ -425,9 +422,8 @@ class AuditTrail:
                 return False
 
             # التحقق من السلسلة
-            if i > 0:
-                if entry.previous_hash != self._chain[i-1].hash:
-                    return False
+            if i > 0 and entry.previous_hash != self._chain[i - 1].hash:
+                return False
 
         return True
 
@@ -454,7 +450,7 @@ class AuditTrail:
             for e in self._chain
         ]
 
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(data, f, indent=2)
 
 
@@ -462,12 +458,14 @@ class AuditTrail:
 # Capability Token
 # =============================================================================
 
+
 @dataclass
 class CapabilityToken:
     """توكن القدرة"""
-    subject: str          # معرف الوكيل
-    resource: str         # المورد
-    action: str           # الإجراء
+
+    subject: str  # معرف الوكيل
+    resource: str  # المورد
+    action: str  # الإجراء
     issued_at: datetime
     expires_at: datetime
     constraints: dict[str, Any] = field(default_factory=dict)
@@ -489,7 +487,7 @@ class CapabilityManager:
         resource: str,
         action: str,
         ttl_seconds: int = 300,
-        constraints: dict[str, Any] | None = None
+        constraints: dict[str, Any] | None = None,
     ) -> CapabilityToken:
         """إصدار توكن"""
         now = datetime.now()
@@ -502,7 +500,7 @@ class CapabilityManager:
             issued_at=now,
             expires_at=now + timedelta(seconds=ttl_seconds),
             constraints=constraints or {},
-            nonce=nonce
+            nonce=nonce,
         )
 
         # توقيع
@@ -513,10 +511,7 @@ class CapabilityManager:
         return token
 
     def verify_token(
-        self,
-        token: CapabilityToken,
-        requested_resource: str,
-        requested_action: str
+        self, token: CapabilityToken, requested_resource: str, requested_action: str
     ) -> bool:
         """التحقق من التوكن"""
         # التحقق من التوقيع
@@ -531,10 +526,7 @@ class CapabilityManager:
         if token.resource != requested_resource:
             return False
 
-        if token.action != requested_action:
-            return False
-
-        return True
+        return token.action == requested_action
 
     def _sign(self, token: CapabilityToken) -> str:
         """توقيع التوكن"""
@@ -551,6 +543,7 @@ class CapabilityManager:
 # =============================================================================
 # Convenience Functions
 # =============================================================================
+
 
 def create_firewall(strictness: str = "high") -> PromptFirewall:
     """إنشاء جدار حماية"""

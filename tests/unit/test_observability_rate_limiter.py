@@ -3,27 +3,21 @@ Tests for new observability and rate limiting modules
 """
 
 import asyncio
+
 import pytest
-import time
 
 from gaap.core.observability import (
-    TracingConfig,
-    MetricsConfig,
-    Tracer,
     Metrics,
     Observability,
-    observability,
-    get_tracer,
-    get_metrics,
-    traced,
+    Tracer,
+    TracingConfig,
 )
-
 from gaap.core.rate_limiter import (
-    RateLimitStrategy,
-    RateLimitConfig,
-    TokenBucketRateLimiter,
-    SlidingWindowRateLimiter,
     AdaptiveRateLimiter,
+    RateLimitConfig,
+    RateLimitStrategy,
+    SlidingWindowRateLimiter,
+    TokenBucketRateLimiter,
     create_rate_limiter,
 )
 

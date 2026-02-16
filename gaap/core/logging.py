@@ -85,9 +85,11 @@ class GAAPLogger:
                 structlog.processors.StackInfoRenderer(),
                 structlog.dev.set_exc_info,
                 structlog.processors.TimeStamper(fmt="iso"),
-                structlog.processors.JSONRenderer()
-                if self.json_format
-                else structlog.dev.ConsoleRenderer(),
+                (
+                    structlog.processors.JSONRenderer()
+                    if self.json_format
+                    else structlog.dev.ConsoleRenderer()
+                ),
             ],
             wrapper_class=structlog.make_filtering_bound_logger(self.level),
             logger_factory=structlog.PrintLoggerFactory(),

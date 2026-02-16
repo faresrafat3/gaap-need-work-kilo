@@ -25,7 +25,6 @@ __all__ = [
     "PRIORITY_MULTIPLIERS",
     "COMPLEXITY_MODEL_TIER",
     "create_router",
-
     # Fallback
     "FallbackManager",
     "FallbackConfig",

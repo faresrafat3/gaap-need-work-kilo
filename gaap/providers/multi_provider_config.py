@@ -15,6 +15,7 @@ from typing import Any
 
 class ProviderType(Enum):
     """Provider types"""
+
     CEREBRAS = "cerebras"
     OPENROUTER = "openrouter"
     GROQ = "groq"
@@ -64,6 +65,7 @@ def _env_keys(var_name: str) -> list[str]:
 @dataclass
 class ProviderLimits:
     """Rate limits for a provider"""
+
     requests_per_minute: int = 0
     requests_per_day: int = 0
     tokens_per_minute: int = 0
@@ -80,6 +82,7 @@ class ProviderLimits:
 @dataclass
 class ProviderConfig:
     """Configuration for a single provider"""
+
     name: str
     provider_type: ProviderType
     api_keys: list[str]
@@ -111,7 +114,7 @@ CEREBRAS_CONFIG = ProviderConfig(
         concurrent_requests=3,
     ),
     priority=95,  # Highest priority - best limits
-    notes="Best free tier - 30 RPM × 7 keys = 210 RPM total"
+    notes="Best free tier - 30 RPM × 7 keys = 210 RPM total",
 )
 
 OPENROUTER_CONFIG = ProviderConfig(
@@ -128,7 +131,7 @@ OPENROUTER_CONFIG = ProviderConfig(
         concurrent_requests=2,
     ),
     priority=75,
-    notes="20 RPM × 7 keys = 140 RPM, but only 50 req/day per key"
+    notes="20 RPM × 7 keys = 140 RPM, but only 50 req/day per key",
 )
 
 GROQ_CONFIG = ProviderConfig(
@@ -146,7 +149,7 @@ GROQ_CONFIG = ProviderConfig(
         concurrent_requests=2,
     ),
     priority=85,
-    notes="Very fast inference, 1000 req/day for 70B models × 7 keys"
+    notes="Very fast inference, 1000 req/day for 70B models × 7 keys",
 )
 
 GEMINI_CONFIG = ProviderConfig(
@@ -164,7 +167,7 @@ GEMINI_CONFIG = ProviderConfig(
         concurrent_requests=2,
     ),
     priority=40,  # Lower priority due to severe rate limits
-    notes="Severe limits: 5 RPM, 20 RPD - use as fallback only"
+    notes="Severe limits: 5 RPM, 20 RPD - use as fallback only",
 )
 
 MISTRAL_CONFIG = ProviderConfig(
@@ -182,7 +185,7 @@ MISTRAL_CONFIG = ProviderConfig(
         concurrent_requests=3,
     ),
     priority=70,
-    notes="1 req/sec = 60 RPM, good token limits"
+    notes="1 req/sec = 60 RPM, good token limits",
 )
 
 MISTRAL_CODESTRAL_CONFIG = ProviderConfig(
@@ -199,7 +202,7 @@ MISTRAL_CODESTRAL_CONFIG = ProviderConfig(
         concurrent_requests=2,
     ),
     priority=65,
-    notes="30 RPM, 2000 RPD - good for code tasks"
+    notes="30 RPM, 2000 RPD - good for code tasks",
 )
 
 GITHUB_CONFIG = ProviderConfig(
@@ -217,7 +220,7 @@ GITHUB_CONFIG = ProviderConfig(
         concurrent_requests=5,
     ),
     priority=60,
-    notes="Copilot Pro: 15 RPM, 150 RPD, token limits per request"
+    notes="Copilot Pro: 15 RPM, 150 RPD, token limits per request",
 )
 
 CLOUDFLARE_CONFIG = ProviderConfig(
@@ -233,7 +236,7 @@ CLOUDFLARE_CONFIG = ProviderConfig(
         concurrent_requests=5,
     ),
     priority=55,
-    notes="10,000 neurons/day limit (usage-based)"
+    notes="10,000 neurons/day limit (usage-based)",
 )
 
 
@@ -243,18 +246,18 @@ CLOUDFLARE_CONFIG = ProviderConfig(
 
 # ✅ WORKING PROVIDERS (Tested Feb 13, 2026)
 WORKING_PROVIDERS = [
-    CEREBRAS_CONFIG,      # ✅ 210 RPM, 511ms avg, PRODUCTION READY
-    GROQ_CONFIG,          # ✅ 210 RPM, 227ms avg, FASTEST
-    MISTRAL_CONFIG,       # ✅ 60 RPM, 603ms avg, VERIFIED
-    GITHUB_CONFIG,        # ✅ 15 RPM, 1498ms avg, BACKUP
+    CEREBRAS_CONFIG,  # ✅ 210 RPM, 511ms avg, PRODUCTION READY
+    GROQ_CONFIG,  # ✅ 210 RPM, 227ms avg, FASTEST
+    MISTRAL_CONFIG,  # ✅ 60 RPM, 603ms avg, VERIFIED
+    GITHUB_CONFIG,  # ✅ 15 RPM, 1498ms avg, BACKUP
 ]
 
 # ❌ FAILED/UNAVAILABLE PROVIDERS (For reference only)
 FAILED_PROVIDERS = [
-    OPENROUTER_CONFIG,       # ❌ HTTP 429 - Needs $10 credit
-    GEMINI_CONFIG,           # ❌ HTTP 429 - Quota exhaused
+    OPENROUTER_CONFIG,  # ❌ HTTP 429 - Needs $10 credit
+    GEMINI_CONFIG,  # ❌ HTTP 429 - Quota exhaused
     MISTRAL_CODESTRAL_CONFIG,  # ❌ Wrong model configuration
-    CLOUDFLARE_CONFIG,       # ❌ Needs CLOUDFLARE_ACCOUNT_ID
+    CLOUDFLARE_CONFIG,  # ❌ Needs CLOUDFLARE_ACCOUNT_ID
 ]
 
 # All providers (for backwards compatibility)
@@ -289,7 +292,11 @@ def get_total_capacity() -> dict[str, Any]:
 
         # Calculate per-provider capacity
         provider_rpm = provider.limits.requests_per_minute * num_keys
-        provider_rpd = provider.limits.requests_per_day * num_keys if provider.limits.requests_per_day > 0 else 999_999
+        provider_rpd = (
+            provider.limits.requests_per_day * num_keys
+            if provider.limits.requests_per_day > 0
+            else 999_999
+        )
 
         total_rpm += provider_rpm
         total_rpd = min(total_rpd + provider_rpd, 999_999)
@@ -303,12 +310,16 @@ def get_total_capacity() -> dict[str, Any]:
             {
                 "name": p.name,
                 "rpm": p.limits.requests_per_minute * len(p.api_keys),
-                "rpd": p.limits.requests_per_day * len(p.api_keys) if p.limits.requests_per_day > 0 else "unlimited",
+                "rpd": (
+                    p.limits.requests_per_day * len(p.api_keys)
+                    if p.limits.requests_per_day > 0
+                    else "unlimited"
+                ),
                 "keys": len(p.api_keys),
                 "priority": p.priority,
             }
             for p in get_enabled_providers()
-        ]
+        ],
     }
 
 
@@ -327,7 +338,7 @@ if __name__ == "__main__":
     print("\nProviders (by priority):")
     print(f"{'Name':<25} {'RPM':>10} {'RPD':>15} {'Keys':>6} {'Priority':>10}")
     print("-" * 80)
-    for p in capacity['providers']:
-        rpd_str = f"{p['rpd']:,}" if isinstance(p['rpd'], int) else p['rpd']
+    for p in capacity["providers"]:
+        rpd_str = f"{p['rpd']:,}" if isinstance(p["rpd"], int) else p["rpd"]
         print(f"{p['name']:<25} {p['rpm']:>10,} {rpd_str:>15} {p['keys']:>6} {p['priority']:>10}")
     print("=" * 80)

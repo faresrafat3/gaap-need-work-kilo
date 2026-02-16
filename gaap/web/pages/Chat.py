@@ -3,6 +3,7 @@ Chat Page - Interactive AI Chat with Streaming
 """
 
 import asyncio
+import contextlib
 import os
 
 import streamlit as st
@@ -79,10 +80,8 @@ def main():
                 for provider in getattr(engine, "providers", []):
                     close_fn = getattr(provider, "close", None)
                     if callable(close_fn):
-                        try:
+                        with contextlib.suppress(Exception):
                             asyncio.run(close_fn())
-                        except Exception:
-                            pass
                 engine.shutdown()
             st.session_state.engine = None
             st.session_state.messages = []

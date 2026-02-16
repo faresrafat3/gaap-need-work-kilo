@@ -102,9 +102,7 @@ class MemoryGuard:
         # Warning zone
         if rss > self.warn_rss_mb and not self._warned:
             self._warned = True
-            logger.warning(
-                f"Memory warning: {rss:.0f}MB (limit={self.max_rss_mb:.0f}MB) {context}"
-            )
+            logger.warning(f"Memory warning: {rss:.0f}MB (limit={self.max_rss_mb:.0f}MB) {context}")
 
         # Hard limit
         if rss > self.max_rss_mb:

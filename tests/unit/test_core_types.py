@@ -3,23 +3,6 @@ Unit tests for GAAP core components
 """
 
 import pytest
-import asyncio
-from dataclasses import dataclass
-from typing import Dict, Any, List, Optional
-
-from gaap.core.types import (
-    Task,
-    TaskResult,
-    TaskPriority,
-    TaskType,
-    TaskComplexity,
-    Message,
-    MessageRole,
-    LayerType,
-    ModelTier,
-    HealingLevel,
-    CriticType,
-)
 
 from gaap.core.exceptions import (
     GAAPException,
@@ -27,6 +10,18 @@ from gaap.core.exceptions import (
     ProviderRateLimitError,
     TaskError,
     TaskTimeoutError,
+)
+from gaap.core.types import (
+    HealingLevel,
+    LayerType,
+    Message,
+    MessageRole,
+    ModelTier,
+    Task,
+    TaskComplexity,
+    TaskPriority,
+    TaskResult,
+    TaskType,
 )
 
 

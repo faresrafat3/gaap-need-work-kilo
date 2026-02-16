@@ -77,11 +77,12 @@ MODEL_ALIASES = {
 # Groq Provider Implementation
 # =============================================================================
 
+
 @register_provider("groq")
 class GroqProvider(BaseProvider):
     """
     مزود Groq - سرعة فائقة مع طبقة مجانية
-    
+
     الميزات:
     - سرعة استجابة فائقة
     - طبقة مجانية سخية
@@ -90,14 +91,12 @@ class GroqProvider(BaseProvider):
     """
 
     def __init__(
-        self,
-        api_key: str | None = None,
-        default_model: str = "llama-3.1-8b-instant",
-        **kwargs
+        self, api_key: str | None = None, default_model: str = "llama-3.1-8b-instant", **kwargs
     ):
         # البحث عن API key من البيئة
         if api_key is None:
             import os
+
             api_key = os.environ.get("GROQ_API_KEY")
 
         super().__init__(
@@ -110,7 +109,7 @@ class GroqProvider(BaseProvider):
             rate_limit_tpm=FREE_TIER_LIMITS["tokens_per_minute"],
             timeout=60.0,
             max_retries=3,
-            default_model=default_model
+            default_model=default_model,
         )
 
         self._session: aiohttp.ClientSession | None = None
@@ -142,33 +141,22 @@ class GroqProvider(BaseProvider):
             self._last_reset = now
 
         return (
-            self._daily_requests < FREE_TIER_LIMITS["requests_per_day"] and
-            self._daily_tokens < FREE_TIER_LIMITS["tokens_per_day"]
+            self._daily_requests < FREE_TIER_LIMITS["requests_per_day"]
+            and self._daily_tokens < FREE_TIER_LIMITS["tokens_per_day"]
         )
 
-    async def _make_request(
-        self,
-        messages: list[Message],
-        model: str,
-        **kwargs
-    ) -> dict[str, Any]:
+    async def _make_request(self, messages: list[Message], model: str, **kwargs) -> dict[str, Any]:
         """تنفيذ الطلب لـ Groq API"""
 
         # التحقق من الحدود اليومية
         if not self._check_daily_limits():
-            raise ProviderRateLimitError(
-                provider_name=self.name,
-                retry_after=86400  # غداً
-            )
+            raise ProviderRateLimitError(provider_name=self.name, retry_after=86400)  # غداً
 
         # حل الأسماء المستعارة
         actual_model = MODEL_ALIASES.get(model, model)
 
         # تحويل الرسائل
-        formatted_messages = [
-            {"role": m.role.value, "content": m.content}
-            for m in messages
-        ]
+        formatted_messages = [{"role": m.role.value, "content": m.content} for m in messages]
 
         # بناء الطلب
         payload = {
@@ -187,26 +175,21 @@ class GroqProvider(BaseProvider):
 
         try:
             async with session.post(
-                GROQ_API_URL,
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=self.timeout)
+                GROQ_API_URL, json=payload, timeout=aiohttp.ClientTimeout(total=self.timeout)
             ) as response:
                 if response.status == 401:
                     raise ProviderAuthenticationError(provider_name=self.name)
 
                 if response.status == 429:
                     retry_after = int(response.headers.get("retry-after", 60))
-                    raise ProviderRateLimitError(
-                        provider_name=self.name,
-                        retry_after=retry_after
-                    )
+                    raise ProviderRateLimitError(provider_name=self.name, retry_after=retry_after)
 
                 if response.status != 200:
                     error_body = await response.text()
                     raise ProviderResponseError(
                         provider_name=self.name,
                         status_code=response.status,
-                        response_body=error_body
+                        response_body=error_body,
                     )
 
                 data = await response.json()
@@ -219,25 +202,16 @@ class GroqProvider(BaseProvider):
                 return data
 
         except aiohttp.ClientError as e:
-            raise ProviderNotAvailableError(
-                provider_name=self.name,
-                reason=str(e)
-            )
+            raise ProviderNotAvailableError(provider_name=self.name, reason=str(e))
 
     async def _stream_request(
-        self,
-        messages: list[Message],
-        model: str,
-        **kwargs
+        self, messages: list[Message], model: str, **kwargs
     ) -> AsyncIterator[str]:
         """تدفق الاستجابة من Groq"""
 
         actual_model = MODEL_ALIASES.get(model, model)
 
-        formatted_messages = [
-            {"role": m.role.value, "content": m.content}
-            for m in messages
-        ]
+        formatted_messages = [{"role": m.role.value, "content": m.content} for m in messages]
 
         payload = {
             "model": actual_model,
@@ -251,20 +225,18 @@ class GroqProvider(BaseProvider):
 
         try:
             async with session.post(
-                GROQ_API_URL,
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=self.timeout)
+                GROQ_API_URL, json=payload, timeout=aiohttp.ClientTimeout(total=self.timeout)
             ) as response:
                 if response.status != 200:
                     error_body = await response.text()
                     raise ProviderResponseError(
                         provider_name=self.name,
                         status_code=response.status,
-                        response_body=error_body
+                        response_body=error_body,
                     )
 
                 async for line in response.content:
-                    line = line.decode('utf-8').strip()
+                    line = line.decode("utf-8").strip()
 
                     if not line or line == "data: [DONE]":
                         continue
@@ -273,31 +245,24 @@ class GroqProvider(BaseProvider):
                         json_str = line[6:]
                         try:
                             chunk = json.loads(json_str)
-                            content = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                            content = (
+                                chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                            )
                             if content:
                                 yield content
                         except json.JSONDecodeError:
                             continue
 
         except aiohttp.ClientError as e:
-            raise ProviderNotAvailableError(
-                provider_name=self.name,
-                reason=str(e)
-            )
+            raise ProviderNotAvailableError(provider_name=self.name, reason=str(e))
 
-    def _calculate_cost(
-        self,
-        model: str,
-        input_tokens: int,
-        output_tokens: int
-    ) -> float:
+    def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
         """حساب التكلفة"""
         actual_model = MODEL_ALIASES.get(model, model)
         costs = GROQ_COSTS.get(actual_model, {"input": 0.0, "output": 0.0})
 
-        return (
-            (input_tokens * costs["input"] / 1_000_000) +
-            (output_tokens * costs["output"] / 1_000_000)
+        return (input_tokens * costs["input"] / 1_000_000) + (
+            output_tokens * costs["output"] / 1_000_000
         )
 
     def get_daily_usage(self) -> dict[str, Any]:
@@ -344,15 +309,12 @@ class GroqProvider(BaseProvider):
 # Convenience Functions
 # =============================================================================
 
+
 def create_groq_provider(
-    api_key: str | None = None,
-    default_model: str = "llama-3.1-8b-instant"
+    api_key: str | None = None, default_model: str = "llama-3.1-8b-instant"
 ) -> GroqProvider:
     """إنشاء مزود Groq بسهولة"""
-    return GroqProvider(
-        api_key=api_key,
-        default_model=default_model
-    )
+    return GroqProvider(api_key=api_key, default_model=default_model)
 
 
 def list_groq_models() -> list[str]:
@@ -369,11 +331,12 @@ def get_groq_free_limits() -> dict[str, int]:
 # Gemini Provider (Free Tier)
 # =============================================================================
 
+
 @register_provider("gemini")
 class GeminiProvider(BaseProvider):
     """
     مزود Google Gemini - طبقة مجانية
-    
+
     الميزات:
     - نافذة سياق ضخمة (1M tokens)
     - طبقة مجانية سخية
@@ -401,7 +364,7 @@ class GeminiProvider(BaseProvider):
         api_key: str | None = None,
         api_keys: list[str] | None = None,
         default_model: str = "gemini-2.5-flash",
-        **kwargs
+        **kwargs,
     ):
 
         env_keys_raw = os.environ.get("GEMINI_API_KEYS", "")
@@ -445,7 +408,7 @@ class GeminiProvider(BaseProvider):
             rate_limit_tpm=1_000_000,  # 1M context!
             timeout=120.0,
             max_retries=3,
-            default_model=default_model
+            default_model=default_model,
         )
 
         self._session: aiohttp.ClientSession | None = None
@@ -498,12 +461,7 @@ class GeminiProvider(BaseProvider):
             self._session = aiohttp.ClientSession()
         return self._session
 
-    async def _make_request(
-        self,
-        messages: list[Message],
-        model: str,
-        **kwargs
-    ) -> dict[str, Any]:
+    async def _make_request(self, messages: list[Message], model: str, **kwargs) -> dict[str, Any]:
         """تنفيذ الطلب لـ Gemini API"""
 
         session = await self._get_session()
@@ -512,10 +470,7 @@ class GeminiProvider(BaseProvider):
         contents = []
         for msg in messages:
             role = "user" if msg.role == MessageRole.USER else "model"
-            contents.append({
-                "role": role,
-                "parts": [{"text": msg.content}]
-            })
+            contents.append({"role": role, "parts": [{"text": msg.content}]})
 
         payload = {
             "contents": contents,
@@ -523,7 +478,7 @@ class GeminiProvider(BaseProvider):
                 "temperature": kwargs.get("temperature", 0.7),
                 "maxOutputTokens": kwargs.get("max_tokens", 8192),
                 "topP": kwargs.get("top_p", 1.0),
-            }
+            },
         }
 
         if not (self._api_keys or self.api_key):
@@ -538,9 +493,7 @@ class GeminiProvider(BaseProvider):
 
             try:
                 async with session.post(
-                    url,
-                    json=payload,
-                    timeout=aiohttp.ClientTimeout(total=self.timeout)
+                    url, json=payload, timeout=aiohttp.ClientTimeout(total=self.timeout)
                 ) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -550,7 +503,7 @@ class GeminiProvider(BaseProvider):
                     last_error = ProviderResponseError(
                         provider_name=self.name,
                         status_code=response.status,
-                        response_body=error_body
+                        response_body=error_body,
                     )
 
                     # تبريد المفتاح عند 429 أو 403/401
@@ -567,10 +520,7 @@ class GeminiProvider(BaseProvider):
                         raise last_error
 
             except aiohttp.ClientError as e:
-                last_error = ProviderNotAvailableError(
-                    provider_name=self.name,
-                    reason=str(e)
-                )
+                last_error = ProviderNotAvailableError(provider_name=self.name, reason=str(e))
                 if not self._rotate_api_key():
                     raise last_error
 
@@ -580,14 +530,10 @@ class GeminiProvider(BaseProvider):
         raise ProviderResponseError(
             provider_name=self.name,
             status_code=500,
-            response_body="Gemini request failed after key rotation attempts"
+            response_body="Gemini request failed after key rotation attempts",
         )
 
-    def _convert_response(
-        self,
-        gemini_response: dict[str, Any],
-        model: str
-    ) -> dict[str, Any]:
+    def _convert_response(self, gemini_response: dict[str, Any], model: str) -> dict[str, Any]:
         """تحويل استجابة Gemini لتنسيق OpenAI"""
 
         candidates = gemini_response.get("candidates", [])
@@ -598,14 +544,13 @@ class GeminiProvider(BaseProvider):
             parts = content.get("parts", [])
             text = "".join(p.get("text", "") for p in parts)
 
-            choices.append({
-                "index": i,
-                "message": {
-                    "role": "assistant",
-                    "content": text
-                },
-                "finish_reason": candidate.get("finishReason", "stop").lower()
-            })
+            choices.append(
+                {
+                    "index": i,
+                    "message": {"role": "assistant", "content": text},
+                    "finish_reason": candidate.get("finishReason", "stop").lower(),
+                }
+            )
 
         usage = gemini_response.get("usageMetadata", {})
 
@@ -616,30 +561,21 @@ class GeminiProvider(BaseProvider):
             "usage": {
                 "prompt_tokens": usage.get("promptTokenCount", 0),
                 "completion_tokens": usage.get("candidatesTokenCount", 0),
-                "total_tokens": usage.get("totalTokenCount", 0)
-            }
+                "total_tokens": usage.get("totalTokenCount", 0),
+            },
         }
 
     async def _stream_request(
-        self,
-        messages: list[Message],
-        model: str,
-        **kwargs
+        self, messages: list[Message], model: str, **kwargs
     ) -> AsyncIterator[str]:
         """تدفق الاستجابة - NotImplemented للمختصر"""
         raise NotImplementedError("Gemini streaming not implemented in this version")
 
-    def _calculate_cost(
-        self,
-        model: str,
-        input_tokens: int,
-        output_tokens: int
-    ) -> float:
+    def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
         """حساب التكلفة"""
         costs = self.GEMINI_COSTS.get(model, {"input": 0.0, "output": 0.0})
-        return (
-            (input_tokens * costs["input"] / 1_000_000) +
-            (output_tokens * costs["output"] / 1_000_000)
+        return (input_tokens * costs["input"] / 1_000_000) + (
+            output_tokens * costs["output"] / 1_000_000
         )
 
     def get_model_tier(self, model: str) -> ModelTier:
@@ -658,11 +594,7 @@ class GeminiProvider(BaseProvider):
 
 
 def create_gemini_provider(
-    api_key: str | None = None,
-    default_model: str = "gemini-2.5-flash"
+    api_key: str | None = None, default_model: str = "gemini-2.5-flash"
 ) -> GeminiProvider:
     """إنشاء مزود Gemini بسهولة"""
-    return GeminiProvider(
-        api_key=api_key,
-        default_model=default_model
-    )
+    return GeminiProvider(api_key=api_key, default_model=default_model)

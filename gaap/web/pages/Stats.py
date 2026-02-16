@@ -63,7 +63,7 @@ def main():
         else:
             providers = list(by_provider.keys())
             requests = [by_provider[p].get("requests", 0) for p in providers]
-            tokens = [by_provider[p].get("tokens", 0) for p in providers]
+            [by_provider[p].get("tokens", 0) for p in providers]
             costs = [by_provider[p].get("cost", 0) for p in providers]
 
             col1, col2 = st.columns(2)

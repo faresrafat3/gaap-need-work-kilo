@@ -3,17 +3,12 @@ Unit tests for Router
 """
 
 import pytest
-import asyncio
-from unittest.mock import MagicMock, AsyncMock
-from typing import Dict, Any, List
 
 from gaap.core.types import (
-    Task,
+    ModelTier,
+    TaskComplexity,
     TaskPriority,
     TaskType,
-    TaskComplexity,
-    ModelTier,
-    ProviderType,
 )
 
 

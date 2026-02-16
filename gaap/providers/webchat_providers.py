@@ -18,6 +18,7 @@ Supports multiple accounts for parallelism.
 
 import asyncio
 import base64
+import contextlib
 import hashlib
 import hmac
 import json
@@ -42,6 +43,7 @@ WEBCHAT_CACHE_DIR = Path.home() / ".config" / "gaap" / "webchat_auth"
 @dataclass
 class WebChatAuth:
     """Cached authentication state for a webchat provider."""
+
     provider: str
     token: str
     cookies: dict[str, str] = field(default_factory=dict)
@@ -137,7 +139,7 @@ def list_accounts(provider: str) -> list[str]:
     accounts = []
     for f in WEBCHAT_CACHE_DIR.iterdir():
         if f.name.startswith(prefix) and f.name.endswith(".json"):
-            label = f.name[len(prefix):-5]
+            label = f.name[len(prefix) : -5]
             accounts.append(label)
     return sorted(accounts)
 
@@ -145,6 +147,7 @@ def list_accounts(provider: str) -> list[str]:
 # =============================================================================
 # Base WebChat Provider
 # =============================================================================
+
 
 class WebChatProvider(ABC):
     """Abstract base for browser-authenticated web chat providers."""
@@ -243,9 +246,7 @@ class WebChatProvider(ABC):
                     break
                 await asyncio.sleep(1)
 
-            user_agent = await page.evaluate(
-                "window.navigator.userAgent", return_by_value=True
-            )
+            user_agent = await page.evaluate("window.navigator.userAgent", return_by_value=True)
 
             # Provider-specific auth capture
             auth = await self._capture_auth(page, nodriver, timeout)
@@ -296,13 +297,12 @@ class WebChatProvider(ABC):
 
         # Run async browser login in sync context
         loop = None
-        try:
+        with contextlib.suppress(RuntimeError):
             loop = asyncio.get_running_loop()
-        except RuntimeError:
-            pass
 
         if loop and loop.is_running():
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as pool:
                 pool.submit(
                     lambda: asyncio.run(self.browser_login(proxy=proxy, timeout=timeout))
@@ -316,6 +316,7 @@ class WebChatProvider(ABC):
 # =============================================================================
 # GLM-5 WebChat Provider (chat.z.ai)
 # =============================================================================
+
 
 class GLMWebChat(WebChatProvider):
     """
@@ -350,6 +351,7 @@ class GLMWebChat(WebChatProvider):
         """
         try:
             from curl_cffi import requests as cf_requests
+
             r = cf_requests.get(
                 "https://chat.z.ai/api/v1/auths/",
                 headers={"Authorization": f"Bearer {token}"},
@@ -404,9 +406,7 @@ class GLMWebChat(WebChatProvider):
 
             # Check localStorage token and validate it's a real user
             try:
-                token = await page.evaluate(
-                    "localStorage.getItem('token')", return_by_value=True
-                )
+                token = await page.evaluate("localStorage.getItem('token')", return_by_value=True)
                 if token and len(token) > 20:
                     info = self._is_real_user_token(token)
                     if info["valid"]:
@@ -432,8 +432,7 @@ class GLMWebChat(WebChatProvider):
 
         if not captured["token"]:
             raise RuntimeError(
-                "مقدرتش أمسك token مسجل. تأكد إنك سجلت دخول في chat.z.ai "
-                "وبعت رسالة في الشات."
+                "مقدرتش أمسك token مسجل. تأكد إنك سجلت دخول في chat.z.ai " "وبعت رسالة في الشات."
             )
 
         # Get user ID if not captured from validation
@@ -452,7 +451,7 @@ class GLMWebChat(WebChatProvider):
     @staticmethod
     def _create_signature(sorted_payload: str, prompt: str, timestamp_ms: int) -> tuple[str, int]:
         """HMAC-SHA256 signature for chat.z.ai anti-bot.
-        
+
         Algorithm (reverse-engineered from js-sha256 in prod-fe-1.0.240):
         1. base64 encode the prompt (UTF-8 bytes -> base64)
         2. data_string = sorted_payload|base64(prompt)|timestamp_ms
@@ -500,7 +499,8 @@ class GLMWebChat(WebChatProvider):
             "version": "0.0.1",
             "platform": "web",
             "token": auth.token,
-            "user_agent": auth.user_agent or "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+            "user_agent": auth.user_agent
+            or "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
             "language": "en-US",
             "languages": "en-US,en",
             "timezone": "UTC",
@@ -535,13 +535,15 @@ class GLMWebChat(WebChatProvider):
         all_params = {**basic_params, **additional_params}
         url_params = urllib.parse.urlencode(all_params)
 
-        sorted_payload = ",".join(
-            f"{k},{v}" for k, v in sorted(basic_params.items())
+        sorted_payload = ",".join(f"{k},{v}" for k, v in sorted(basic_params.items()))
+
+        signature, timestamp = self._create_signature(
+            sorted_payload, prompt.strip(), current_time_ms
         )
 
-        signature, timestamp = self._create_signature(sorted_payload, prompt.strip(), current_time_ms)
-
-        full_url = f"{self.URL}/api/v2/chat/completions?{url_params}&signature_timestamp={timestamp}"
+        full_url = (
+            f"{self.URL}/api/v2/chat/completions?{url_params}&signature_timestamp={timestamp}"
+        )
         return full_url, signature
 
     def call(
@@ -571,7 +573,7 @@ class GLMWebChat(WebChatProvider):
         # Build signed URL
         url, signature = self._build_signed_url(user_prompt)
 
-        chat_id = str(uuid.uuid4())
+        str(uuid.uuid4())
         payload = {
             "stream": True,
             "model": model_id,
@@ -679,6 +681,7 @@ class GLMWebChat(WebChatProvider):
 # Kimi K2.5 WebChat Provider (kimi.com)
 # =============================================================================
 
+
 class KimiWebChat(WebChatProvider):
     """
     Kimi K2.5 Thinking via kimi.com web chat.
@@ -706,10 +709,10 @@ class KimiWebChat(WebChatProvider):
     # Model → Scenario enum mapping (from Kimi web app JS bundle)
     MODEL_SCENARIOS = {
         "kimi-k2.5-thinking": "SCENARIO_K2D5",
-        "kimi-k2":           "SCENARIO_K2",
-        "kimi-k2-thinking":  "SCENARIO_K2_THINKING",
-        "kimi-research":     "SCENARIO_RESEARCH",
-        "kimi":              "SCENARIO_K2D5",  # default to K2.5
+        "kimi-k2": "SCENARIO_K2",
+        "kimi-k2-thinking": "SCENARIO_K2_THINKING",
+        "kimi-research": "SCENARIO_RESEARCH",
+        "kimi": "SCENARIO_K2D5",  # default to K2.5
     }
 
     # Legacy alias
@@ -758,10 +761,7 @@ class KimiWebChat(WebChatProvider):
             url = event.request.url if hasattr(event.request, "url") else ""
             headers = event.request.headers if hasattr(event.request, "headers") else {}
             if "kimi.com/api" in url or "kimi.com/apiv2" in url:
-                auth_header = (
-                    headers.get("Authorization", "")
-                    or headers.get("authorization", "")
-                )
+                auth_header = headers.get("Authorization", "") or headers.get("authorization", "")
                 if auth_header.startswith("Bearer ") and len(auth_header) > 50:
                     token = auth_header[7:]
                     if token not in ("undefined", "null"):
@@ -823,9 +823,7 @@ class KimiWebChat(WebChatProvider):
             from curl_cffi import requests as cf_requests
 
             cookies = {}
-            for c in await page.send(
-                nodriver_module.cdp.network.get_cookies([self.URL])
-            ):
+            for c in await page.send(nodriver_module.cdp.network.get_cookies([self.URL])):
                 cookies[c.name] = c.value
 
             r = cf_requests.get(
@@ -915,9 +913,7 @@ class KimiWebChat(WebChatProvider):
 
         auth = self.auth
         if not auth:
-            raise RuntimeError(
-                f"Kimi [{self.account}]: Not authenticated. Run warmup() first."
-            )
+            raise RuntimeError(f"Kimi [{self.account}]: Not authenticated. Run warmup() first.")
 
         # Extract user content from messages
         user_content = ""
@@ -970,8 +966,7 @@ class KimiWebChat(WebChatProvider):
 
         if r.status_code in (401, 403):
             raise PermissionError(
-                f"Kimi auth rejected ({r.status_code}). "
-                f"Run --webchat-login kimi to re-login."
+                f"Kimi auth rejected ({r.status_code}). " f"Run --webchat-login kimi to re-login."
             )
 
         if r.status_code != 200:
@@ -1012,9 +1007,7 @@ class KimiWebChat(WebChatProvider):
             # Check for application-level error events
             if "error" in msg:
                 err = msg["error"]
-                error_msg = (
-                    f"Kimi error: {err}" if isinstance(err, str) else json.dumps(err)
-                )
+                error_msg = f"Kimi error: {err}" if isinstance(err, str) else json.dumps(err)
                 continue
 
             op = msg.get("op", "")
@@ -1050,6 +1043,7 @@ class KimiWebChat(WebChatProvider):
 # =============================================================================
 # DeepSeek WebChat Provider (chat.deepseek.com)
 # =============================================================================
+
 
 class DeepSeekWebChat(WebChatProvider):
     """
@@ -1099,15 +1093,13 @@ class DeepSeekWebChat(WebChatProvider):
             url = event.request.url if hasattr(event.request, "url") else ""
             headers = event.request.headers if hasattr(event.request, "headers") else {}
             if "chat.deepseek.com/api" in url:
-                auth_header = (
-                    headers.get("Authorization", "")
-                    or headers.get("authorization", "")
-                )
+                auth_header = headers.get("Authorization", "") or headers.get("authorization", "")
                 if auth_header.startswith("Bearer ") and len(auth_header) > 30:
                     token = auth_header[7:]
                     # Validate token with a quick API call
                     try:
                         from curl_cffi import requests as cf_requests
+
                         r = cf_requests.get(
                             f"{self._BASE_API}/users/current",
                             headers={
@@ -1182,9 +1174,7 @@ class DeepSeekWebChat(WebChatProvider):
         )
 
         if r.status_code in (401, 403):
-            raise PermissionError(
-                f"DeepSeek auth rejected ({r.status_code}). Re-login needed."
-            )
+            raise PermissionError(f"DeepSeek auth rejected ({r.status_code}). Re-login needed.")
         if r.status_code != 200:
             raise RuntimeError(f"DeepSeek session create error {r.status_code}: {r.text[:200]}")
 
@@ -1228,7 +1218,8 @@ class DeepSeekWebChat(WebChatProvider):
 
         result = subprocess.run(
             [
-                "node", solver_path,
+                "node",
+                solver_path,
                 challenge["algorithm"],
                 challenge["challenge"],
                 challenge["salt"],
@@ -1259,9 +1250,7 @@ class DeepSeekWebChat(WebChatProvider):
             "signature": challenge["signature"],
             "target_path": challenge["target_path"],
         }
-        return base64.b64encode(
-            json.dumps(pow_response, separators=(",", ":")).encode()
-        ).decode()
+        return base64.b64encode(json.dumps(pow_response, separators=(",", ":")).encode()).decode()
 
     def call(
         self,
@@ -1278,9 +1267,7 @@ class DeepSeekWebChat(WebChatProvider):
 
         auth = self.auth
         if not auth:
-            raise RuntimeError(
-                f"DeepSeek [{self.account}]: Not authenticated. Run warmup() first."
-            )
+            raise RuntimeError(f"DeepSeek [{self.account}]: Not authenticated. Run warmup() first.")
 
         model = model or self.DEFAULT_MODEL
         thinking_enabled = "thinking" in model.lower()
@@ -1438,6 +1425,7 @@ class DeepSeekWebChat(WebChatProvider):
 # GitHub Copilot WebChat Provider (api.githubcopilot.com)
 # =============================================================================
 
+
 class CopilotWebChat(WebChatProvider):
     """
     GitHub Copilot via api.githubcopilot.com — OpenAI-compatible API.
@@ -1549,6 +1537,7 @@ class CopilotWebChat(WebChatProvider):
         # Try opening browser automatically
         try:
             import webbrowser
+
             webbrowser.open(verification_uri)
             print("  (Browser opened automatically)")
         except Exception:
@@ -1613,9 +1602,7 @@ class CopilotWebChat(WebChatProvider):
             elif error == "access_denied":
                 raise RuntimeError("Authorization denied by user.")
             else:
-                raise RuntimeError(
-                    f"OAuth error: {error} — {result.get('error_description', '')}"
-                )
+                raise RuntimeError(f"OAuth error: {error} — {result.get('error_description', '')}")
 
         raise RuntimeError("OAuth timeout — no authorization received")
 
@@ -1650,13 +1637,9 @@ class CopilotWebChat(WebChatProvider):
         )
 
         if r.status_code == 401:
-            raise PermissionError(
-                "GitHub token invalid/revoked. Re-run warmup(force=True)."
-            )
+            raise PermissionError("GitHub token invalid/revoked. Re-run warmup(force=True).")
         if r.status_code != 200:
-            raise RuntimeError(
-                f"Copilot token exchange failed: {r.status_code} — {r.text[:200]}"
-            )
+            raise RuntimeError(f"Copilot token exchange failed: {r.status_code} — {r.text[:200]}")
 
         data = r.json()
         token = data.get("token", "")
@@ -1668,6 +1651,7 @@ class CopilotWebChat(WebChatProvider):
         if expires_at_str:
             try:
                 from datetime import datetime
+
                 dt = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
                 self._copilot_token_expires = dt.timestamp()
             except Exception:
@@ -1685,9 +1669,7 @@ class CopilotWebChat(WebChatProvider):
 
         auth = self.auth
         if not auth:
-            raise RuntimeError(
-                f"Copilot [{self.account}]: Not authenticated. Run warmup() first."
-            )
+            raise RuntimeError(f"Copilot [{self.account}]: Not authenticated. Run warmup() first.")
 
         return self._exchange_copilot_token(auth.token)
 
@@ -1709,9 +1691,7 @@ class CopilotWebChat(WebChatProvider):
 
         auth = self.auth
         if not auth:
-            raise RuntimeError(
-                f"Copilot [{self.account}]: Not authenticated. Run warmup() first."
-            )
+            raise RuntimeError(f"Copilot [{self.account}]: Not authenticated. Run warmup() first.")
 
         model = model or self.DEFAULT_MODEL
         copilot_token = self._get_copilot_token()
@@ -1763,9 +1743,7 @@ class CopilotWebChat(WebChatProvider):
             )
 
         if r.status_code != 200:
-            raise RuntimeError(
-                f"Copilot API error {r.status_code}: {r.text[:200]}"
-            )
+            raise RuntimeError(f"Copilot API error {r.status_code}: {r.text[:200]}")
 
         return self._parse_openai_sse(r)
 
@@ -1855,12 +1833,13 @@ def webchat_call(
       - Auto-selects best account (least loaded, highest health)
       - Tracks rate limits per account
       - Auto-rotates on failure
-    
+
     Falls back to simple auth check if no pools configured.
     """
     # --- Try smart routing via AccountPool ---
     try:
         from .account_manager import PoolManager
+
         mgr = PoolManager.instance()
         pool = mgr.pool(provider_name)
 
@@ -1877,7 +1856,8 @@ def webchat_call(
                         result = provider.call(messages, model=model, timeout=timeout)
                         latency_ms = (time.time() - start) * 1000
                         pool.record_call(
-                            acct_label, success=True,
+                            acct_label,
+                            success=True,
                             latency_ms=latency_ms,
                             tokens_used=len(result) // 4,
                         )
@@ -1885,7 +1865,8 @@ def webchat_call(
                     except Exception as e:
                         latency_ms = (time.time() - start) * 1000
                         pool.record_call(
-                            acct_label, success=False,
+                            acct_label,
+                            success=False,
                             latency_ms=latency_ms,
                             error_msg=str(e)[:100],
                         )
@@ -1893,6 +1874,7 @@ def webchat_call(
                         # Detect hard rate limits and set cooldown
                         try:
                             from .account_manager import detect_hard_cooldown
+
                             hc = detect_hard_cooldown(str(e))
                             if hc:
                                 cd_sec, cd_reason = hc
@@ -1909,9 +1891,12 @@ def webchat_call(
                             if fb_provider.is_authenticated:
                                 start2 = time.time()
                                 try:
-                                    result2 = fb_provider.call(messages, model=model, timeout=timeout)
+                                    result2 = fb_provider.call(
+                                        messages, model=model, timeout=timeout
+                                    )
                                     pool.record_call(
-                                        fallback.label, success=True,
+                                        fallback.label,
+                                        success=True,
                                         latency_ms=(time.time() - start2) * 1000,
                                         tokens_used=len(result2) // 4,
                                     )
@@ -1958,6 +1943,7 @@ def check_all_webchat_auth() -> dict[str, list[dict[str, Any]]]:
 # =============================================================================
 # CLI
 # =============================================================================
+
 
 def _cli():
     import sys

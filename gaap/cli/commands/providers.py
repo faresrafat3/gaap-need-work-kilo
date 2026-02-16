@@ -82,7 +82,7 @@ def _show_status():
     print("\n📊 Provider Status")
     print("=" * 60)
 
-    for key, info in PROVIDERS_INFO.items():
+    for _key, info in PROVIDERS_INFO.items():
         env_key = info["env_key"]
         has_key = os.environ.get(env_key) if env_key else True
         status = "🟢 Ready" if has_key else "🔴 No API Key"

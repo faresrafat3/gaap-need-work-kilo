@@ -21,13 +21,12 @@ from gaap.core.types import (
 # Logger Setup
 # =============================================================================
 
+
 def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
@@ -38,41 +37,47 @@ def get_logger(name: str) -> logging.Logger:
 # Enums
 # =============================================================================
 
+
 class ContextStrategy(Enum):
     """استراتيجيات إدارة السياق"""
-    HCL = auto()                    # Hierarchical Context Loading
-    PKG = auto()                    # Project Knowledge Graph
-    TERRITORY = auto()              # Territory Mapping
-    SMART_CHUNKING = auto()         # Smart Chunking
-    EXTERNAL_BRAIN = auto()         # External Brain
-    HYBRID = auto()                 # مزيج من الاستراتيجيات
+
+    HCL = auto()  # Hierarchical Context Loading
+    PKG = auto()  # Project Knowledge Graph
+    TERRITORY = auto()  # Territory Mapping
+    SMART_CHUNKING = auto()  # Smart Chunking
+    EXTERNAL_BRAIN = auto()  # External Brain
+    HYBRID = auto()  # مزيج من الاستراتيجيات
 
 
 class ProjectSize(Enum):
     """حجم المشروع"""
-    TINY = auto()       # < 10k tokens
-    SMALL = auto()      # 10k - 100k tokens
-    MEDIUM = auto()     # 100k - 1M tokens
-    LARGE = auto()      # 1M - 10M tokens
-    HUGE = auto()       # 10M - 100M tokens
-    MASSIVE = auto()    # 100M+ tokens
+
+    TINY = auto()  # < 10k tokens
+    SMALL = auto()  # 10k - 100k tokens
+    MEDIUM = auto()  # 100k - 1M tokens
+    LARGE = auto()  # 1M - 10M tokens
+    HUGE = auto()  # 10M - 100M tokens
+    MASSIVE = auto()  # 100M+ tokens
 
 
 class TaskScope(Enum):
     """نطاق المهمة"""
-    LOCAL = auto()          # ملف واحد
-    MODULE = auto()         # وحدة واحدة
-    CROSS_MODULE = auto()   # عدة وحدات
-    SYSTEM_WIDE = auto()    # النظام بالكامل
+
+    LOCAL = auto()  # ملف واحد
+    MODULE = auto()  # وحدة واحدة
+    CROSS_MODULE = auto()  # عدة وحدات
+    SYSTEM_WIDE = auto()  # النظام بالكامل
 
 
 # =============================================================================
 # Data Classes
 # =============================================================================
 
+
 @dataclass
 class ContextDecision:
     """قرار إدارة السياق"""
+
     strategy: ContextStrategy
     budget: ContextBudget
     estimated_tokens: int
@@ -85,6 +90,7 @@ class ContextDecision:
 @dataclass
 class ProjectProfile:
     """ملف تعريف المشروع"""
+
     name: str
     total_files: int = 0
     total_lines: int = 0
@@ -112,6 +118,7 @@ class ProjectProfile:
 @dataclass
 class AgentTerritory:
     """منطقة وكيل"""
+
     agent_id: str
     zone_name: str
     files: list[str] = field(default_factory=list)
@@ -123,10 +130,11 @@ class AgentTerritory:
 # Context Orchestrator
 # =============================================================================
 
+
 class ContextOrchestrator:
     """
     منسق السياق - العقل الذي يوزع المزايا بذكاء
-    
+
     يقرر:
     - أي استراتيجية استخدام
     - كيفية توزيع الميزانية
@@ -156,7 +164,7 @@ class ContextOrchestrator:
         self,
         project_path: str | None = None,
         default_budget_level: str = "medium",
-        enable_caching: bool = True
+        enable_caching: bool = True,
     ):
         self.project_path = project_path
         self.default_budget_level = default_budget_level
@@ -194,19 +202,23 @@ class ContextOrchestrator:
         # تحليل الملفات
         for root, dirs, files in os.walk(self.project_path):
             # تجاهل المجلدات المخفية و node_modules
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d != 'node_modules' and d != '__pycache__']
+            dirs[:] = [
+                d
+                for d in dirs
+                if not d.startswith(".") and d != "node_modules" and d != "__pycache__"
+            ]
 
             for file in files:
-                if file.startswith('.'):
+                if file.startswith("."):
                     continue
 
                 file_path = os.path.join(root, file)
                 ext = os.path.splitext(file)[1].lower()
 
                 try:
-                    with open(file_path, encoding='utf-8', errors='ignore') as f:
+                    with open(file_path, encoding="utf-8", errors="ignore") as f:
                         content = f.read()
-                        lines = content.count('\n') + 1
+                        lines = content.count("\n") + 1
                         tokens = len(content.split()) * 1.5  # تقدير تقريبي
 
                         profile.total_files += 1
@@ -215,11 +227,21 @@ class ContextOrchestrator:
 
                         # تحديد اللغة
                         lang_map = {
-                            '.py': 'Python', '.js': 'JavaScript', '.ts': 'TypeScript',
-                            '.jsx': 'React', '.tsx': 'React', '.java': 'Java',
-                            '.go': 'Go', '.rs': 'Rust', '.rb': 'Ruby',
-                            '.php': 'PHP', '.cs': 'C#', '.cpp': 'C++',
-                            '.c': 'C', '.swift': 'Swift', '.kt': 'Kotlin',
+                            ".py": "Python",
+                            ".js": "JavaScript",
+                            ".ts": "TypeScript",
+                            ".jsx": "React",
+                            ".tsx": "React",
+                            ".java": "Java",
+                            ".go": "Go",
+                            ".rs": "Rust",
+                            ".rb": "Ruby",
+                            ".php": "PHP",
+                            ".cs": "C#",
+                            ".cpp": "C++",
+                            ".c": "C",
+                            ".swift": "Swift",
+                            ".kt": "Kotlin",
                         }
                         lang = lang_map.get(ext)
                         if lang and lang not in profile.languages:
@@ -261,17 +283,15 @@ class ContextOrchestrator:
     # =========================================================================
 
     async def decide_strategy(
-        self,
-        task: Task,
-        budget_override: int | None = None
+        self, task: Task, budget_override: int | None = None
     ) -> ContextDecision:
         """
         تحديد أفضل استراتيجية لإدارة السياق
-        
+
         Args:
             task: المهمة المراد تنفيذها
             budget_override: تجاوز الميزانية (اختياري)
-        
+
         Returns:
             قرار السياق
         """
@@ -283,10 +303,7 @@ class ContextOrchestrator:
         task_scope = self._analyze_task_scope(task)
 
         # حساب الميزانية
-        base_budget = self.DEFAULT_BUDGETS.get(
-            self.default_budget_level,
-            50_000
-        )
+        base_budget = self.DEFAULT_BUDGETS.get(self.default_budget_level, 50_000)
         priority_mult = self.PRIORITY_MULTIPLIERS.get(task.priority, 1.0)
         budget_amount = int(base_budget * priority_mult)
 
@@ -298,21 +315,16 @@ class ContextOrchestrator:
             project_size=self._project_profile.size,
             task_scope=task_scope,
             task_type=task.type,
-            budget=budget_amount
+            budget=budget_amount,
         )
 
         # تقدير الرموز المطلوبة
         estimated_tokens = self._estimate_required_tokens(
-            strategy=strategy,
-            task_scope=task_scope,
-            task=task
+            strategy=strategy, task_scope=task_scope, task=task
         )
 
         # بناء القرار
-        budget = ContextBudget(
-            total=budget_amount,
-            level=self._get_context_level(task_scope)
-        )
+        budget = ContextBudget(total=budget_amount, level=self._get_context_level(task_scope))
 
         decision = ContextDecision(
             strategy=strategy,
@@ -325,7 +337,7 @@ class ContextOrchestrator:
                 "project_size": self._project_profile.size.name,
                 "task_scope": task_scope.name,
                 "task_type": task.type.name,
-            }
+            },
         )
 
         self._decision_history.append(decision)
@@ -364,11 +376,7 @@ class ContextOrchestrator:
         return scope_from_complexity.get(task.complexity, TaskScope.MODULE)
 
     def _select_strategy(
-        self,
-        project_size: ProjectSize,
-        task_scope: TaskScope,
-        task_type: TaskType,
-        budget: int
+        self, project_size: ProjectSize, task_scope: TaskScope, task_type: TaskType, budget: int
     ) -> tuple[ContextStrategy, str]:
         """اختيار الاستراتيجية المثلى"""
 
@@ -398,10 +406,7 @@ class ContextOrchestrator:
         return ContextStrategy.HCL, "Default HCL strategy"
 
     def _estimate_required_tokens(
-        self,
-        strategy: ContextStrategy,
-        task_scope: TaskScope,
-        task: Task
+        self, strategy: ContextStrategy, task_scope: TaskScope, task: Task
     ) -> int:
         """تقدير الرموز المطلوبة"""
         base_estimates = {
@@ -427,7 +432,7 @@ class ContextOrchestrator:
 
         return int(base * mult)
 
-    def _get_context_level(self, task_scope: TaskScope) -> 'ContextLevel':
+    def _get_context_level(self, task_scope: TaskScope) -> "ContextLevel":
         """الحصول على مستوى السياق"""
         level_map = {
             TaskScope.LOCAL: ContextLevel.LEVEL_3_FULL,
@@ -437,11 +442,7 @@ class ContextOrchestrator:
         }
         return level_map.get(task_scope, ContextLevel.LEVEL_2_FILE)
 
-    def _calculate_confidence(
-        self,
-        strategy: ContextStrategy,
-        task_scope: TaskScope
-    ) -> float:
+    def _calculate_confidence(self, strategy: ContextStrategy, task_scope: TaskScope) -> float:
         """حساب الثقة في القرار"""
         # ثقة عالية للتطابقات الواضحة
         confidence_map = {
@@ -454,10 +455,7 @@ class ContextOrchestrator:
 
         return confidence_map.get((strategy, task_scope), 0.75)
 
-    def _get_alternative_strategies(
-        self,
-        primary: ContextStrategy
-    ) -> list[ContextStrategy]:
+    def _get_alternative_strategies(self, primary: ContextStrategy) -> list[ContextStrategy]:
         """الحصول على الاستراتيجيات البديلة"""
         alternatives_map = {
             ContextStrategy.PKG: [ContextStrategy.HYBRID, ContextStrategy.TERRITORY],
@@ -475,10 +473,7 @@ class ContextOrchestrator:
     # =========================================================================
 
     async def load_context(
-        self,
-        decision: ContextDecision,
-        task: Task,
-        focus_files: list[str] | None = None
+        self, decision: ContextDecision, task: Task, focus_files: list[str] | None = None
     ) -> ContextManager:
         """تحميل السياق بناءً على القرار"""
         budget = decision.budget
@@ -501,14 +496,12 @@ class ContextOrchestrator:
         return manager
 
     async def _load_hcl(
-        self,
-        manager: ContextManager,
-        task: Task,
-        focus_files: list[str] | None
+        self, manager: ContextManager, task: Task, focus_files: list[str] | None
     ) -> None:
         """تحميل باستخدام HCL"""
         if self._hcl is None:
             from gaap.context.hcl import HierarchicalContextLoader
+
             self._hcl = HierarchicalContextLoader(self.project_path)
 
         # تحميل المستوى 0 دائماً
@@ -519,7 +512,7 @@ class ContextOrchestrator:
                 content=overview.content,
                 token_count=overview.token_count,
                 level=ContextLevel.LEVEL_0_OVERVIEW,
-                priority=100
+                priority=100,
             )
             manager.add_window(window)
 
@@ -533,19 +526,17 @@ class ContextOrchestrator:
                         content=node.content,
                         token_count=node.token_count,
                         level=ContextLevel.LEVEL_3_FULL,
-                        source=file_path
+                        source=file_path,
                     )
                     manager.add_window(window)
 
     async def _load_smart_chunks(
-        self,
-        manager: ContextManager,
-        task: Task,
-        focus_files: list[str] | None
+        self, manager: ContextManager, task: Task, focus_files: list[str] | None
     ) -> None:
         """تحميل باستخدام Smart Chunking"""
         if self._smart_chunker is None:
             from gaap.context.smart_chunking import SmartChunker
+
             self._smart_chunker = SmartChunker(self.project_path)
 
         if focus_files:
@@ -558,18 +549,15 @@ class ContextOrchestrator:
                         token_count=chunk.token_count,
                         level=ContextLevel.LEVEL_3_FULL,
                         source=file_path,
-                        metadata={"chunk_type": chunk.chunk_type.name}
+                        metadata={"chunk_type": chunk.chunk_type.name},
                     )
                     manager.add_window(window)
 
-    async def _load_from_brain(
-        self,
-        manager: ContextManager,
-        task: Task
-    ) -> None:
+    async def _load_from_brain(self, manager: ContextManager, task: Task) -> None:
         """تحميل من External Brain"""
         if self._external_brain is None:
             from gaap.context.external_brain import ExternalBrain
+
             self._external_brain = ExternalBrain(self.project_path)
 
         # البحث عن السياق ذي الصلة
@@ -583,15 +571,11 @@ class ContextOrchestrator:
                 token_count=result.token_count,
                 level=ContextLevel.LEVEL_2_FILE,
                 source=result.source,
-                metadata={"relevance_score": result.relevance_score}
+                metadata={"relevance_score": result.relevance_score},
             )
             manager.add_window(window)
 
-    async def _load_territory(
-        self,
-        manager: ContextManager,
-        task: Task
-    ) -> None:
+    async def _load_territory(self, manager: ContextManager, task: Task) -> None:
         """تحميل منطقة معينة"""
         # تحديد المنطقة من المهمة
         territory = self._find_relevant_territory(task)
@@ -609,20 +593,17 @@ class ContextOrchestrator:
                                 content=content[:50000],  # حد
                                 token_count=int(tokens),
                                 level=ContextLevel.LEVEL_2_FILE,
-                                source=file_path
+                                source=file_path,
                             )
                             manager.add_window(window)
                     except Exception as e:
                         self._logger.warning(f"Could not load {file_path}: {e}")
 
-    async def _load_from_pkg(
-        self,
-        manager: ContextManager,
-        task: Task
-    ) -> None:
+    async def _load_from_pkg(self, manager: ContextManager, task: Task) -> None:
         """تحميل من PKG"""
         if self._pkg_agent is None:
             from gaap.context.pkg_agent import PKGAgent
+
             self._pkg_agent = PKGAgent(self.project_path)
 
         # الحصول على الرسم البياني ذي الصلة
@@ -635,15 +616,12 @@ class ContextOrchestrator:
                 token_count=len((node.summary or node.name).split()) * 1.5,
                 level=ContextLevel.LEVEL_1_MODULE,
                 source=node.file_path,
-                metadata={"node_type": node.node_type}
+                metadata={"node_type": node.node_type},
             )
             manager.add_window(window)
 
     async def _load_hybrid(
-        self,
-        manager: ContextManager,
-        task: Task,
-        focus_files: list[str] | None
+        self, manager: ContextManager, task: Task, focus_files: list[str] | None
     ) -> None:
         """تحميل هجين"""
         # مزج من عدة مصادر
@@ -655,7 +633,7 @@ class ContextOrchestrator:
         # تحليل المهمة للعثور على منطقة
         for territory in self._territories.values():
             if any(
-                keyword.lower() in ' '.join(territory.files).lower()
+                keyword.lower() in " ".join(territory.files).lower()
                 for keyword in task.description.split()[:5]
             ):
                 return territory
@@ -667,18 +645,11 @@ class ContextOrchestrator:
     # =========================================================================
 
     def define_territory(
-        self,
-        agent_id: str,
-        zone_name: str,
-        files: list[str],
-        interfaces: list[str] | None = None
+        self, agent_id: str, zone_name: str, files: list[str], interfaces: list[str] | None = None
     ) -> AgentTerritory:
         """تحديد منطقة وكيل"""
         territory = AgentTerritory(
-            agent_id=agent_id,
-            zone_name=zone_name,
-            files=files,
-            interfaces=interfaces or []
+            agent_id=agent_id, zone_name=zone_name, files=files, interfaces=interfaces or []
         )
 
         # تقدير الرموز
@@ -687,7 +658,7 @@ class ContextOrchestrator:
             try:
                 with open(file_path) as f:
                     total_tokens += len(f.read().split()) * 1.5
-            except:
+            except Exception:
                 pass
 
         territory.estimated_tokens = int(total_tokens)
@@ -723,12 +694,7 @@ class ContextOrchestrator:
 # Convenience Functions
 # =============================================================================
 
-def create_orchestrator(
-    project_path: str,
-    budget_level: str = "medium"
-) -> ContextOrchestrator:
+
+def create_orchestrator(project_path: str, budget_level: str = "medium") -> ContextOrchestrator:
     """إنشاء منسق سياق"""
-    return ContextOrchestrator(
-        project_path=project_path,
-        default_budget_level=budget_level
-    )
+    return ContextOrchestrator(project_path=project_path, default_budget_level=budget_level)

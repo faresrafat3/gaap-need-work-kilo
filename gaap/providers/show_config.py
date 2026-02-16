@@ -6,7 +6,6 @@ Shows clean, filtered configuration for all providers
 Only primary models kept for production use
 """
 
-
 from gaap.providers.multi_provider_config import (
     FAILED_PROVIDERS,
     WORKING_PROVIDERS,
@@ -75,12 +74,14 @@ def print_provider_summary():
         rpm_total = provider.limits.requests_per_minute * num_keys
         total_rpm += rpm_total
         total_keys += num_keys
-        provider_rows.append({
-            "name": provider.name,
-            "rpm": rpm_total,
-            "keys": num_keys,
-            "priority": provider.priority,
-        })
+        provider_rows.append(
+            {
+                "name": provider.name,
+                "rpm": rpm_total,
+                "keys": num_keys,
+                "priority": provider.priority,
+            }
+        )
 
     print("📊 TOTAL CAPACITY (Working Providers Only)")
     print("-" * 90)
@@ -142,7 +143,7 @@ def print_model_comparison():
             "latency": "227ms",
             "accuracy": "87.0%",
             "rpm": 210,
-            "status": "✅ FASTEST"
+            "status": "✅ FASTEST",
         },
         {
             "provider": "Cerebras",
@@ -150,7 +151,7 @@ def print_model_comparison():
             "latency": "511ms",
             "accuracy": "87.0%",
             "rpm": 210,
-            "status": "✅ RELIABLE"
+            "status": "✅ RELIABLE",
         },
         {
             "provider": "Mistral",
@@ -158,7 +159,7 @@ def print_model_comparison():
             "latency": "603ms",
             "accuracy": "N/A",
             "rpm": 60,
-            "status": "✅ VERIFIED"
+            "status": "✅ VERIFIED",
         },
         {
             "provider": "GitHub",
@@ -166,7 +167,7 @@ def print_model_comparison():
             "latency": "1498ms",
             "accuracy": "N/A",
             "rpm": 15,
-            "status": "✅ BACKUP"
+            "status": "✅ BACKUP",
         },
     ]
 
@@ -174,7 +175,9 @@ def print_model_comparison():
     print("-" * 90)
 
     for m in models_data:
-        print(f"{m['provider']:<12} {m['model']:<30} {m['latency']:>10} {m['accuracy']:>8} {m['rpm']:>6} {m['status']:<12}")
+        print(
+            f"{m['provider']:<12} {m['model']:<30} {m['latency']:>10} {m['accuracy']:>8} {m['rpm']:>6} {m['status']:<12}"
+        )
 
     print()
     print("=" * 90)

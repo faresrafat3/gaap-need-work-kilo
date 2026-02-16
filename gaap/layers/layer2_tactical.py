@@ -25,13 +25,12 @@ from gaap.layers.layer1_strategic import ArchitectureSpec
 # Logger Setup
 # =============================================================================
 
+
 def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
@@ -42,8 +41,10 @@ def get_logger(name: str) -> logging.Logger:
 # Enums
 # =============================================================================
 
+
 class TaskCategory(Enum):
     """تصنيفات المهام"""
+
     SETUP = auto()
     DATABASE = auto()
     API = auto()
@@ -57,8 +58,9 @@ class TaskCategory(Enum):
 
 class DependencyType(Enum):
     """أنواع التبعيات"""
-    HARD = "hard"          # يجب أن تكتمل قبل البدء
-    SOFT = "soft"          # يفضل أن تكتمل
+
+    HARD = "hard"  # يجب أن تكتمل قبل البدء
+    SOFT = "soft"  # يفضل أن تكتمل
     CONDITIONAL = "conditional"  # بناءً على شرط
 
 
@@ -66,9 +68,11 @@ class DependencyType(Enum):
 # Data Classes
 # =============================================================================
 
+
 @dataclass
 class AtomicTask:
     """مهمة ذرية"""
+
     id: str
     name: str
     description: str
@@ -117,9 +121,10 @@ class AtomicTask:
 @dataclass
 class TaskNode:
     """عقدة في رسم المهام"""
+
     task: AtomicTask
-    children: list['TaskNode'] = field(default_factory=list)
-    parents: list['TaskNode'] = field(default_factory=list)
+    children: list["TaskNode"] = field(default_factory=list)
+    parents: list["TaskNode"] = field(default_factory=list)
     level: int = 0
 
     @property
@@ -134,6 +139,7 @@ class TaskNode:
 @dataclass
 class TaskGraph:
     """رسم بياني للمهام (DAG)"""
+
     root_nodes: list[TaskNode] = field(default_factory=list)
     all_nodes: dict[str, TaskNode] = field(default_factory=dict)
 
@@ -150,10 +156,7 @@ class TaskGraph:
         return node
 
     def add_dependency(
-        self,
-        task_id: str,
-        depends_on_id: str,
-        dep_type: DependencyType = DependencyType.HARD
+        self, task_id: str, depends_on_id: str, dep_type: DependencyType = DependencyType.HARD
     ) -> None:
         """إضافة تبعية"""
         if task_id not in self.all_nodes or depends_on_id not in self.all_nodes:
@@ -290,6 +293,7 @@ class TaskGraph:
 # Dependency Resolver
 # =============================================================================
 
+
 class DependencyResolver:
     """حل التبعيات"""
 
@@ -351,10 +355,11 @@ class DependencyResolver:
 # Tactical Decomposer
 # =============================================================================
 
+
 class TacticalDecomposer:
     """
     المحلل التكتيكي الذكي (LLM-Powered)
-    
+
     يحول المواصفات المعمارية إلى مهام ذرية باستخدام الـ LLM:
     - تحليل الطلب الأصلي والمعمارية
     - توليد مهام مخصصة ومرتبطة بالطلب فعلياً
@@ -450,21 +455,17 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         self._llm_decompositions = 0
         self._fallback_decompositions = 0
 
-    async def decompose(
-        self,
-        spec: ArchitectureSpec,
-        goals: list[str]
-    ) -> list[AtomicTask]:
+    async def decompose(self, spec: ArchitectureSpec, goals: list[str]) -> list[AtomicTask]:
         """
         تفكيك المواصفات لمهام ذرية
-        
+
         يستخدم الـ LLM أولاً، وإذا فشل يرجع لتفكيك ذكي هيوريستيكي
         """
         # استخراج النص الأصلي من الـ metadata
-        original_intent = spec.metadata.get('original_intent', {})
-        original_text = original_intent.get('original_text', '')
-        intent_type = original_intent.get('intent_type', 'UNKNOWN')
-        explicit_goals = original_intent.get('explicit_goals', goals)
+        original_intent = spec.metadata.get("original_intent", {})
+        original_text = original_intent.get("original_text", "")
+        intent_type = original_intent.get("intent_type", "UNKNOWN")
+        explicit_goals = original_intent.get("explicit_goals", goals)
 
         # محاولة التفكيك بالـ LLM
         if self._provider and original_text:
@@ -478,16 +479,14 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
                 self._logger.warning(f"LLM decomposition failed, using smart fallback: {e}")
 
         # Fallback: تفكيك ذكي بدون LLM
-        tasks = await self._smart_fallback_decompose(spec, original_text, intent_type, explicit_goals)
+        tasks = await self._smart_fallback_decompose(
+            spec, original_text, intent_type, explicit_goals
+        )
         self._fallback_decompositions += 1
         return tasks
 
     async def _llm_decompose(
-        self,
-        spec: ArchitectureSpec,
-        original_text: str,
-        intent_type: str,
-        goals: list[str]
+        self, spec: ArchitectureSpec, original_text: str, intent_type: str, goals: list[str]
     ) -> list[AtomicTask] | None:
         """تفكيك باستخدام الـ LLM"""
         # بناء البرومبت
@@ -505,12 +504,9 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         messages = [
             Message(
                 role=MessageRole.SYSTEM,
-                content="You are a precise task decomposition engine. Output only valid JSON arrays."
+                content="You are a precise task decomposition engine. Output only valid JSON arrays.",
             ),
-            Message(
-                role=MessageRole.USER,
-                content=prompt
-            ),
+            Message(role=MessageRole.USER, content=prompt),
         ]
 
         response = await self._provider.chat_completion(
@@ -544,33 +540,33 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         cleaned = raw.strip()
 
         # إزالة thinking tags إذا موجودة
-        thinking_pattern = re.compile(r'<think>.*?</think>', re.DOTALL)
-        cleaned = thinking_pattern.sub('', cleaned).strip()
+        thinking_pattern = re.compile(r"<think>.*?</think>", re.DOTALL)
+        cleaned = thinking_pattern.sub("", cleaned).strip()
 
         # إزالة markdown code fences
-        if cleaned.startswith('```'):
+        if cleaned.startswith("```"):
             # إزالة أول سطر (```json أو ```)
-            lines = cleaned.split('\n')
+            lines = cleaned.split("\n")
             start_idx = 1
             end_idx = len(lines)
             for i in range(len(lines) - 1, 0, -1):
-                if lines[i].strip() == '```':
+                if lines[i].strip() == "```":
                     end_idx = i
                     break
-            cleaned = '\n'.join(lines[start_idx:end_idx])
+            cleaned = "\n".join(lines[start_idx:end_idx])
 
         # محاولة parse مباشرة
         try:
             data = json.loads(cleaned)
             if isinstance(data, list):
                 return data
-            elif isinstance(data, dict) and 'tasks' in data:
-                return data['tasks']
+            elif isinstance(data, dict) and "tasks" in data:
+                return data["tasks"]
         except json.JSONDecodeError:
             pass
 
         # محاولة استخراج JSON array من النص
-        bracket_match = re.search(r'\[[\s\S]*\]', cleaned)
+        bracket_match = re.search(r"\[[\s\S]*\]", cleaned)
         if bracket_match:
             try:
                 data = json.loads(bracket_match.group())
@@ -583,9 +579,7 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         return None
 
     def _convert_to_atomic_tasks(
-        self,
-        tasks_data: list[dict],
-        spec: ArchitectureSpec
+        self, tasks_data: list[dict], spec: ArchitectureSpec
     ) -> list[AtomicTask]:
         """تحويل بيانات JSON لـ AtomicTask objects"""
         tasks = []
@@ -599,30 +593,30 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
             task_id_map[idx] = task_id
 
             # تعيين الفئة
-            category_str = data.get('category', 'api').lower().strip()
+            category_str = data.get("category", "api").lower().strip()
             category = self.CATEGORY_MAP.get(category_str, TaskCategory.API)
 
             # تعيين النوع
-            type_str = data.get('type', 'code_generation').lower().strip()
+            type_str = data.get("type", "code_generation").lower().strip()
             task_type = self.TYPE_MAP.get(type_str, TaskType.CODE_GENERATION)
 
             # تعيين الأولوية
-            priority_str = data.get('priority', 'normal').lower().strip()
+            priority_str = data.get("priority", "normal").lower().strip()
             priority = self.PRIORITY_MAP.get(priority_str, TaskPriority.NORMAL)
 
             # تعيين التعقيد
-            complexity_str = data.get('complexity', 'moderate').lower().strip()
+            complexity_str = data.get("complexity", "moderate").lower().strip()
             complexity = self.COMPLEXITY_MAP.get(complexity_str, TaskComplexity.MODERATE)
 
             # تقدير الوقت
-            est_minutes = data.get('estimated_minutes', 15)
+            est_minutes = data.get("estimated_minutes", 15)
             if not isinstance(est_minutes, (int, float)):
                 est_minutes = 15
 
             task = AtomicTask(
                 id=task_id,
-                name=str(data.get('name', f'Task {idx + 1}'))[:80],
-                description=str(data.get('description', data.get('name', f'Task {idx + 1}'))),
+                name=str(data.get("name", f"Task {idx + 1}"))[:80],
+                description=str(data.get("description", data.get("name", f"Task {idx + 1}"))),
                 category=category,
                 type=task_type,
                 priority=priority,
@@ -630,20 +624,20 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
                 estimated_time_minutes=int(est_minutes),
                 estimated_tokens=int(est_minutes * 80),
                 constraints={
-                    "language": spec.tech_stack.get('language', 'python'),
-                    "framework": spec.tech_stack.get('framework', ''),
+                    "language": spec.tech_stack.get("language", "python"),
+                    "framework": spec.tech_stack.get("framework", ""),
                 },
                 metadata={
                     "source": "llm_decomposition",
                     "original_index": idx,
-                    "raw_depends_on": data.get('depends_on', []),
+                    "raw_depends_on": data.get("depends_on", []),
                 },
             )
             tasks.append(task)
 
         # ربط التبعيات باستخدام الـ index map
         for task in tasks:
-            raw_deps = task.metadata.get('raw_depends_on', [])
+            raw_deps = task.metadata.get("raw_depends_on", [])
             if isinstance(raw_deps, list):
                 for dep_idx in raw_deps:
                     if isinstance(dep_idx, int) and dep_idx in task_id_map:
@@ -669,7 +663,9 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         def has_cycle(task_id: str, visited: set, stack: set) -> bool:
             visited.add(task_id)
             stack.add(task_id)
-            for dep_id in task_map.get(task_id, AtomicTask(id="", name="", description="", category=TaskCategory.SETUP)).dependencies:
+            for dep_id in task_map.get(
+                task_id, AtomicTask(id="", name="", description="", category=TaskCategory.SETUP)
+            ).dependencies:
                 if dep_id not in visited:
                     if has_cycle(dep_id, visited, stack):
                         return True
@@ -689,31 +685,37 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         return tasks
 
     async def _smart_fallback_decompose(
-        self,
-        spec: ArchitectureSpec,
-        original_text: str,
-        intent_type: str,
-        goals: list[str]
+        self, spec: ArchitectureSpec, original_text: str, intent_type: str, goals: list[str]
     ) -> list[AtomicTask]:
         """
         تفكيك ذكي هيوريستيكي (Fallback)
-        
+
         بدلاً من القوالب الثابتة، يحلل النص ويولد مهام مرتبطة
         """
         tasks = []
 
         # تحليل النص لاستخراج كلمات مفتاحية ونوع العمل
-        text_lower = (original_text or '').lower()
+        text_lower = (original_text or "").lower()
 
-        if intent_type == 'CODE_GENERATION' or any(kw in text_lower for kw in ['write', 'create', 'implement', 'build', 'اكتب', 'أنشئ']):
+        if intent_type == "CODE_GENERATION" or any(
+            kw in text_lower for kw in ["write", "create", "implement", "build", "اكتب", "أنشئ"]
+        ):
             tasks = self._decompose_code_generation(original_text, spec, goals)
-        elif intent_type == 'DEBUGGING' or any(kw in text_lower for kw in ['debug', 'fix', 'error', 'bug', 'صلح', 'خطأ']):
+        elif intent_type == "DEBUGGING" or any(
+            kw in text_lower for kw in ["debug", "fix", "error", "bug", "صلح", "خطأ"]
+        ):
             tasks = self._decompose_debugging(original_text, spec)
-        elif intent_type == 'CODE_REVIEW' or any(kw in text_lower for kw in ['review', 'analyze', 'check', 'راجع']):
+        elif intent_type == "CODE_REVIEW" or any(
+            kw in text_lower for kw in ["review", "analyze", "check", "راجع"]
+        ):
             tasks = self._decompose_code_review(original_text, spec)
-        elif intent_type == 'ARCHITECTURE' or any(kw in text_lower for kw in ['design', 'architect', 'system', 'صمم', 'معمارية']):
+        elif intent_type == "ARCHITECTURE" or any(
+            kw in text_lower for kw in ["design", "architect", "system", "صمم", "معمارية"]
+        ):
             tasks = self._decompose_architecture(original_text, spec, goals)
-        elif intent_type == 'REFACTORING' or any(kw in text_lower for kw in ['refactor', 'improve', 'optimize', 'حسن']):
+        elif intent_type == "REFACTORING" or any(
+            kw in text_lower for kw in ["refactor", "improve", "optimize", "حسن"]
+        ):
             tasks = self._decompose_refactoring(original_text, spec)
         else:
             # تفكيك عام مبني على الأهداف
@@ -721,15 +723,12 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
 
         # تقليم إذا تجاوز الحد
         if len(tasks) > self.max_subtasks:
-            tasks = tasks[:self.max_subtasks]
+            tasks = tasks[: self.max_subtasks]
 
         return tasks
 
     def _decompose_code_generation(
-        self,
-        original_text: str,
-        spec: ArchitectureSpec,
-        goals: list[str]
+        self, original_text: str, spec: ArchitectureSpec, goals: list[str]
     ) -> list[AtomicTask]:
         """تفكيك مهمة برمجية"""
         tasks = []
@@ -753,7 +752,12 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         impl_task = AtomicTask(
             id=self._generate_task_id(),
             name=f"Implement: {original_text[:50]}",
-            description=f"Implement the following:\n{original_text}\n\nRequirements:\n" + "\n".join(f"- {g}" for g in goals) if goals else original_text,
+            description=(
+                f"Implement the following:\n{original_text}\n\nRequirements:\n"
+                + "\n".join(f"- {g}" for g in goals)
+                if goals
+                else original_text
+            ),
             category=TaskCategory.API,
             type=TaskType.CODE_GENERATION,
             priority=TaskPriority.HIGH,
@@ -762,7 +766,7 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
             estimated_tokens=1500,
             dependencies=[analyze_task.id],
             constraints={
-                "language": spec.tech_stack.get('language', 'python'),
+                "language": spec.tech_stack.get("language", "python"),
             },
             metadata={"source": "smart_fallback"},
         )
@@ -786,11 +790,7 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
 
         return tasks
 
-    def _decompose_debugging(
-        self,
-        original_text: str,
-        spec: ArchitectureSpec
-    ) -> list[AtomicTask]:
+    def _decompose_debugging(self, original_text: str, spec: ArchitectureSpec) -> list[AtomicTask]:
         """تفكيك مهمة تصحيح أخطاء"""
         tasks = []
 
@@ -844,9 +844,7 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         return tasks
 
     def _decompose_code_review(
-        self,
-        original_text: str,
-        spec: ArchitectureSpec
+        self, original_text: str, spec: ArchitectureSpec
     ) -> list[AtomicTask]:
         """تفكيك مهمة مراجعة كود"""
         tasks = []
@@ -883,10 +881,7 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         return tasks
 
     def _decompose_architecture(
-        self,
-        original_text: str,
-        spec: ArchitectureSpec,
-        goals: list[str]
+        self, original_text: str, spec: ArchitectureSpec, goals: list[str]
     ) -> list[AtomicTask]:
         """تفكيك مهمة تصميم معماري"""
         tasks = []
@@ -895,7 +890,9 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         requirements = AtomicTask(
             id=self._generate_task_id(),
             name=f"Requirements analysis: {original_text[:40]}",
-            description=f"Analyze requirements for:\n{original_text}\n\nGoals:\n" + "\n".join(f"- {g}" for g in goals) + "\n\nIdentify:\n1. Functional requirements\n2. Non-functional requirements\n3. Scale and performance needs\n4. Integration points",
+            description=f"Analyze requirements for:\n{original_text}\n\nGoals:\n"
+            + "\n".join(f"- {g}" for g in goals)
+            + "\n\nIdentify:\n1. Functional requirements\n2. Non-functional requirements\n3. Scale and performance needs\n4. Integration points",
             category=TaskCategory.SETUP,
             type=TaskType.ANALYSIS,
             priority=TaskPriority.CRITICAL,
@@ -941,9 +938,7 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         return tasks
 
     def _decompose_refactoring(
-        self,
-        original_text: str,
-        spec: ArchitectureSpec
+        self, original_text: str, spec: ArchitectureSpec
     ) -> list[AtomicTask]:
         """تفكيك مهمة إعادة هيكلة"""
         tasks = []
@@ -995,10 +990,7 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         return tasks
 
     def _decompose_general(
-        self,
-        original_text: str,
-        spec: ArchitectureSpec,
-        goals: list[str]
+        self, original_text: str, spec: ArchitectureSpec, goals: list[str]
     ) -> list[AtomicTask]:
         """تفكيك عام للمهام غير المصنفة"""
         tasks = []
@@ -1007,7 +999,12 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         analyze = AtomicTask(
             id=self._generate_task_id(),
             name=f"Analyze: {original_text[:55]}",
-            description=f"Analyze and understand the following request:\n{original_text}\n\n" + ("Goals:\n" + "\n".join(f"- {g}" for g in goals) if goals else "Identify the key objectives and deliverables."),
+            description=f"Analyze and understand the following request:\n{original_text}\n\n"
+            + (
+                "Goals:\n" + "\n".join(f"- {g}" for g in goals)
+                if goals
+                else "Identify the key objectives and deliverables."
+            ),
             category=TaskCategory.SETUP,
             type=TaskType.ANALYSIS,
             priority=TaskPriority.HIGH,
@@ -1070,6 +1067,7 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
 # Execution Queue
 # =============================================================================
 
+
 class ExecutionQueue:
     """طابور التنفيذ"""
 
@@ -1125,10 +1123,11 @@ class ExecutionQueue:
 # Layer 2 Tactical
 # =============================================================================
 
+
 class Layer2Tactical(BaseLayer):
     """
     طبقة التنظيم التكتيكي
-    
+
     المسؤوليات:
     - تفكيك المواصفات المعمارية لمهام ذرية
     - حل التبعيات وبناء رسم المهام
@@ -1136,18 +1135,10 @@ class Layer2Tactical(BaseLayer):
     - تقدير الموارد
     """
 
-    def __init__(
-        self,
-        max_subtasks: int = 50,
-        max_parallel: int = 10,
-        provider=None
-    ):
+    def __init__(self, max_subtasks: int = 50, max_parallel: int = 10, provider=None):
         super().__init__(LayerType.TACTICAL)
 
-        self.decomposer = TacticalDecomposer(
-            max_subtasks=max_subtasks,
-            provider=provider
-        )
+        self.decomposer = TacticalDecomposer(max_subtasks=max_subtasks, provider=provider)
         self.resolver = DependencyResolver()
         self.queue = ExecutionQueue(max_parallel=max_parallel)
 
@@ -1164,10 +1155,10 @@ class Layer2Tactical(BaseLayer):
         # استخراج البيانات
         if isinstance(input_data, ArchitectureSpec):
             spec = input_data
-            goals = spec.metadata.get('plan', {}).get('phases', [])
+            goals = spec.metadata.get("plan", {}).get("phases", [])
         elif isinstance(input_data, dict):
-            spec = input_data.get('spec')
-            goals = input_data.get('goals', [])
+            spec = input_data.get("spec")
+            goals = input_data.get("goals", [])
         else:
             raise ValueError("Expected ArchitectureSpec or dict")
 
@@ -1186,8 +1177,7 @@ class Layer2Tactical(BaseLayer):
 
         elapsed = (time.time() - start_time) * 1000
         self._logger.info(
-            f"Task graph created: {len(tasks)} tasks, "
-            f"{graph.max_depth} levels, {elapsed:.0f}ms"
+            f"Task graph created: {len(tasks)} tasks, " f"{graph.max_depth} levels, {elapsed:.0f}ms"
         )
 
         return graph
@@ -1223,14 +1213,9 @@ class Layer2Tactical(BaseLayer):
 # Convenience Functions
 # =============================================================================
 
+
 def create_tactical_layer(
-    max_subtasks: int = 50,
-    max_parallel: int = 10,
-    provider=None
+    max_subtasks: int = 50, max_parallel: int = 10, provider=None
 ) -> Layer2Tactical:
     """إنشاء طبقة تكتيكية"""
-    return Layer2Tactical(
-        max_subtasks=max_subtasks,
-        max_parallel=max_parallel,
-        provider=provider
-    )
+    return Layer2Tactical(max_subtasks=max_subtasks, max_parallel=max_parallel, provider=provider)

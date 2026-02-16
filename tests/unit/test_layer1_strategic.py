@@ -3,18 +3,13 @@ Unit tests for Layer 1 - Strategic Layer
 """
 
 import pytest
-import asyncio
-from unittest.mock import MagicMock, AsyncMock, patch
-from typing import Dict, Any, List
 
 from gaap.core.types import (
-    Task,
+    CriticType,
+    ModelTier,
+    TaskComplexity,
     TaskPriority,
     TaskType,
-    TaskComplexity,
-    ModelTier,
-    HealingLevel,
-    CriticType,
 )
 
 

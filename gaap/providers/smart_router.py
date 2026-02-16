@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class KeyState:
     """Track state of a single API key"""
+
     key_index: int
     last_used: float = 0.0
     requests_this_minute: int = 0
@@ -59,13 +60,13 @@ class KeyState:
         if self.is_exhausted:
             return False
 
-        if limits.requests_per_minute > 0 and self.requests_this_minute >= limits.requests_per_minute:
+        if (
+            limits.requests_per_minute > 0
+            and self.requests_this_minute >= limits.requests_per_minute
+        ):
             return False
 
-        if limits.requests_per_day > 0 and self.requests_today >= limits.requests_per_day:
-            return False
-
-        return True
+        return not (limits.requests_per_day > 0 and self.requests_today >= limits.requests_per_day)
 
     def mark_used(self):
         """Mark key as used"""
@@ -91,6 +92,7 @@ class KeyState:
 @dataclass
 class ProviderState:
     """Track state of a provider"""
+
     config: ProviderConfig
     key_states: list[KeyState] = field(default_factory=list)
     total_requests: int = 0
@@ -101,10 +103,7 @@ class ProviderState:
 
     def __post_init__(self):
         if not self.key_states:
-            self.key_states = [
-                KeyState(key_index=i)
-                for i in range(len(self.config.api_keys))
-            ]
+            self.key_states = [KeyState(key_index=i) for i in range(len(self.config.api_keys))]
 
     def get_available_key(self) -> tuple[int, str] | None:
         """Get an available API key index and value"""
@@ -113,7 +112,8 @@ class ProviderState:
 
         # Find keys that can be used
         available = [
-            (i, state) for i, state in enumerate(self.key_states)
+            (i, state)
+            for i, state in enumerate(self.key_states)
             if state.can_use(self.config.limits)
         ]
 
@@ -149,10 +149,7 @@ class ProviderState:
 
     def get_utilization(self) -> float:
         """Get current utilization (0.0 - 1.0)"""
-        available = sum(
-            1 for state in self.key_states
-            if state.can_use(self.config.limits)
-        )
+        available = sum(1 for state in self.key_states if state.can_use(self.config.limits))
         total = len(self.key_states)
         return 1.0 - (available / max(total, 1))
 
@@ -169,7 +166,7 @@ class SmartRouter:
     def __init__(self, enabled_provider_types: list[ProviderType] | None = None):
         """
         Initialize router
-        
+
         Args:
             enabled_provider_types: List of provider types to enable, or None for all
         """
@@ -187,11 +184,11 @@ class SmartRouter:
     def select_provider(
         self,
         model_preference: str | None = None,
-        exclude_providers: list[ProviderType] | None = None
+        exclude_providers: list[ProviderType] | None = None,
     ) -> tuple[ProviderType, int, str] | None:
         """
         Select best provider and API key
-        
+
         Returns:
             Tuple of (provider_type, key_index, api_key) or None if no provider available
         """
@@ -210,7 +207,7 @@ class SmartRouter:
                 x[1].config.priority,  # Higher priority first
                 -x[1].get_utilization(),  # Lower utilization better
             ),
-            reverse=True
+            reverse=True,
         )
 
         # Try each provider until we find an available key
@@ -237,7 +234,7 @@ class SmartRouter:
         key_index: int,
         success: bool,
         cost: float = 0.0,
-        rate_limited: bool = False
+        rate_limited: bool = False,
     ):
         """Mark request result"""
         if provider_type not in self.provider_states:
@@ -249,23 +246,18 @@ class SmartRouter:
         if rate_limited:
             state.key_states[key_index].mark_rate_limited()
 
-    async def execute_with_retry(
-        self,
-        call_fn,
-        max_provider_attempts: int = 3,
-        **kwargs
-    ):
+    async def execute_with_retry(self, call_fn, max_provider_attempts: int = 3, **kwargs):
         """
         Execute a function with automatic provider retry
-        
+
         Args:
             call_fn: Async function that takes (provider_type, api_key) and returns result
             max_provider_attempts: Max number of different providers to try
             **kwargs: Additional args for select_provider
-        
+
         Returns:
             Result from call_fn
-        
+
         Raises:
             Exception if all providers exhausted
         """
@@ -274,10 +266,7 @@ class SmartRouter:
 
         for attempt in range(max_provider_attempts):
             # Select provider
-            selection = self.select_provider(
-                exclude_providers=attempted_providers,
-                **kwargs
-            )
+            selection = self.select_provider(exclude_providers=attempted_providers, **kwargs)
 
             if not selection:
                 raise RuntimeError(
@@ -302,18 +291,11 @@ class SmartRouter:
                 error_str = str(e).lower()
 
                 # Check if rate limited
-                is_rate_limited = (
-                    "rate" in error_str or
-                    "quota" in error_str or
-                    "429" in error_str
-                )
+                is_rate_limited = "rate" in error_str or "quota" in error_str or "429" in error_str
 
                 # Mark failure
                 self.mark_request(
-                    provider_type,
-                    key_index,
-                    success=False,
-                    rate_limited=is_rate_limited
+                    provider_type, key_index, success=False, rate_limited=is_rate_limited
                 )
 
                 logger.warning(
@@ -342,14 +324,11 @@ class SmartRouter:
             "total_requests": sum(s.total_requests for s in self.provider_states.values()),
             "total_errors": sum(s.total_errors for s in self.provider_states.values()),
             "total_cost": sum(s.total_cost for s in self.provider_states.values()),
-            "providers": {}
+            "providers": {},
         }
 
         for ptype, state in self.provider_states.items():
-            available_keys = sum(
-                1 for ks in state.key_states
-                if ks.can_use(state.config.limits)
-            )
+            available_keys = sum(1 for ks in state.key_states if ks.can_use(state.config.limits))
 
             stats["providers"][ptype.value] = {
                 "name": state.config.name,
@@ -380,11 +359,7 @@ class SmartRouter:
         print(f"{'Provider':<25} {'Pri':>4} {'Keys':>10} {'Util':>8} {'Reqs':>8} {'Errs':>6}")
         print("-" * 80)
 
-        for pdata in sorted(
-            stats['providers'].values(),
-            key=lambda x: x['priority'],
-            reverse=True
-        ):
+        for pdata in sorted(stats["providers"].values(), key=lambda x: x["priority"], reverse=True):
             print(
                 f"{pdata['name']:<25} {pdata['priority']:>4} "
                 f"{pdata['available_keys']}/{pdata['total_keys']:>1} "
@@ -399,11 +374,13 @@ async def example_usage():
     """Example of how to use SmartRouter"""
 
     # Initialize router with specific providers
-    router = SmartRouter(enabled_provider_types=[
-        ProviderType.CEREBRAS,
-        ProviderType.GROQ,
-        ProviderType.OPENROUTER,
-    ])
+    router = SmartRouter(
+        enabled_provider_types=[
+            ProviderType.CEREBRAS,
+            ProviderType.GROQ,
+            ProviderType.OPENROUTER,
+        ]
+    )
 
     # Example call function
     async def make_api_call(provider_type: ProviderType, api_key: str):

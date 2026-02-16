@@ -13,12 +13,13 @@ Strategy:
 Rate Limits:
   g4f: ~5 RPM (shared across models)
   Gemini API: 5 RPM × 7 keys = 35 RPM total
-  
+
 All models: 1M token context window
 """
 
 import asyncio
 import base64
+import contextlib
 import json
 import os
 import time
@@ -31,25 +32,27 @@ from typing import Any
 # Configuration
 # =============================================================================
 
+
 class BackendType(Enum):
-    G4F = "g4f"                       # g4f default routing
-    G4F_PROVIDER = "g4f_provider"      # g4f with specific provider (LMArena, OpenaiChat, etc.)
+    G4F = "g4f"  # g4f default routing
+    G4F_PROVIDER = "g4f_provider"  # g4f with specific provider (LMArena, OpenaiChat, etc.)
     OPENAI_COMPAT = "openai_compatible"
-    WEBCHAT = "webchat"                # Browser-authenticated web chat (GLM, Kimi, DeepSeek)
+    WEBCHAT = "webchat"  # Browser-authenticated web chat (GLM, Kimi, DeepSeek)
 
 
 @dataclass
 class ModelSlot:
     """A single model slot in the fallback chain."""
-    name: str                    # Display name
-    model_id: str                # Model ID for the API
-    backend: BackendType         # How to call it
-    base_url: str = ""           # API base URL (for OpenAI-compat)
-    g4f_provider: str = ""       # g4f Provider class name (e.g. "LMArena", "OpenaiChat")
+
+    name: str  # Display name
+    model_id: str  # Model ID for the API
+    backend: BackendType  # How to call it
+    base_url: str = ""  # API base URL (for OpenAI-compat)
+    g4f_provider: str = ""  # g4f Provider class name (e.g. "LMArena", "OpenaiChat")
     api_keys: list[str] = field(default_factory=list)
-    rpm_per_key: int = 5         # Rate limit per key
+    rpm_per_key: int = 5  # Rate limit per key
     context_window: int = 1_000_000  # Max context tokens
-    priority: int = 100          # Higher = preferred
+    priority: int = 100  # Higher = preferred
     enabled: bool = True
 
     # Runtime state
@@ -139,6 +142,7 @@ def _read_var_from_env_file(var_name: str) -> str:
         return ""
     return ""
 
+
 def _split_env_list(var_name: str) -> list[str]:
     value = os.getenv(var_name, "").strip()
     if not value:
@@ -152,6 +156,7 @@ def _refresh_lmarena_models() -> None:
     """Force LMArena to refresh its model list from arena.ai (requires curl_cffi)."""
     try:
         from g4f.Provider import LMArena
+
         LMArena._models_loaded = False
         models = LMArena.get_models(timeout=30)
         if models:
@@ -174,6 +179,7 @@ def _get_lmarena_cache_path() -> Path:
         return LMARENA_CACHE_PATH
     try:
         from g4f.cookies import get_cookies_dir
+
         LMARENA_CACHE_PATH = Path(get_cookies_dir()) / "auth_LMArena.json"
     except ImportError:
         LMARENA_CACHE_PATH = Path.home() / ".config" / "g4f" / "cookies" / "auth_LMArena.json"
@@ -183,7 +189,7 @@ def _get_lmarena_cache_path() -> Path:
 def check_lmarena_auth() -> dict[str, Any]:
     """
     Check the LMArena auth cache status.
-    
+
     Returns dict with:
       - valid: bool (token exists and not expired)
       - expires_in_sec: int (seconds until expiry, negative = expired)
@@ -249,10 +255,10 @@ def check_lmarena_auth() -> dict[str, Any]:
 def warmup_lmarena_auth(force: bool = False) -> dict[str, Any]:
     """
     Warm up LMArena auth by triggering browser automation.
-    
+
     If force=True or token is expired/missing, opens real Chrome browser
     so the user can help solve captcha. The browser window will be visible.
-    
+
     Returns check_lmarena_auth() result after warmup.
     """
     status = check_lmarena_auth()
@@ -272,22 +278,19 @@ def warmup_lmarena_auth(force: bool = False) -> dict[str, Any]:
 
         # Run the async auth in a sync context
         loop = None
-        try:
+        with contextlib.suppress(RuntimeError):
             loop = asyncio.get_running_loop()
-        except RuntimeError:
-            pass
 
         if loop and loop.is_running():
             # Already in async context – create task
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as pool:
                 args, grecaptcha = pool.submit(
                     lambda: asyncio.run(LMArena.get_args_from_nodriver(proxy=None, force=True))
                 ).result(timeout=180)
         else:
-            args, grecaptcha = asyncio.run(
-                LMArena.get_args_from_nodriver(proxy=None, force=True)
-            )
+            args, grecaptcha = asyncio.run(LMArena.get_args_from_nodriver(proxy=None, force=True))
 
         print("  ✅ Authentication successful!")
         status = check_lmarena_auth()
@@ -474,7 +477,7 @@ def _apply_profile_priorities(chain: list[ModelSlot], profile: str) -> list[Mode
 def build_default_chain(profile: str = "quality") -> list[ModelSlot]:
     """
     Build fallback chain dynamically from available env vars.
-    
+
     Priority:
       1. Kimi K2.5 (WebChat Direct) - Primary
       2. DeepSeek V3.2 (WebChat Direct) - Fallback
@@ -498,7 +501,7 @@ def build_default_chain(profile: str = "quality") -> list[ModelSlot]:
                 g4f_provider="kimi",
                 rpm_per_key=60,  # WebChat supports higher RPM
                 context_window=128_000,
-                priority=200,    # Highest priority
+                priority=200,  # Highest priority
             )
         )
 
@@ -641,20 +644,21 @@ def get_onboarding_requirements() -> list[dict[str, str]]:
 # Unified Provider
 # =============================================================================
 
+
 class UnifiedProvider:
     """
     Primary + Fallback provider with rate limit awareness.
-    
+
     Usage:
         provider = UnifiedProvider()
         text, model, latency = provider.call("Your prompt here")
-    
+
     Fallback Logic:
         1. Try primary (gemini-2.5-flash g4f)
         2. If fails → try gemini-2.5-pro g4f
         3. If fails → try gemini-2.5-flash Gemini API
         4. If all fail → raise error
-    
+
     Rate Limit Logic:
         - Tracks time between calls per slot
         - Enforces minimum delay based on RPM
@@ -701,12 +705,14 @@ class UnifiedProvider:
     def _get_g4f_client(self):
         if self._g4f_client is None:
             from g4f.client import Client as G4FClient
+
             self._g4f_client = G4FClient()
         return self._g4f_client
 
     def _resolve_g4f_provider(self, provider_name: str):
         """Resolve a g4f provider class by name."""
         import g4f.Provider as gp
+
         cls = getattr(gp, provider_name, None)
         if cls is None:
             raise ValueError(f"Unknown g4f provider: {provider_name}")
@@ -717,9 +723,8 @@ class UnifiedProvider:
         cache_key = f"{slot.base_url}:{key[:8]}"
         if cache_key not in self._openai_clients:
             import openai
-            self._openai_clients[cache_key] = openai.OpenAI(
-                api_key=key, base_url=slot.base_url
-            )
+
+            self._openai_clients[cache_key] = openai.OpenAI(api_key=key, base_url=slot.base_url)
         return self._openai_clients[cache_key]
 
     def _wait_rate_limit(self, slot: ModelSlot):
@@ -735,7 +740,13 @@ class UnifiedProvider:
         message = str(error).lower()
         if "429" in message or "rate limit" in message or "quota" in message:
             return "rate_limit"
-        if "api key" in message or "unauthorized" in message or "forbidden" in message or "401" in message or "403" in message:
+        if (
+            "api key" in message
+            or "unauthorized" in message
+            or "forbidden" in message
+            or "401" in message
+            or "403" in message
+        ):
             return "auth"
         if "timeout" in message or "timed out" in message:
             return "timeout"
@@ -743,7 +754,12 @@ class UnifiedProvider:
             return "network"
         if "provider" in message or "cookie" in message:
             return "provider"
-        if "private model" in message or "not supported" in message or "model" in message and "not found" in message:
+        if (
+            "private model" in message
+            or "not supported" in message
+            or "model" in message
+            and "not found" in message
+        ):
             return "model_unavailable"
         return "unknown"
 
@@ -762,7 +778,9 @@ class UnifiedProvider:
         self._wait_rate_limit(slot)
 
         # LMArena browser automation needs longer timeout
-        effective_timeout = max(timeout, 180) if slot.backend == BackendType.G4F_PROVIDER else timeout
+        effective_timeout = (
+            max(timeout, 180) if slot.backend == BackendType.G4F_PROVIDER else timeout
+        )
 
         messages = []
         if system:
@@ -811,6 +829,7 @@ class UnifiedProvider:
 
         elif slot.backend == BackendType.WEBCHAT:
             from .webchat_providers import webchat_call
+
             content = webchat_call(
                 provider_name=slot.g4f_provider,
                 messages=messages,
@@ -840,7 +859,7 @@ class UnifiedProvider:
     ) -> tuple[str, str, float]:
         """
         Call with automatic fallback.
-        
+
         Returns: (answer_text, model_name, latency_ms)
         """
         errors = []
@@ -862,9 +881,7 @@ class UnifiedProvider:
 
             for attempt in range(max_retries_per_slot + 1):
                 try:
-                    content, latency_ms = self._call_slot(
-                        slot, prompt, system, timeout
-                    )
+                    content, latency_ms = self._call_slot(slot, prompt, system, timeout)
                     return content, slot.name, latency_ms
 
                 except Exception as e:
@@ -957,15 +974,13 @@ class UnifiedProvider:
                     or _read_var_from_env_file("GAAP_ENABLE_LMARENA")
                     or "1"
                 )
-                configured = (lm_flag == "1")
+                configured = lm_flag == "1"
             elif env_key != "none":
                 first_key = env_key.split(" /")[0]
                 val = os.getenv(first_key, "").strip() or _read_var_from_env_file(first_key)
                 configured = bool(val)
             status = "✅" if configured or env_key == "none" else "⚪"
-            lines.append(
-                f"  {status} {item['source']}: {item['needed']} | ENV: {env_key}"
-            )
+            lines.append(f"  {status} {item['source']}: {item['needed']} | ENV: {env_key}")
             lines.append(f"      - {item['notes']}")
         lines.append("=" * 70)
         return "\n".join(lines)

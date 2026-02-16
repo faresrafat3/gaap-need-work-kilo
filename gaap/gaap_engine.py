@@ -17,8 +17,8 @@ from gaap.layers.layer1_strategic import ArchitectureSpec, Layer1Strategic
 from gaap.layers.layer2_tactical import AtomicTask, Layer2Tactical, TaskCategory, TaskGraph
 from gaap.layers.layer3_execution import ExecutionResult, Layer3Execution
 from gaap.memory.hierarchical import HierarchicalMemory
-from gaap.providers.chat_based import G4FProvider
 from gaap.providers.free_tier import GeminiProvider, GroqProvider
+from gaap.providers.unified_gaap_provider import UnifiedGAAPProvider
 from gaap.routing.fallback import FallbackManager
 from gaap.routing.router import RoutingStrategy, SmartRouter
 from gaap.security.firewall import AuditTrail, PromptFirewall
@@ -27,13 +27,12 @@ from gaap.security.firewall import AuditTrail, PromptFirewall
 # Logger Setup
 # =============================================================================
 
+
 def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
@@ -44,9 +43,11 @@ def get_logger(name: str) -> logging.Logger:
 # Data Classes
 # =============================================================================
 
+
 @dataclass
 class GAAPRequest:
     """طلب GAAP"""
+
     text: str
     context: dict[str, Any] | None = None
     priority: TaskPriority = TaskPriority.NORMAL
@@ -57,6 +58,7 @@ class GAAPRequest:
 @dataclass
 class GAAPResponse:
     """استجابة GAAP"""
+
     request_id: str
     success: bool
     output: Any = None
@@ -83,10 +85,11 @@ class GAAPResponse:
 # GAAP Engine
 # =============================================================================
 
+
 class GAAPEngine:
     """
     محرك GAAP الرئيسي
-    
+
     يجمع كل الطبقات:
     - Layer 0: Interface (فحص أمني، تصنيف)
     - Layer 1: Strategic (تخطيط معماري)
@@ -102,21 +105,19 @@ class GAAPEngine:
         enable_healing: bool = True,
         enable_memory: bool = True,
         enable_security: bool = True,
-        project_path: str | None = None
+        project_path: str | None = None,
     ):
         self._logger = get_logger("gaap.engine")
 
-        # إعداد المزودين
+        # إعداد المزودين (الافتراضي: المزود الموحد الذي يبدأ بـ Kimi)
         if providers is None:
-            providers = [G4FProvider()]
+            providers = [UnifiedGAAPProvider()]
 
         self.providers = providers
 
         # إعداد التوجيه
         self.router = SmartRouter(
-            providers=providers,
-            strategy=RoutingStrategy.SMART,
-            budget_limit=budget
+            providers=providers, strategy=RoutingStrategy.SMART, budget_limit=budget
         )
 
         # إعداد الـ Fallback
@@ -143,29 +144,18 @@ class GAAPEngine:
             self.audit_trail = AuditTrail()
 
         # الطبقات
-        self.layer0 = Layer0Interface(
-            firewall_strictness="high",
-            enable_behavioral_analysis=True
-        )
+        self.layer0 = Layer0Interface(firewall_strictness="high", enable_behavioral_analysis=True)
 
         self.layer1 = Layer1Strategic(
-            tot_depth=5,
-            tot_branching=4,
-            mad_rounds=3,
-            provider=providers[0] if providers else None
+            tot_depth=5, tot_branching=4, mad_rounds=3, provider=providers[0] if providers else None
         )
 
         self.layer2 = Layer2Tactical(
-            max_subtasks=5,
-            max_parallel=3,
-            provider=providers[0] if providers else None
+            max_subtasks=5, max_parallel=3, provider=providers[0] if providers else None
         )
 
         self.layer3 = Layer3Execution(
-            router=self.router,
-            fallback=self.fallback,
-            enable_twin=False,
-            max_parallel=3
+            router=self.router, fallback=self.fallback, enable_twin=False, max_parallel=3
         )
 
         # === Memory Safety ===
@@ -192,10 +182,7 @@ class GAAPEngine:
         if self.fallback:
             self.fallback.reset_health()
 
-        response = GAAPResponse(
-            request_id=request_id,
-            success=False
-        )
+        response = GAAPResponse(request_id=request_id, success=False)
 
         try:
             # ========== Layer 0: Interface ==========
@@ -206,7 +193,7 @@ class GAAPEngine:
                 scan_result = self.firewall.scan(request.text, request.context)
                 if not scan_result.is_safe:
                     response.error = f"Security risk detected: {scan_result.risk_level.name}"
-                    response.metadata['security_scan'] = scan_result.to_dict()
+                    response.metadata["security_scan"] = scan_result.to_dict()
                     return response
 
             # تصنيف النية
@@ -237,7 +224,9 @@ class GAAPEngine:
                 graph = await self.layer2.process(spec)
                 response.task_graph = graph
 
-                self._logger.info(f"Layer 2 done — RSS={get_rss_mb():.0f}MB, tasks={graph.total_tasks}")
+                self._logger.info(
+                    f"Layer 2 done — RSS={get_rss_mb():.0f}MB, tasks={graph.total_tasks}"
+                )
                 gc.collect()
 
                 # ========== Layer 3: Execution ==========
@@ -298,7 +287,7 @@ class GAAPEngine:
                     action="process_request",
                     agent_id="gaap_engine",
                     resource=request_id,
-                    result="success" if response.success else "failed"
+                    result="success" if response.success else "failed",
                 )
 
             # تحديث الإحصائيات
@@ -310,21 +299,18 @@ class GAAPEngine:
         except Exception as e:
             self._logger.error(f"Request {request_id} failed: {e}")
             import traceback
+
             self._logger.error(f"Traceback:\n{traceback.format_exc()}")
             response.error = str(e)
             self._failed_requests += 1
 
         # حساب المقاييس
         response.total_time_ms = (time.time() - start_time) * 1000
-        response.total_cost_usd = sum(
-            r.cost_usd for r in response.execution_results
+        response.total_cost_usd = sum(r.cost_usd for r in response.execution_results)
+        response.total_tokens = sum(r.tokens_used for r in response.execution_results)
+        response.quality_score = sum(r.quality_score for r in response.execution_results) / max(
+            len(response.execution_results), 1
         )
-        response.total_tokens = sum(
-            r.tokens_used for r in response.execution_results
-        )
-        response.quality_score = sum(
-            r.quality_score for r in response.execution_results
-        ) / max(len(response.execution_results), 1)
 
         self._logger.info(
             f"Request {request_id} completed: "
@@ -336,9 +322,7 @@ class GAAPEngine:
         return response
 
     async def _direct_execution(
-        self,
-        request: GAAPRequest,
-        intent: StructuredIntent
+        self, request: GAAPRequest, intent: StructuredIntent
     ) -> ExecutionResult:
         """تنفيذ مباشر للطلبات البسيطة"""
         # إنشاء مهمة بسيطة
@@ -347,13 +331,16 @@ class GAAPEngine:
             name="Direct Execution",
             description=request.text,
             category=TaskCategory.SETUP,
-            type=intent.intent_type.name.lower().startswith('code') and TaskType.CODE_GENERATION or TaskType.ANALYSIS,
+            type=intent.intent_type.name.lower().startswith("code")
+            and TaskType.CODE_GENERATION
+            or TaskType.ANALYSIS,
         )
 
         return await self.layer3.process(task)
 
     async def _execute_with_healing(self, task: AtomicTask) -> ExecutionResult:
         """تنفيذ مع تعافي ذاتي"""
+
         async def execute_func(t):
             return await self.layer3.process(t)
 
@@ -377,7 +364,7 @@ class GAAPEngine:
                             category=TaskCategory.SETUP,
                             type=t.type,
                         )
-                    )
+                    ),
                 )
 
                 if healing_result.success:
@@ -392,22 +379,11 @@ class GAAPEngine:
             return result
 
         except Exception as e:
-            return ExecutionResult(
-                task_id=task.id,
-                success=False,
-                error=str(e)
-            )
+            return ExecutionResult(task_id=task.id, success=False, error=str(e))
 
-    async def chat(
-        self,
-        message: str,
-        context: dict[str, Any] | None = None
-    ) -> str:
+    async def chat(self, message: str, context: dict[str, Any] | None = None) -> str:
         """محادثة بسيطة"""
-        request = GAAPRequest(
-            text=message,
-            context=context
-        )
+        request = GAAPRequest(text=message, context=context)
 
         response = await self.process(request)
 
@@ -440,13 +416,14 @@ class GAAPEngine:
 # Convenience Functions
 # =============================================================================
 
+
 def create_engine(
     groq_api_key: str | None = None,
     gemini_api_key: str | None = None,
     gemini_api_keys: list[str] | None = None,
     budget: float = 100.0,
     project_path: str | None = None,
-    enable_all: bool = True
+    enable_all: bool = True,
 ) -> GAAPEngine:
     """إنشاء محرك GAAP"""
     providers = []
@@ -471,9 +448,9 @@ def create_engine(
             )
         )
 
-    # Fallback مجاني فقط إذا لا توجد مفاتيح مزودات حقيقية
+    # Fallback مجاني (Kimi-first) فقط إذا لا توجد مفاتيح مزودات حقيقية
     if not providers:
-        providers.append(G4FProvider())
+        providers.append(UnifiedGAAPProvider())
 
     return GAAPEngine(
         providers=providers,
@@ -482,20 +459,12 @@ def create_engine(
         enable_healing=enable_all,
         enable_memory=enable_all,
         enable_security=enable_all,
-        project_path=project_path
+        project_path=project_path,
     )
 
 
-async def quick_chat(
-    message: str,
-    groq_api_key: str | None = None,
-    budget: float = 10.0
-) -> str:
+async def quick_chat(message: str, groq_api_key: str | None = None, budget: float = 10.0) -> str:
     """محادثة سريعة"""
-    engine = create_engine(
-        groq_api_key=groq_api_key,
-        budget=budget,
-        enable_all=False
-    )
+    engine = create_engine(groq_api_key=groq_api_key, budget=budget, enable_all=False)
 
     return await engine.chat(message)

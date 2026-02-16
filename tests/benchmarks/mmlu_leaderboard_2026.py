@@ -19,7 +19,6 @@ LATEST_OFFICIAL_SCORES = {
     "claude-opus-4": 92.8,  # #4
     "gemini-2.5-pro-preview": 92.4,  # #5
     "o3": 92.3,  # #6 - OpenAI reasoning model
-    
     # Previous Generation (Still Publicly Available)
     "gpt-4-turbo": 87.1,
     "claude-3-opus": 86.8,
@@ -48,9 +47,9 @@ print("Last Updated: November 13, 2025")
 print()
 
 print("📊 **Our Free-Tier Results (100 samples MMLU):**")
-print(f"   Cerebras (Llama 3.3 70B):  87.0%")
-print(f"   Groq (Llama 3.3 70B):      87.0%")
-print(f"   Cost: $0.00  |  Time: 2 minutes  |  Errors: 0")
+print("   Cerebras (Llama 3.3 70B):  87.0%")
+print("   Groq (Llama 3.3 70B):      87.0%")
+print("   Cost: $0.00  |  Time: 2 minutes  |  Errors: 0")
 print()
 
 print("🎯 **Official MMLU Kaggle Leaderboard:**")
@@ -66,13 +65,13 @@ for model, score in sorted_models:
     if score > our_score:
         our_rank += 1
 
-print(f"Rank | Model                         | Score  | vs Ours | Availability")
+print("Rank | Model                         | Score  | vs Ours | Availability")
 print("-" * 90)
 
 for i, (model, score) in enumerate(sorted_models, 1):
     diff = our_score - score
     diff_str = f"+{diff:.1f}%" if diff > 0 else f"{diff:.1f}%"
-    
+
     # Determine availability
     availability = ""
     if "gemini-3" in model or "gpt-5" in model or "claude-opus-4" in model or "o3" in model:
@@ -83,7 +82,7 @@ for i, (model, score) in enumerate(sorted_models, 1):
         availability = "✅ FREE (Our base)"
     else:
         availability = "💰 Paid API"
-    
+
     # Add markers
     notes = ""
     if i == 1:
@@ -94,9 +93,11 @@ for i, (model, score) in enumerate(sorted_models, 1):
         notes = "🥉"
     elif abs(score - our_score) < 0.5:
         notes = "⭐"
-    
+
     if i == our_rank and model != "llama-3.3-70b":
-        print(f"{i:2} 🔥 | Our Llama 3.3 (Free-Tier)   | {our_score:5.1f}% | ----    | ✅ FREE + Fast")
+        print(
+            f"{i:2} 🔥 | Our Llama 3.3 (Free-Tier)   | {our_score:5.1f}% | ----    | ✅ FREE + Fast"
+        )
         print(f"{i:2}   | {model:29} | {score:5.1f}% | {diff_str:7} | {availability}")
     else:
         print(f"{i:2} {notes:2} | {model:29} | {score:5.1f}% | {diff_str:7} | {availability}")
@@ -107,32 +108,32 @@ print()
 
 print("📈 **Analysis:**")
 print()
-print(f"🎯 **Our Position:**")
+print("🎯 **Our Position:**")
 print(f"   - Rank: #{our_rank} out of {len(LATEST_OFFICIAL_SCORES)} models")
-print(f"   - Score: 87.0%")
-print(f"   - Ties with GPT-4 Turbo (87.1%)")
+print("   - Score: 87.0%")
+print("   - Ties with GPT-4 Turbo (87.1%)")
 print()
 
-print(f"📊 **Gap Analysis:**")
-print(f"   To #1 (Gemini 3 Pro):      -6.9%  (🔒 Not available)")
-print(f"   To #2 (GPT-5):             -6.5%  (🔒 Waitlist only)")
-print(f"   To #3 (Claude Opus 4.1):   -6.4%  (🔒 Preview)")
-print(f"   From Base (Llama 3.3):     +2.0%  (✅ Our improvement!)")
+print("📊 **Gap Analysis:**")
+print("   To #1 (Gemini 3 Pro):      -6.9%  (🔒 Not available)")
+print("   To #2 (GPT-5):             -6.5%  (🔒 Waitlist only)")
+print("   To #3 (Claude Opus 4.1):   -6.4%  (🔒 Preview)")
+print("   From Base (Llama 3.3):     +2.0%  (✅ Our improvement!)")
 print()
 
-print(f"✅ **What We Beat:**")
-print(f"   - GPT-4 (86.4%)")
-print(f"   - Claude-3-Opus (86.8%)")
-print(f"   - Gemini 1.5 Pro (85.9%)")
-print(f"   - Gemini 2.0 Flash (82.5%)")
-print(f"   - All Llama 3.x variants")
-print(f"   - All publicly available models below 87%")
+print("✅ **What We Beat:**")
+print("   - GPT-4 (86.4%)")
+print("   - Claude-3-Opus (86.8%)")
+print("   - Gemini 1.5 Pro (85.9%)")
+print("   - Gemini 2.0 Flash (82.5%)")
+print("   - All Llama 3.x variants")
+print("   - All publicly available models below 87%")
 print()
 
-print(f"🏆 **Achievement Level:**")
+print("🏆 **Achievement Level:**")
 relative_to_leader = (our_score / 93.9) * 100
 print(f"   We achieve {relative_to_leader:.1f}% of the #1 model's performance")
-print(f"   Using 100% FREE APIs with ZERO cost!")
+print("   Using 100% FREE APIs with ZERO cost!")
 print()
 
 print("💡 **Key Insights:**")

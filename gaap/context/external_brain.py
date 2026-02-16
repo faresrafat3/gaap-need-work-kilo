@@ -14,9 +14,11 @@ from typing import Any
 # Data Classes
 # =============================================================================
 
+
 @dataclass
 class BrainIndex:
     """فهرس في الدماغ الخارجي"""
+
     id: str
     content: str
     source: str
@@ -42,6 +44,7 @@ class BrainIndex:
 @dataclass
 class SearchResult:
     """نتيجة بحث"""
+
     id: str
     content: str
     source: str
@@ -54,6 +57,7 @@ class SearchResult:
 # =============================================================================
 # Text Embedding (Simple TF-IDF)
 # =============================================================================
+
 
 class SimpleEmbedding:
     """
@@ -110,16 +114,72 @@ class SimpleEmbedding:
         # تحويل للصيغة الصغيرة
         text = text.lower()
         # استخراج الكلمات
-        words = re.findall(r'\b[a-z_][a-z0-9_]*\b', text)
+        words = re.findall(r"\b[a-z_][a-z0-9_]*\b", text)
         # إزالة الكلمات الشائعة
-        stopwords = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
-                    'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
-                    'would', 'could', 'should', 'may', 'might', 'must', 'shall',
-                    'can', 'need', 'to', 'of', 'in', 'for', 'on', 'with', 'at',
-                    'by', 'from', 'as', 'into', 'through', 'during', 'before',
-                    'after', 'above', 'below', 'between', 'under', 'again',
-                    'this', 'that', 'these', 'those', 'and', 'but', 'or', 'if',
-                    'else', 'then', 'so', 'than', 'too', 'very', 'just', 'now'}
+        stopwords = {
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "must",
+            "shall",
+            "can",
+            "need",
+            "to",
+            "of",
+            "in",
+            "for",
+            "on",
+            "with",
+            "at",
+            "by",
+            "from",
+            "as",
+            "into",
+            "through",
+            "during",
+            "before",
+            "after",
+            "above",
+            "below",
+            "between",
+            "under",
+            "again",
+            "this",
+            "that",
+            "these",
+            "those",
+            "and",
+            "but",
+            "or",
+            "if",
+            "else",
+            "then",
+            "so",
+            "than",
+            "too",
+            "very",
+            "just",
+            "now",
+        }
 
         return [w for w in words if w not in stopwords and len(w) > 2]
 
@@ -143,10 +203,11 @@ class SimpleEmbedding:
 # External Brain
 # =============================================================================
 
+
 class ExternalBrain:
     """
     الدماغ الخارجي - ذاكرة منظمة للوكلاء
-    
+
     الميزات:
     - فهرسة الملفات والأكواد
     - بحث دلالي سريع
@@ -155,13 +216,10 @@ class ExternalBrain:
     """
 
     def __init__(
-        self,
-        project_path: str,
-        storage_path: str | None = None,
-        max_index_size: int = 100000
+        self, project_path: str, storage_path: str | None = None, max_index_size: int = 100000
     ):
         self.project_path = project_path
-        self.storage_path = storage_path or os.path.join(project_path, '.gaap', 'brain')
+        self.storage_path = storage_path or os.path.join(project_path, ".gaap", "brain")
         self.max_index_size = max_index_size
 
         self._logger = logging.getLogger("gaap.context.brain")
@@ -196,16 +254,21 @@ class ExternalBrain:
 
         for root, dirs, files in os.walk(self.project_path):
             # تجاهل المجلدات المخفية
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', '__pycache__', 'venv', '.git', '.gaap']]
+            dirs[:] = [
+                d
+                for d in dirs
+                if not d.startswith(".")
+                and d not in ["node_modules", "__pycache__", "venv", ".git", ".gaap"]
+            ]
 
             for file in files:
-                if file.startswith('.'):
+                if file.startswith("."):
                     continue
 
                 file_path = os.path.join(root, file)
 
                 try:
-                    with open(file_path, encoding='utf-8') as f:
+                    with open(file_path, encoding="utf-8") as f:
                         content = f.read()
 
                     # فهرسة الملف
@@ -252,7 +315,7 @@ class ExternalBrain:
             metadata={
                 "file_name": os.path.basename(file_path),
                 "ext": os.path.splitext(file_path)[1],
-            }
+            },
         )
 
     def _index_file_components(self, file_path: str, content: str) -> list[BrainIndex]:
@@ -260,9 +323,9 @@ class ExternalBrain:
         indices: list[BrainIndex] = []
         ext = os.path.splitext(file_path)[1].lower()
 
-        if ext == '.py':
+        if ext == ".py":
             indices = self._index_python_components(file_path, content)
-        elif ext in ('.js', '.ts', '.jsx', '.tsx'):
+        elif ext in (".js", ".ts", ".jsx", ".tsx"):
             indices = self._index_js_components(file_path, content)
 
         return indices
@@ -278,13 +341,15 @@ class ExternalBrain:
 
             for node in ast.walk(tree):
                 if isinstance(node, ast.ClassDef):
-                    indices.append(self._create_component_index(
-                        file_path, content, node, "class", node.name
-                    ))
+                    indices.append(
+                        self._create_component_index(file_path, content, node, "class", node.name)
+                    )
                 elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    indices.append(self._create_component_index(
-                        file_path, content, node, "function", node.name
-                    ))
+                    indices.append(
+                        self._create_component_index(
+                            file_path, content, node, "function", node.name
+                        )
+                    )
         except SyntaxError:
             pass
 
@@ -295,47 +360,47 @@ class ExternalBrain:
         indices: list[BrainIndex] = []
 
         # استخراج الفئات
-        class_pattern = re.compile(r'class\s+(\w+)', re.MULTILINE)
+        class_pattern = re.compile(r"class\s+(\w+)", re.MULTILINE)
         for match in class_pattern.finditer(content):
-            indices.append(BrainIndex(
-                id=self._generate_id(f"{file_path}:class:{match.group(1)}"),
-                content=content[max(0, match.start() - 100):match.start() + 1000],
-                source=file_path,
-                content_type="class",
-                token_count=500,
-                keywords=[match.group(1).lower()]
-            ))
+            indices.append(
+                BrainIndex(
+                    id=self._generate_id(f"{file_path}:class:{match.group(1)}"),
+                    content=content[max(0, match.start() - 100) : match.start() + 1000],
+                    source=file_path,
+                    content_type="class",
+                    token_count=500,
+                    keywords=[match.group(1).lower()],
+                )
+            )
 
         # استخراج الدوال
-        func_pattern = re.compile(r'function\s+(\w+)', re.MULTILINE)
+        func_pattern = re.compile(r"function\s+(\w+)", re.MULTILINE)
         for match in func_pattern.finditer(content):
-            indices.append(BrainIndex(
-                id=self._generate_id(f"{file_path}:func:{match.group(1)}"),
-                content=content[max(0, match.start() - 50):match.start() + 500],
-                source=file_path,
-                content_type="function",
-                token_count=200,
-                keywords=[match.group(1).lower()]
-            ))
+            indices.append(
+                BrainIndex(
+                    id=self._generate_id(f"{file_path}:func:{match.group(1)}"),
+                    content=content[max(0, match.start() - 50) : match.start() + 500],
+                    source=file_path,
+                    content_type="function",
+                    token_count=200,
+                    keywords=[match.group(1).lower()],
+                )
+            )
 
         return indices
 
     def _create_component_index(
-        self,
-        file_path: str,
-        content: str,
-        node,
-        content_type: str,
-        name: str
+        self, file_path: str, content: str, node, content_type: str, name: str
     ) -> BrainIndex:
         """إنشاء فهرس مكون"""
         start_line = node.lineno
         end_line = node.end_lineno or start_line
-        lines = content.split('\n')
-        component_content = '\n'.join(lines[start_line - 1:end_line])
+        lines = content.split("\n")
+        component_content = "\n".join(lines[start_line - 1 : end_line])
 
         import ast
-        docstring = ast.get_docstring(node) if hasattr(node, 'body') else ""
+
+        docstring = ast.get_docstring(node) if hasattr(node, "body") else ""
 
         return BrainIndex(
             id=self._generate_id(f"{file_path}:{content_type}:{name}"),
@@ -349,7 +414,7 @@ class ExternalBrain:
                 "docstring": docstring[:500] if docstring else "",
                 "start_line": start_line,
                 "end_line": end_line,
-            }
+            },
         )
 
     # =========================================================================
@@ -357,21 +422,17 @@ class ExternalBrain:
     # =========================================================================
 
     async def search(
-        self,
-        query: str,
-        limit: int = 10,
-        content_type: str | None = None,
-        min_score: float = 0.1
+        self, query: str, limit: int = 10, content_type: str | None = None, min_score: float = 0.1
     ) -> list[SearchResult]:
         """
         البحث في الدماغ الخارجي
-        
+
         Args:
             query: نص البحث
             limit: الحد الأقصى للنتائج
             content_type: نوع المحتوى (file, function, class)
             min_score: الحد الأدنى للصلة
-        
+
         Returns:
             قائمة النتائج
         """
@@ -407,9 +468,7 @@ class ExternalBrain:
             semantic_score = 0.0
             if self._is_fitted and index.embedding:
                 index_embedding = self._embedding.encode(index.content)
-                semantic_score = SimpleEmbedding.cosine_similarity(
-                    query_embedding, index_embedding
-                )
+                semantic_score = SimpleEmbedding.cosine_similarity(query_embedding, index_embedding)
 
             # درجة تطابق النص
             text_score = 0.0
@@ -431,15 +490,17 @@ class ExternalBrain:
                 score *= 0.8
 
             if score >= min_score:
-                results.append(SearchResult(
-                    id=index_id,
-                    content=index.content,
-                    source=index.source,
-                    relevance_score=score,
-                    token_count=index.token_count,
-                    content_type=index.content_type,
-                    metadata=index.metadata
-                ))
+                results.append(
+                    SearchResult(
+                        id=index_id,
+                        content=index.content,
+                        source=index.source,
+                        relevance_score=score,
+                        token_count=index.token_count,
+                        content_type=index.content_type,
+                        metadata=index.metadata,
+                    )
+                )
 
         # ترتيب النتائج
         results.sort(key=lambda x: x.relevance_score, reverse=True)
@@ -457,24 +518,18 @@ class ExternalBrain:
 
     async def get_by_source(self, source: str) -> list[BrainIndex]:
         """الحصول على فهارس بمصدر"""
-        return [self._indices[iid] for iid in self._source_index.get(source, []) if iid in self._indices]
+        return [
+            self._indices[iid] for iid in self._source_index.get(source, []) if iid in self._indices
+        ]
 
     async def get_recent(self, limit: int = 20) -> list[BrainIndex]:
         """الحصول على أحدث الفهارس"""
-        sorted_indices = sorted(
-            self._indices.values(),
-            key=lambda x: x.created_at,
-            reverse=True
-        )
+        sorted_indices = sorted(self._indices.values(), key=lambda x: x.created_at, reverse=True)
         return sorted_indices[:limit]
 
     async def get_most_accessed(self, limit: int = 20) -> list[BrainIndex]:
         """الحصول على الأكثر وصولاً"""
-        sorted_indices = sorted(
-            self._indices.values(),
-            key=lambda x: x.access_count,
-            reverse=True
-        )
+        sorted_indices = sorted(self._indices.values(), key=lambda x: x.access_count, reverse=True)
         return sorted_indices[:limit]
 
     # =========================================================================
@@ -482,10 +537,7 @@ class ExternalBrain:
     # =========================================================================
 
     async def store_knowledge(
-        self,
-        key: str,
-        content: str,
-        metadata: dict[str, Any] | None = None
+        self, key: str, content: str, metadata: dict[str, Any] | None = None
     ) -> None:
         """تخزين معرفة مكتسبة"""
         index = BrainIndex(
@@ -495,7 +547,7 @@ class ExternalBrain:
             content_type="pattern",
             token_count=len(content.split()) * 1.5,
             keywords=self._extract_keywords(content),
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
 
         self._indices[index.id] = index
@@ -556,7 +608,7 @@ class ExternalBrain:
             }
 
             index_path = os.path.join(self.storage_path, "brain_index.json")
-            with open(index_path, 'w', encoding='utf-8') as f:
+            with open(index_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
 
         except Exception as e:
@@ -570,7 +622,7 @@ class ExternalBrain:
             if not os.path.exists(index_path):
                 return False
 
-            with open(index_path, encoding='utf-8') as f:
+            with open(index_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             self._indices = {
@@ -582,7 +634,7 @@ class ExternalBrain:
                     token_count=v.get("token_count", 0),
                     keywords=v.get("keywords", []),
                     metadata=v.get("metadata", {}),
-                    access_count=v.get("access_count", 0)
+                    access_count=v.get("access_count", 0),
                 )
                 for k, v in data.get("indices", {}).items()
             }

@@ -2,7 +2,6 @@
 History Page - View Conversation History
 """
 
-
 import streamlit as st
 
 
@@ -63,13 +62,10 @@ def main():
             history = [h for h in history if search_query.lower() in h.get("content", "").lower()]
             st.info(f"Found {len(history)} matching messages")
 
-        for i, item in enumerate(reversed(history[-limit:])):
+        for _i, item in enumerate(reversed(history[-limit:])):
             timestamp = item.get("timestamp", "Unknown")
             role = item.get("role", "unknown")
             content = item.get("content", "")
-
-            role_icon = ":bust_in_silhouette:" if role == "user" else ":robot_face:"
-            role_color = "blue" if role == "user" else "green"
 
             with st.chat_message(role):
                 st.caption(f"{timestamp[:16]} | {role}")

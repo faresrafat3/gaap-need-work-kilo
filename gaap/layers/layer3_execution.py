@@ -1,13 +1,17 @@
 # Layer 3: Execution Layer
 import asyncio
 import logging
+import os
+import re
+import sys
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from typing import Any
 
 from gaap.core.base import BaseLayer
+from gaap.core.tools import ToolRegistry
 from gaap.core.types import (
     CriticEvaluation,
     CriticType,
@@ -19,21 +23,33 @@ from gaap.core.types import (
     TaskType,
 )
 from gaap.layers.layer2_tactical import AtomicTask
+from gaap.mad.critic_prompts import SYSTEM_PROMPTS, build_user_prompt
+from gaap.mad.response_parser import (
+    CriticParseError,
+    fallback_evaluation,
+    parse_critic_response,
+)
 from gaap.providers.base_provider import BaseProvider
 from gaap.routing.fallback import FallbackManager
 from gaap.routing.router import SmartRouter
+from gaap.validators import (
+    BaseValidator,
+    QualityGate,
+    ValidationResult,
+    create_validators,
+)
+from gaap.validators.base import Severity as ValidatorSeverity
 
 # =============================================================================
 # Logger Setup
 # =============================================================================
 
+
 def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
@@ -44,29 +60,24 @@ def get_logger(name: str) -> logging.Logger:
 # Enums
 # =============================================================================
 
+
 class ExecutionMode(Enum):
     """أوضاع التنفيذ"""
-    SINGLE = "single"          # تنفيذ واحد
-    GENETIC_TWIN = "twin"       # توأم جيني
-    CONSENSUS = "consensus"     # إجماع متعدد
 
-
-class QualityGate(Enum):
-    """بوابات الجودة"""
-    SYNTAX_CHECK = auto()
-    LOGIC_REVIEW = auto()
-    SECURITY_SCAN = auto()
-    PERFORMANCE_CHECK = auto()
-    STYLE_CHECK = auto()
+    SINGLE = "single"  # تنفيذ واحد
+    GENETIC_TWIN = "twin"  # توأم جيني
+    CONSENSUS = "consensus"  # إجماع متعدد
 
 
 # =============================================================================
 # Data Classes
 # =============================================================================
 
+
 @dataclass
 class ExecutionResult:
     """نتيجة تنفيذ"""
+
     task_id: str
     success: bool
     output: Any = None
@@ -95,6 +106,7 @@ class ExecutionResult:
 @dataclass
 class AgentExecutor:
     """منفذ وكيل"""
+
     id: str
     specialization: TaskType
     provider: BaseProvider
@@ -110,10 +122,11 @@ class AgentExecutor:
 # Genetic Twin System
 # =============================================================================
 
+
 class GeneticTwin:
     """
     نظام التوأم الجيني
-    
+
     يشغل نسختين من الحل ويقارن بينهما:
     - Model Diversity: نماذج مختلفة
     - Prompt Diversity: صياغات مختلفة
@@ -124,7 +137,7 @@ class GeneticTwin:
         self,
         enabled: bool = True,
         similarity_threshold: float = 0.95,
-        for_critical_only: bool = True
+        for_critical_only: bool = True,
     ):
         self.enabled = enabled
         self.similarity_threshold = similarity_threshold
@@ -140,11 +153,11 @@ class GeneticTwin:
         self,
         task: AtomicTask,
         execute_func: Callable[[AtomicTask, dict[str, Any]], Awaitable[Any]],
-        is_critical: bool = False
+        is_critical: bool = False,
     ) -> tuple[Any, float, bool]:
         """
         تنفيذ مع توأم
-        
+
         Returns:
             (result, agreement_score, twin_was_used)
         """
@@ -165,7 +178,7 @@ class GeneticTwin:
         results = await asyncio.gather(
             execute_func(task, primary_config),
             execute_func(task, twin_config),
-            return_exceptions=True
+            return_exceptions=True,
         )
 
         primary_result = results[0] if not isinstance(results[0], Exception) else None
@@ -221,10 +234,11 @@ class GeneticTwin:
 # MAD Quality Panel
 # =============================================================================
 
+
 class MADQualityPanel:
     """
     لجنة جودة MAD
-    
+
     تتكون من نقاد متخصصين:
     - Logic Critic: صحة المنطق
     - Security Critic: الأمان
@@ -244,36 +258,40 @@ class MADQualityPanel:
     def __init__(
         self,
         min_score: float = 70.0,
-        unanimous_for_critical: bool = True
+        unanimous_for_critical: bool = True,
+        provider: BaseProvider | None = None,
+        critic_model: str | None = None,
     ):
         self.min_score = min_score
         self.unanimous_for_critical = unanimous_for_critical
+        self.provider = provider
+        self.critic_model = critic_model or "llama-3.3-70b-versatile"
         self._logger = get_logger("gaap.layer3.mad")
 
         # الإحصائيات
         self._evaluations_count = 0
         self._rejections = 0
+        self._llm_failures = 0
 
     async def evaluate(
-        self,
-        artifact: Any,
-        task: AtomicTask,
-        critics: list[CriticType] | None = None
+        self, artifact: Any, task: AtomicTask, critics: list[CriticType] | None = None
     ) -> MADDecision:
         """تقييم المخرجات"""
         self._evaluations_count += 1
 
         # تحديد النقاد
         if critics is None:
-            critics = [CriticType.LOGIC, CriticType.SECURITY,
-                      CriticType.PERFORMANCE, CriticType.STYLE]
+            critics = [
+                CriticType.LOGIC,
+                CriticType.SECURITY,
+                CriticType.PERFORMANCE,
+                CriticType.STYLE,
+            ]
 
         evaluations = []
 
         for critic_type in critics:
-            evaluation = await self._evaluate_with_critic(
-                artifact, task, critic_type
-            )
+            evaluation = await self._evaluate_with_critic(artifact, task, critic_type)
             evaluations.append(evaluation)
 
         # حساب الدرجة النهائية
@@ -281,9 +299,7 @@ class MADQualityPanel:
 
         # تحديد القبول
         approved = self._determine_approval(
-            final_score,
-            evaluations,
-            task.priority == TaskPriority.CRITICAL
+            final_score, evaluations, task.priority == TaskPriority.CRITICAL
         )
 
         if not approved:
@@ -300,53 +316,75 @@ class MADQualityPanel:
             final_score=final_score,
             evaluations=evaluations,
             required_changes=required_changes,
-            decision_reasoning=f"Score: {final_score:.1f}, Critics: {len(evaluations)}"
+            decision_reasoning=f"Score: {final_score:.1f}, Critics: {len(evaluations)}",
         )
 
     async def _evaluate_with_critic(
-        self,
-        artifact: Any,
-        task: AtomicTask,
-        critic_type: CriticType
+        self, artifact: Any, task: AtomicTask, critic_type: CriticType
     ) -> CriticEvaluation:
-        """تقييم بناقد محدد"""
-        # تحويل artifact لنص
+        """تقييم بناقد محدد باستخدام LLM"""
         artifact_text = str(artifact) if artifact else ""
 
-        # تقييم مبسط (في الإنتاج، سيستخدم LLM)
-        score = self._simple_evaluate(artifact_text, task, critic_type)
+        if self.provider is None:
+            self._logger.warning("No provider configured, using fallback evaluation")
+            return self._fallback_critic_eval(artifact_text, task, critic_type)
 
-        approved = score >= self.min_score
+        try:
+            system_prompt = SYSTEM_PROMPTS.get(critic_type, SYSTEM_PROMPTS[CriticType.LOGIC])
+            user_prompt = build_user_prompt(artifact_text, task)
 
-        issues = []
-        suggestions = []
+            messages = [
+                Message(role=MessageRole.SYSTEM, content=system_prompt),
+                Message(role=MessageRole.USER, content=user_prompt),
+            ]
 
-        if not approved:
-            if critic_type == CriticType.SECURITY:
-                issues.append("Potential security concern detected")
-                suggestions.append("Review for injection vulnerabilities")
-            elif critic_type == CriticType.LOGIC:
-                issues.append("Logic issues detected")
-                suggestions.append("Verify edge cases")
-            elif critic_type == CriticType.PERFORMANCE:
-                issues.append("Performance concerns")
-                suggestions.append("Consider optimization")
+            response = await self.provider.chat_completion(
+                messages=messages,
+                model=self.critic_model,
+                temperature=0.3,
+                max_tokens=2048,
+            )
 
+            if not response.choices or not response.choices[0].message.content:
+                self._logger.warning(f"LLM call failed for {critic_type.name}, using fallback")
+                self._llm_failures += 1
+                return self._fallback_critic_eval(artifact_text, task, critic_type)
+
+            parsed = parse_critic_response(response.choices[0].message.content, critic_type)
+
+            return CriticEvaluation(
+                critic_type=critic_type,
+                score=parsed["score"],
+                approved=parsed["approved"],
+                issues=parsed["issues"],
+                suggestions=parsed["suggestions"],
+                reasoning=parsed["reasoning"],
+            )
+
+        except CriticParseError as e:
+            self._logger.warning(f"Parse error for {critic_type.name}: {e}")
+            self._llm_failures += 1
+            return self._fallback_critic_eval(artifact_text, task, critic_type)
+        except Exception as e:
+            self._logger.warning(f"LLM evaluation failed for {critic_type.name}: {e}")
+            self._llm_failures += 1
+            return self._fallback_critic_eval(artifact_text, task, critic_type)
+
+    def _fallback_critic_eval(
+        self, artifact: str, task: AtomicTask, critic_type: CriticType
+    ) -> CriticEvaluation:
+        """تقييم احتياطي باستخدام heuristics"""
+        result = fallback_evaluation(critic_type, artifact)
         return CriticEvaluation(
             critic_type=critic_type,
-            score=score,
-            approved=approved,
-            issues=issues,
-            suggestions=suggestions,
-            reasoning=f"Evaluated by {critic_type.name}"
+            score=result["score"],
+            approved=result["approved"],
+            issues=result["issues"],
+            suggestions=result["suggestions"],
+            reasoning=result["reasoning"],
         )
 
-    def _simple_evaluate(
-        self,
-        artifact: str,
-        task: AtomicTask,
-        critic_type: CriticType
-    ) -> float:
+    def _simple_evaluate(self, artifact: str, task: AtomicTask, critic_type: CriticType) -> float:
         """تقييم بسيط"""
         score = 70.0  # درجة أساسية
 
@@ -377,10 +415,7 @@ class MADQualityPanel:
 
         return max(min(score, 100), 0)
 
-    def _calculate_final_score(
-        self,
-        evaluations: list[CriticEvaluation]
-    ) -> float:
+    def _calculate_final_score(self, evaluations: list[CriticEvaluation]) -> float:
         """حساب الدرجة النهائية"""
         total_weight = 0.0
         weighted_sum = 0.0
@@ -393,10 +428,7 @@ class MADQualityPanel:
         return weighted_sum / total_weight if total_weight > 0 else 0
 
     def _determine_approval(
-        self,
-        final_score: float,
-        evaluations: list[CriticEvaluation],
-        is_critical: bool
+        self, final_score: float, evaluations: list[CriticEvaluation], is_critical: bool
     ) -> bool:
         """تحديد القبول"""
         # فحص الدرجة الأساسية
@@ -415,6 +447,7 @@ class MADQualityPanel:
             "evaluations": self._evaluations_count,
             "rejections": self._rejections,
             "rejection_rate": self._rejections / max(self._evaluations_count, 1),
+            "llm_failures": self._llm_failures,
         }
 
 
@@ -422,18 +455,15 @@ class MADQualityPanel:
 # Executor Pool
 # =============================================================================
 
+
 class ExecutorPool:
     """مجمع المنفذين"""
 
-    def __init__(
-        self,
-        router: SmartRouter,
-        fallback: FallbackManager,
-        max_parallel: int = 10
-    ):
+    def __init__(self, router: SmartRouter, fallback: FallbackManager, max_parallel: int = 10):
         self.router = router
         self.fallback = fallback
         self.max_parallel = max_parallel
+        self.tool_registry = ToolRegistry()  # Initialize tools
 
         self._executors: dict[str, AgentExecutor] = {}
         self._logger = get_logger("gaap.layer3.executor")
@@ -448,61 +478,139 @@ class ExecutorPool:
         self._executors[executor.id] = executor
 
     async def execute(
-        self,
-        task: AtomicTask,
-        context: dict[str, Any] | None = None
+        self, task: AtomicTask, context: dict[str, Any] | None = None
     ) -> ExecutionResult:
-        """تنفيذ مهمة"""
+        """تنفيذ مهمة مع دعم الأدوات"""
         start_time = time.time()
         context = context or {}
 
         self._tasks_executed += 1
 
         try:
-            # تحضير الرسائل
+            # 1. تحضير الرسائل الأولية (بما في ذلك تعليمات الأدوات)
             messages = self._prepare_messages(task)
-
-            # الحصول على قرار التوجيه
-            decision = await self.router.route(
-                messages=messages,
-                task=task.to_task()
+            messages.insert(
+                0, Message(role=MessageRole.SYSTEM, content=self.tool_registry.get_instructions())
             )
 
-            # تنفيذ مع fallback
-            response = await self.fallback.execute_with_fallback(
-                messages=messages,
-                primary_provider=decision.selected_provider,
-                primary_model=decision.selected_model
-            )
+            iteration = 0
+            MAX_ITERATIONS = 5
+            total_tokens = 0
+            final_output = ""
+            last_decision = None
 
-            # استخراج النتيجة
-            output = response.choices[0].message.content if response.choices else ""
+            while iteration < MAX_ITERATIONS:
+                iteration += 1
 
-            # حساب التكلفة
-            cost = decision.estimated_cost
-            if response.usage:
-                cost = (
-                    response.usage.prompt_tokens * 0.00001 +
-                    response.usage.completion_tokens * 0.00003
+                # الحصول على قرار التوجيه
+                decision = await self.router.route(messages=messages, task=task.to_task())
+                last_decision = decision
+
+                # تنفيذ مع fallback
+                response = await self.fallback.execute_with_fallback(
+                    messages=messages,
+                    primary_provider=decision.selected_provider,
+                    primary_model=decision.selected_model,
                 )
+
+                # استخراج النتيجة
+                assistant_output = response.choices[0].message.content if response.choices else ""
+                total_tokens += response.usage.total_tokens if response.usage else 0
+
+                # إضافة رد المساعد للسجل
+                messages.append(Message(role=MessageRole.ASSISTANT, content=assistant_output))
+
+                # 2. البحث عن استدعاء أداة CALL: tool_name(param='val') أو كود Python تلقائي
+                tool_call_match = re.search(r"CALL:\s*(\w+)\((.*?)\)", assistant_output, re.DOTALL)
+                python_code_match = re.search(r"```python\n(.*?)```", assistant_output, re.DOTALL)
+
+                if tool_call_match:
+                    tool_name = tool_call_match.group(1).strip()
+                    args_str = tool_call_match.group(2).strip()
+
+                    # محاولة استخراج الوسائط (أكثر قوة)
+                    args = {}
+                    try:
+                        # Handle both single and double quotes
+                        pairs = re.findall(r"(\w+)\s*=\s*['\"](.*?)['\"]", args_str, re.DOTALL)
+                        args = {k.strip(): v.strip() for k, v in pairs}
+                    except Exception as e:
+                        self._logger.warning(f"Failed to parse tool args: {e}")
+
+                    # تنفيذ الأداة
+                    tool_result = self.tool_registry.execute(tool_name, **args)
+
+                    # إضافة نتيجة الأداة للسجل للمتابعة
+                    feedback = f"System: TOOL RESULT ({tool_name}): {tool_result}"
+                    messages.append(Message(role=MessageRole.USER, content=feedback))
+
+                    self._logger.info(f"Tool {tool_name} executed. Continuing loop with feedback.")
+                    continue
+
+                elif python_code_match:
+                    # اكتشاف كود بايثون تلقائياً وتنفيذه
+                    code = python_code_match.group(1).strip()
+                    self._logger.info("Detected Python code block, executing autonomously...")
+
+                    # حفظ الكود في ملف مؤقت وتشغيله
+                    temp_file = f"temp_exec_{int(time.time())}.py"
+                    try:
+                        with open(temp_file, "w") as f:
+                            f.write(code)
+
+                        import subprocess
+
+                        proc = subprocess.run(
+                            [sys.executable, temp_file], capture_output=True, text=True, timeout=30
+                        )
+
+                        exec_result = f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+                        if proc.returncode != 0:
+                            exec_result = f"FAILED (Exit {proc.returncode}):\n{exec_result}"
+
+                        messages.append(
+                            Message(
+                                role=MessageRole.USER,
+                                content=f"System: AUTO-EXECUTION RESULT:\n{exec_result}",
+                            )
+                        )
+                        self._logger.info("Auto-execution complete, returning results to LLM.")
+                    except Exception as e:
+                        messages.append(
+                            Message(role=MessageRole.USER, content=f"System: Execution Error: {e}")
+                        )
+                    finally:
+                        if os.path.exists(temp_file):
+                            os.remove(temp_file)
+                    continue
+
+                else:
+                    # لا توجد أدوات أخرى للاستدعاء، هذا هو الرد النهائي
+                    final_output = assistant_output
+                    break
 
             self._successful += 1
 
             return ExecutionResult(
                 task_id=task.id,
                 success=True,
-                output=output,
-                latency_ms=response.latency_ms,
-                tokens_used=response.usage.total_tokens if response.usage else 0,
-                cost_usd=cost,
+                output=final_output,
+                latency_ms=(time.time() - start_time) * 1000,
+                tokens_used=total_tokens,
+                cost_usd=0.0,  # WebChat is free
                 metadata={
-                    "provider": decision.selected_provider,
-                    "model": decision.selected_model,
-                }
+                    "iterations": iteration,
+                    "provider": last_decision.selected_provider if last_decision else "unknown",
+                    "model": last_decision.selected_model if last_decision else "unknown",
+                },
             )
 
         except Exception as e:
             self._failed += 1
+            self._logger.error(f"Execution failed for task {task.id}: {e}")
+            import traceback
+
+            self._logger.error(traceback.format_exc())
 
             return ExecutionResult(
                 task_id=task.id,
@@ -517,12 +625,9 @@ class ExecutorPool:
         messages = [
             Message(
                 role=MessageRole.SYSTEM,
-                content="You are an expert software developer. Provide clean, efficient, and well-documented code."
+                content="You are an expert software developer. Provide clean, efficient, and well-documented code.",
             ),
-            Message(
-                role=MessageRole.USER,
-                content=task.description
-            )
+            Message(role=MessageRole.USER, content=task.description),
         ]
 
         # إضافة القيود
@@ -530,20 +635,14 @@ class ExecutorPool:
             constraints_text = "Constraints:\n"
             for key, value in task.constraints.items():
                 constraints_text += f"- {key}: {value}\n"
-            messages.insert(1, Message(
-                role=MessageRole.SYSTEM,
-                content=constraints_text
-            ))
+            messages.insert(1, Message(role=MessageRole.SYSTEM, content=constraints_text))
 
         # إضافة معايير القبول
         if task.acceptance_criteria:
             criteria_text = "Acceptance Criteria:\n"
             for criterion in task.acceptance_criteria:
                 criteria_text += f"- {criterion}\n"
-            messages.append(Message(
-                role=MessageRole.USER,
-                content=criteria_text
-            ))
+            messages.append(Message(role=MessageRole.USER, content=criteria_text))
 
         return messages
 
@@ -561,39 +660,118 @@ class ExecutorPool:
 # Quality Pipeline
 # =============================================================================
 
+
 class QualityPipeline:
-    """خط أنابيب الجودة"""
+    """خط أنابيب الجودة مع الـ validators"""
 
     def __init__(
         self,
         mad_panel: MADQualityPanel,
-        twin_system: GeneticTwin
+        twin_system: GeneticTwin,
+        validators: dict[QualityGate, BaseValidator] | None = None,
     ):
         self.mad_panel = mad_panel
         self.twin_system = twin_system
+        self.validators = validators or create_validators()
         self._logger = get_logger("gaap.layer3.quality")
 
+        self._validation_count = 0
+        self._validation_failures = 0
+
     async def process(
-        self,
-        artifact: Any,
-        task: AtomicTask,
-        is_critical: bool = False
+        self, artifact: Any, task: AtomicTask, is_critical: bool = False
     ) -> tuple[Any, float, list[CriticEvaluation]]:
         """معالجة الجودة"""
-        # تقييم MAD
+        self._validation_count += 1
+
+        context = self._build_context(task)
+
+        gate_results = await self._run_validators(artifact, context, is_critical)
+
+        errors = [r for r in gate_results if not r.passed and r.severity == ValidatorSeverity.ERROR]
+        if errors:
+            self._validation_failures += 1
+
+        quality_adjustment = self._calculate_quality_adjustment(gate_results)
+
         decision = await self.mad_panel.evaluate(artifact, task)
 
-        return artifact, decision.final_score, decision.evaluations
+        final_score = max(0, min(100, decision.final_score + quality_adjustment))
+
+        return artifact, final_score, decision.evaluations
+
+    async def _run_validators(
+        self, artifact: Any, context: dict[str, Any], is_critical: bool
+    ) -> list[ValidationResult]:
+        """تشغيل جميع الـ validators"""
+        results = []
+
+        for gate, validator in self.validators.items():
+            if not validator.enabled:
+                continue
+
+            if is_critical or gate in [
+                QualityGate.SYNTAX_CHECK,
+                QualityGate.SECURITY_SCAN,
+            ]:
+                try:
+                    result = await validator.validate(artifact, context)
+                    results.append(result)
+                except Exception as e:
+                    self._logger.warning(f"Validator {gate.name} failed: {e}")
+                    results.append(
+                        ValidationResult.warning(
+                            f"Validator error: {str(e)[:50]}",
+                            details={"gate": gate.name},
+                        )
+                    )
+
+        return results
+
+    def _build_context(self, task: AtomicTask) -> dict[str, Any]:
+        """بناء سياق التحقق"""
+        context = {"task_id": task.id, "task_name": task.name}
+
+        if hasattr(task, "language"):
+            context["language"] = task.language
+        elif hasattr(task, "metadata") and task.metadata:
+            context["language"] = task.metadata.get("language", "python")
+        else:
+            context["language"] = "python"
+
+        return context
+
+    def _calculate_quality_adjustment(self, results: list[ValidationResult]) -> float:
+        """حساب تعديل الجودة بناءً على نتائج الـ validators"""
+        adjustment = 0.0
+
+        for result in results:
+            if result.severity == ValidatorSeverity.ERROR:
+                adjustment -= 10.0
+            elif result.severity == ValidatorSeverity.WARNING:
+                adjustment -= 2.0
+
+        return adjustment
+
+    def get_stats(self) -> dict[str, Any]:
+        """إحصائيات"""
+        validator_stats = [v.get_stats() for v in self.validators.values()]
+        return {
+            "validations": self._validation_count,
+            "failures": self._validation_failures,
+            "validators": validator_stats,
+        }
 
 
 # =============================================================================
 # Layer 3 Execution
 # =============================================================================
 
+
 class Layer3Execution(BaseLayer):
     """
     طبقة التنفيذ والجودة
-    
+
     المسؤوليات:
     - تنفيذ المهام الذرية
     - تطبيق التوأم الجيني
@@ -607,7 +785,7 @@ class Layer3Execution(BaseLayer):
         fallback: FallbackManager,
         enable_twin: bool = True,
         max_parallel: int = 10,
-        quality_threshold: float = 70.0
+        quality_threshold: float = 70.0,
     ):
         super().__init__(LayerType.EXECUTION)
 
@@ -639,8 +817,7 @@ class Layer3Execution(BaseLayer):
         # تنفيذ مع توأم جيني
         if self.twin_system.enabled and (is_critical or not self.twin_system.for_critical_only):
             result, agreement, twin_used = await self.twin_system.execute_with_twin(
-                task,
-                self.executor_pool.execute
+                task, self.executor_pool.execute
             )
         else:
             result = await self.executor_pool.execute(task)
@@ -664,10 +841,7 @@ class Layer3Execution(BaseLayer):
 
         return result
 
-    async def execute_batch(
-        self,
-        tasks: list[AtomicTask]
-    ) -> list[ExecutionResult]:
+    async def execute_batch(self, tasks: list[AtomicTask]) -> list[ExecutionResult]:
         """تنفيذ دفعة مهام"""
         results = []
 
@@ -693,16 +867,11 @@ class Layer3Execution(BaseLayer):
 # Convenience Functions
 # =============================================================================
 
+
 def create_execution_layer(
-    router: SmartRouter,
-    fallback: FallbackManager,
-    enable_twin: bool = True,
-    max_parallel: int = 10
+    router: SmartRouter, fallback: FallbackManager, enable_twin: bool = True, max_parallel: int = 10
 ) -> Layer3Execution:
     """إنشاء طبقة التنفيذ"""
     return Layer3Execution(
-        router=router,
-        fallback=fallback,
-        enable_twin=enable_twin,
-        max_parallel=max_parallel
+        router=router, fallback=fallback, enable_twin=enable_twin, max_parallel=max_parallel
     )

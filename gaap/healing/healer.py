@@ -24,13 +24,12 @@ from gaap.core.types import (
 # Logger Setup
 # =============================================================================
 
+
 def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
@@ -41,19 +40,22 @@ def get_logger(name: str) -> logging.Logger:
 # Enums
 # =============================================================================
 
+
 class ErrorCategory(Enum):
     """تصنيفات الأخطاء"""
-    TRANSIENT = auto()       # خطأ عابر (شبكة، timeout)
-    SYNTAX = auto()          # خطأ صيغة
-    LOGIC = auto()           # خطأ منطقي
-    MODEL_LIMIT = auto()     # حدود النموذج
-    RESOURCE = auto()        # موارد (ميزانية، rate limit)
-    CRITICAL = auto()        # خطأ حرج
-    UNKNOWN = auto()         # غير معروف
+
+    TRANSIENT = auto()  # خطأ عابر (شبكة، timeout)
+    SYNTAX = auto()  # خطأ صيغة
+    LOGIC = auto()  # خطأ منطقي
+    MODEL_LIMIT = auto()  # حدود النموذج
+    RESOURCE = auto()  # موارد (ميزانية، rate limit)
+    CRITICAL = auto()  # خطأ حرج
+    UNKNOWN = auto()  # غير معروف
 
 
 class RecoveryAction(Enum):
     """إجراءات الاسترداد"""
+
     RETRY = auto()
     REFINE_PROMPT = auto()
     CHANGE_MODEL = auto()
@@ -67,9 +69,11 @@ class RecoveryAction(Enum):
 # Data Classes
 # =============================================================================
 
+
 @dataclass
 class ErrorContext:
     """سياق الخطأ"""
+
     error: Exception
     category: ErrorCategory
     message: str
@@ -97,6 +101,7 @@ class ErrorContext:
 @dataclass
 class RecoveryResult:
     """نتيجة الاسترداد"""
+
     success: bool
     action: RecoveryAction
     level: HealingLevel
@@ -110,6 +115,7 @@ class RecoveryResult:
 @dataclass
 class HealingRecord:
     """سجل تعافي"""
+
     task_id: str
     level: HealingLevel
     action: RecoveryAction
@@ -124,41 +130,42 @@ class HealingRecord:
 # Error Classifier
 # =============================================================================
 
+
 class ErrorClassifier:
     """مصنف الأخطاء"""
 
     # أنماط الأخطاء
     PATTERNS = {
         ErrorCategory.TRANSIENT: [
-            r'connection\s+(reset|refused)',
-            r'network\s+error',
-            r'service\s+unavailable',
-            r'temporary\s+failure',
-            r'rate\s+limit',
-            r'too\s+many\s+requests',
-            r'exhausted',
-            r'concurrency',
+            r"connection\s+(reset|refused)",
+            r"network\s+error",
+            r"service\s+unavailable",
+            r"temporary\s+failure",
+            r"rate\s+limit",
+            r"too\s+many\s+requests",
+            r"exhausted",
+            r"concurrency",
         ],
         ErrorCategory.MODEL_LIMIT: [
-            r'timeout',                # Timeouts = model too slow, not transient
-            r'timed\s+out',
-            r'maximum\s+context',
-            r'token\s+limit',
-            r'content\s+policy',
-            r'safety\s+filter',
-            r'model\s+overloaded',
+            r"timeout",  # Timeouts = model too slow, not transient
+            r"timed\s+out",
+            r"maximum\s+context",
+            r"token\s+limit",
+            r"content\s+policy",
+            r"safety\s+filter",
+            r"model\s+overloaded",
         ],
         ErrorCategory.RESOURCE: [
-            r'budget\s+exceeded',
-            r'quota\s+exceeded',
-            r'out\s+of\s+memory',
-            r'disk\s+full',
+            r"budget\s+exceeded",
+            r"quota\s+exceeded",
+            r"out\s+of\s+memory",
+            r"disk\s+full",
         ],
         ErrorCategory.CRITICAL: [
-            r'security\s+violation',
-            r'unauthorized',
-            r'forbidden',
-            r'fatal\s+error',
+            r"security\s+violation",
+            r"unauthorized",
+            r"forbidden",
+            r"fatal\s+error",
         ],
     }
 
@@ -184,10 +191,10 @@ class ErrorClassifier:
         if isinstance(error, ProviderError):
             return ErrorCategory.MODEL_LIMIT
 
-        if 'timeout' in error_type:
+        if "timeout" in error_type:
             return ErrorCategory.TRANSIENT
 
-        if 'auth' in error_type:
+        if "auth" in error_type:
             return ErrorCategory.CRITICAL
 
         return ErrorCategory.UNKNOWN
@@ -196,6 +203,7 @@ class ErrorClassifier:
 # =============================================================================
 # Prompt Refiner
 # =============================================================================
+
 
 class PromptRefiner:
     """محسن الـ Prompts"""
@@ -248,12 +256,7 @@ Consider:
     }
 
     @classmethod
-    def refine(
-        cls,
-        original_prompt: str,
-        error: Exception,
-        error_category: ErrorCategory
-    ) -> str:
+    def refine(cls, original_prompt: str, error: Exception, error_category: ErrorCategory) -> str:
         """تحسين الـ Prompt"""
         template_key = "general"
 
@@ -266,20 +269,18 @@ Consider:
 
         template = cls.REFINEMENT_TEMPLATES.get(template_key, cls.REFINEMENT_TEMPLATES["general"])
 
-        return template.format(
-            original_prompt=original_prompt,
-            error_message=str(error)[:500]
-        )
+        return template.format(original_prompt=original_prompt, error_message=str(error)[:500])
 
 
 # =============================================================================
 # Self-Healing System
 # =============================================================================
 
+
 class SelfHealingSystem:
     """
     نظام التعافي الذاتي
-    
+
     يستخدم 5 مستويات للتعافي:
     - L1: إعادة المحاولة البسيطة
     - L2: تحسين الـ Prompt
@@ -290,9 +291,9 @@ class SelfHealingSystem:
 
     # حدود المستويات
     MAX_RETRIES_PER_LEVEL = {
-        HealingLevel.L1_RETRY: 1,          # Was 3 — reduced: retrying timeouts 3× wastes 540s
-        HealingLevel.L2_REFINE: 1,         # Was 2 — reduced: with only 1 provider, repeated retries just timeout
-        HealingLevel.L3_PIVOT: 1,          # Was 2 — reduced
+        HealingLevel.L1_RETRY: 1,  # Was 3 — reduced: retrying timeouts 3× wastes 540s
+        HealingLevel.L2_REFINE: 1,  # Was 2 — reduced: with only 1 provider, repeated retries just timeout
+        HealingLevel.L3_PIVOT: 1,  # Was 2 — reduced
         HealingLevel.L4_STRATEGY_SHIFT: 1,
         HealingLevel.L5_HUMAN_ESCALATION: 0,
     }
@@ -309,7 +310,7 @@ class SelfHealingSystem:
     def __init__(
         self,
         max_level: HealingLevel = HealingLevel.L4_STRATEGY_SHIFT,
-        on_escalate: Callable[[ErrorContext], Awaitable[None]] | None = None
+        on_escalate: Callable[[ErrorContext], Awaitable[None]] | None = None,
     ):
         self.max_level = max_level
         self.on_escalate = on_escalate
@@ -333,17 +334,17 @@ class SelfHealingSystem:
         error: Exception,
         task: Task,
         execute_func: Callable[[Task], Awaitable[Any]],
-        context: dict[str, Any] | None = None
+        context: dict[str, Any] | None = None,
     ) -> RecoveryResult:
         """
         محاولة التعافي من خطأ
-        
+
         Args:
             error: الخطأ الذي حدث
             task: المهمة المراد تنفيذها
             execute_func: دالة التنفيذ
             context: سياق إضافي
-        
+
         Returns:
             نتيجة الاسترداد
         """
@@ -362,7 +363,7 @@ class SelfHealingSystem:
             provider=context.get("provider", "") if context else "",
             model=context.get("model", "") if context else "",
             attempt=0,
-            stack_trace=traceback.format_exc()
+            stack_trace=traceback.format_exc(),
         )
 
         # تسجيل الخطأ
@@ -384,7 +385,7 @@ class SelfHealingSystem:
                 error_ctx=error_ctx,
                 task=task,
                 execute_func=execute_func,
-                context=context
+                context=context,
             )
 
             if result.success:
@@ -395,7 +396,7 @@ class SelfHealingSystem:
                     level=current_level,
                     action=result.action,
                     success=True,
-                    error_category=error_category
+                    error_category=error_category,
                 )
                 return result
 
@@ -414,7 +415,7 @@ class SelfHealingSystem:
             level=current_level,
             error="All healing levels exhausted",
             attempts=error_ctx.attempt,
-            time_spent_ms=(time.time() - start_time) * 1000
+            time_spent_ms=(time.time() - start_time) * 1000,
         )
 
         # التصعيد
@@ -427,7 +428,7 @@ class SelfHealingSystem:
             action=RecoveryAction.ESCALATE,
             success=False,
             error_category=error_category,
-            details=str(error)
+            details=str(error),
         )
 
         return result
@@ -453,7 +454,7 @@ class SelfHealingSystem:
         error_ctx: ErrorContext,
         task: Task,
         execute_func: Callable[[Task], Awaitable[Any]],
-        context: dict[str, Any] | None = None
+        context: dict[str, Any] | None = None,
     ) -> RecoveryResult:
         """محاولة مستوى معين"""
         max_retries = self.MAX_RETRIES_PER_LEVEL.get(level, 1)
@@ -462,9 +463,7 @@ class SelfHealingSystem:
         for attempt in range(max_retries):
             error_ctx.attempt = attempt + 1
 
-            self._logger.info(
-                f"Attempting {level.name} (attempt {attempt + 1}/{max_retries})"
-            )
+            self._logger.info(f"Attempting {level.name} (attempt {attempt + 1}/{max_retries})")
 
             # انتظار قبل المحاولة
             if attempt > 0 and delay > 0:
@@ -482,9 +481,9 @@ class SelfHealingSystem:
                 # Check if the result object itself indicates failure
                 # (execute_func may return ExecutionResult with success=False
                 #  without raising an exception)
-                result_success = getattr(result, 'success', True)
+                result_success = getattr(result, "success", True)
                 if not result_success:
-                    error_msg = getattr(result, 'error', 'Execution returned success=False')
+                    error_msg = getattr(result, "error", "Execution returned success=False")
                     self._logger.warning(
                         f"{level.name} attempt {attempt + 1}: execution returned failure: {str(error_msg)[:100]}"
                     )
@@ -497,13 +496,11 @@ class SelfHealingSystem:
                     level=level,
                     result=result,
                     attempts=attempt + 1,
-                    metadata={"action": action.name}
+                    metadata={"action": action.name},
                 )
 
             except Exception as e:
-                self._logger.warning(
-                    f"{level.name} attempt {attempt + 1} failed: {e}"
-                )
+                self._logger.warning(f"{level.name} attempt {attempt + 1} failed: {e}")
                 error_ctx.error = e
                 continue
 
@@ -512,7 +509,7 @@ class SelfHealingSystem:
             action=RecoveryAction.RETRY,
             level=level,
             error=str(error_ctx.error),
-            attempts=max_retries
+            attempts=max_retries,
         )
 
     async def _apply_level_action(
@@ -520,7 +517,7 @@ class SelfHealingSystem:
         level: HealingLevel,
         error_ctx: ErrorContext,
         task: Task,
-        context: dict[str, Any] | None = None
+        context: dict[str, Any] | None = None,
     ) -> tuple[RecoveryAction, Task]:
         """تطبيق إجراء المستوى"""
         context = context or {}
@@ -532,9 +529,7 @@ class SelfHealingSystem:
         elif level == HealingLevel.L2_REFINE:
             # تحسين الـ Prompt
             refined_description = PromptRefiner.refine(
-                task.description,
-                error_ctx.error,
-                error_ctx.category
+                task.description, error_ctx.error, error_ctx.category
             )
 
             modified_task = Task(
@@ -545,7 +540,7 @@ class SelfHealingSystem:
                 complexity=task.complexity,
                 context=task.context,
                 constraints=task.constraints,
-                metadata={**task.metadata, "refined": True}
+                metadata={**task.metadata, "refined": True},
             )
 
             return RecoveryAction.REFINE_PROMPT, modified_task
@@ -561,7 +556,7 @@ class SelfHealingSystem:
                 complexity=task.complexity,
                 context=task.context,
                 constraints={**task.constraints, "force_model_tier": "higher"},
-                metadata={**task.metadata, "model_pivoted": True}
+                metadata={**task.metadata, "model_pivoted": True},
             )
 
             return RecoveryAction.CHANGE_MODEL, modified_task
@@ -578,7 +573,7 @@ class SelfHealingSystem:
                 complexity=TaskComplexity.SIMPLE,
                 context=task.context,
                 constraints={**task.constraints, "simplified": True},
-                metadata={**task.metadata, "simplified": True}
+                metadata={**task.metadata, "simplified": True},
             )
 
             return RecoveryAction.SIMPLIFY_TASK, modified_task
@@ -636,7 +631,7 @@ This is a simplified version due to previous failures with the full implementati
         action: RecoveryAction,
         success: bool,
         error_category: ErrorCategory,
-        details: str = ""
+        details: str = "",
     ) -> None:
         """تسجيل محاولة التعافي"""
         record = HealingRecord(
@@ -646,7 +641,7 @@ This is a simplified version due to previous failures with the full implementati
             success=success,
             duration_ms=0,
             error_category=error_category,
-            details=details
+            details=details,
         )
 
         self._records.append(record)
@@ -663,7 +658,8 @@ This is a simplified version due to previous failures with the full implementati
             "escalations": self._escalations,
             "recovery_rate": (
                 self._successful_recoveries / self._total_healing_attempts
-                if self._total_healing_attempts > 0 else 0
+                if self._total_healing_attempts > 0
+                else 0
             ),
             "errors_by_category": self._get_errors_by_category(),
             "healing_by_level": self._get_healing_by_level(),

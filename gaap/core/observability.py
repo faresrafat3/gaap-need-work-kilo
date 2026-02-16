@@ -329,9 +329,7 @@ class Metrics:
             else:
                 metric.set(value)
 
-    def inc_gauge(
-        self, name: str, labels: dict[str, str] | None = None, value: float = 1
-    ) -> None:
+    def inc_gauge(self, name: str, labels: dict[str, str] | None = None, value: float = 1) -> None:
         """Increment a gauge"""
         if PROMETHEUS_AVAILABLE and name in self._metrics:
             metric = self._metrics[name]
@@ -340,9 +338,7 @@ class Metrics:
             else:
                 metric.inc(value)
 
-    def dec_gauge(
-        self, name: str, labels: dict[str, str] | None = None, value: float = 1
-    ) -> None:
+    def dec_gauge(self, name: str, labels: dict[str, str] | None = None, value: float = 1) -> None:
         """Decrement a gauge"""
         if PROMETHEUS_AVAILABLE and name in self._metrics:
             metric = self._metrics[name]

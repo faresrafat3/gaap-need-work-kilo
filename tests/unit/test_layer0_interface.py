@@ -3,17 +3,10 @@ Unit tests for Layer 0 - Interface Layer
 """
 
 import pytest
-import asyncio
-from unittest.mock import MagicMock, AsyncMock, patch
-from typing import Dict, Any
 
 from gaap.core.types import (
-    Task,
     TaskPriority,
     TaskType,
-    Message,
-    MessageRole,
-    LayerType,
 )
 
 

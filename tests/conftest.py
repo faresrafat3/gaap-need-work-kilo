@@ -2,29 +2,26 @@
 Shared pytest fixtures for GAAP tests
 """
 
-import pytest
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from gaap.core.types import (
-    Task,
-    TaskResult,
-    TaskPriority,
-    TaskType,
-    TaskComplexity,
+    ChatCompletionChoice,
+    ChatCompletionResponse,
+    LayerType,
     Message,
     MessageRole,
-    ChatCompletionResponse,
-    ChatCompletionChoice,
-    Usage,
     ProviderType,
-    ModelTier,
-    LayerType,
-    ExecutionStatus,
+    Task,
+    TaskComplexity,
+    TaskPriority,
+    TaskResult,
+    TaskType,
+    Usage,
 )
-
 
 # =============================================================================
 # Event Loop
@@ -51,7 +48,7 @@ def sample_message() -> Message:
 
 
 @pytest.fixture
-def sample_messages() -> List[Message]:
+def sample_messages() -> list[Message]:
     """Create a list of sample messages"""
     return [
         Message(role=MessageRole.SYSTEM, content="You are a helpful assistant."),
@@ -83,7 +80,7 @@ def sample_task() -> Task:
 
 
 @pytest.fixture
-def sample_tasks() -> List[Task]:
+def sample_tasks() -> list[Task]:
     """Create multiple sample tasks"""
     return [
         Task(
@@ -250,7 +247,7 @@ def sample_chat_response() -> ChatCompletionResponse:
 
 
 @pytest.fixture
-def sample_provider_config() -> Dict[str, Any]:
+def sample_provider_config() -> dict[str, Any]:
     """Create sample provider configuration"""
     return {
         "name": "test-provider",
@@ -262,7 +259,7 @@ def sample_provider_config() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sample_engine_config() -> Dict[str, Any]:
+def sample_engine_config() -> dict[str, Any]:
     """Create sample engine configuration"""
     return {
         "budget": 10.0,
@@ -304,7 +301,7 @@ def mock_layer():
 @pytest.fixture
 def mock_router():
     """Create a mock router"""
-    from gaap.core.types import RoutingDecision, RoutingContext
+    from gaap.core.types import RoutingDecision
 
     router = MagicMock()
 
@@ -400,7 +397,7 @@ class TaskFactory:
         return Task(id=id, type=type, description=description, priority=priority, **kwargs)
 
     @staticmethod
-    def create_batch(count: int = 5) -> List[Task]:
+    def create_batch(count: int = 5) -> list[Task]:
         return [
             TaskFactory.create(id=f"task-{i:03d}", description=f"Test task {i}")
             for i in range(count)
@@ -423,7 +420,7 @@ class MessageFactory:
         return Message(role=MessageRole.SYSTEM, content=content)
 
     @staticmethod
-    def conversation(turns: int = 3) -> List[Message]:
+    def conversation(turns: int = 3) -> list[Message]:
         messages = [MessageFactory.system()]
         for i in range(turns):
             messages.append(MessageFactory.user(f"User message {i}"))

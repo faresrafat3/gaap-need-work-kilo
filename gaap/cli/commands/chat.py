@@ -2,6 +2,7 @@
 Chat Commands
 """
 
+import contextlib
 import os
 
 
@@ -64,10 +65,8 @@ async def cmd_chat(args):
         for provider in getattr(engine, "providers", []):
             close_fn = getattr(provider, "close", None)
             if callable(close_fn):
-                try:
+                with contextlib.suppress(Exception):
                     await close_fn()
-                except Exception:
-                    pass
         engine.shutdown()
 
 
@@ -138,8 +137,6 @@ async def cmd_interactive(args):
         for provider in getattr(engine, "providers", []):
             close_fn = getattr(provider, "close", None)
             if callable(close_fn):
-                try:
+                with contextlib.suppress(Exception):
                     await close_fn()
-                except Exception:
-                    pass
         engine.shutdown()

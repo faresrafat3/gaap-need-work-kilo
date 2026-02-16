@@ -4,7 +4,6 @@ GAAP Web UI - Main Dashboard
 Run with: streamlit run gaap/web/app.py
 """
 
-
 import streamlit as st
 
 st.set_page_config(

@@ -12,8 +12,10 @@ from typing import Any
 # Enums
 # =============================================================================
 
+
 class ChunkType(Enum):
     """أنواع القطع"""
+
     FILE = "file"
     CLASS = "class"
     FUNCTION = "function"
@@ -28,9 +30,11 @@ class ChunkType(Enum):
 # Data Classes
 # =============================================================================
 
+
 @dataclass
 class CodeChunk:
     """قطعة كود"""
+
     id: str
     chunk_type: ChunkType
     name: str
@@ -62,10 +66,11 @@ class CodeChunk:
 # Smart Chunker
 # =============================================================================
 
+
 class SmartChunker:
     """
     المقسم الذكي للكود
-    
+
     الميزات:
     - تقسيم يحترم البنية البرمجية
     - استخراج الواجهات
@@ -86,11 +91,7 @@ class SmartChunker:
     # Chunking Methods
     # =========================================================================
 
-    async def chunk_file(
-        self,
-        file_path: str,
-        max_chunk_size: int = None
-    ) -> list[CodeChunk]:
+    async def chunk_file(self, file_path: str, max_chunk_size: int = None) -> list[CodeChunk]:
         """تقسيم ملف إلى قطع"""
         max_chunk_size = max_chunk_size or self.MAX_CHUNK_TOKENS
 
@@ -101,7 +102,7 @@ class SmartChunker:
 
         # قراءة الملف
         try:
-            with open(file_path, encoding='utf-8') as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
         except Exception as e:
             self._logger.warning(f"Could not read {file_path}: {e}")
@@ -110,9 +111,9 @@ class SmartChunker:
         ext = os.path.splitext(file_path)[1].lower()
 
         # تقسيم حسب نوع الملف
-        if ext == '.py':
+        if ext == ".py":
             chunks = self._chunk_python(file_path, content, max_chunk_size)
-        elif ext in ('.js', '.ts', '.jsx', '.tsx'):
+        elif ext in (".js", ".ts", ".jsx", ".tsx"):
             chunks = self._chunk_javascript(file_path, content, max_chunk_size)
         else:
             chunks = self._chunk_generic(file_path, content, max_chunk_size)
@@ -122,15 +123,10 @@ class SmartChunker:
 
         return chunks
 
-    def _chunk_python(
-        self,
-        file_path: str,
-        content: str,
-        max_chunk_size: int
-    ) -> list[CodeChunk]:
+    def _chunk_python(self, file_path: str, content: str, max_chunk_size: int) -> list[CodeChunk]:
         """تقسيم ملف Python"""
         chunks: list[CodeChunk] = []
-        lines = content.split('\n')
+        lines = content.split("\n")
 
         # تجربة تحليل AST
         try:
@@ -139,16 +135,18 @@ class SmartChunker:
             # استخراج التوثيق
             module_doc = ast.get_docstring(tree)
             if module_doc:
-                chunks.append(CodeChunk(
-                    id=self._generate_id(file_path, "module_doc"),
-                    chunk_type=ChunkType.MODULE_DOC,
-                    name="module_docstring",
-                    content=module_doc,
-                    token_count=len(module_doc.split()) * 1.5,
-                    file_path=file_path,
-                    start_line=1,
-                    end_line=module_doc.count('\n') + 1
-                ))
+                chunks.append(
+                    CodeChunk(
+                        id=self._generate_id(file_path, "module_doc"),
+                        chunk_type=ChunkType.MODULE_DOC,
+                        name="module_docstring",
+                        content=module_doc,
+                        token_count=len(module_doc.split()) * 1.5,
+                        file_path=file_path,
+                        start_line=1,
+                        end_line=module_doc.count("\n") + 1,
+                    )
+                )
 
             # استخراج imports
             imports = []
@@ -157,15 +155,17 @@ class SmartChunker:
                     imports.append(ast.unparse(node))
 
             if imports:
-                import_content = '\n'.join(imports)
-                chunks.append(CodeChunk(
-                    id=self._generate_id(file_path, "imports"),
-                    chunk_type=ChunkType.IMPORTS,
-                    name="imports",
-                    content=import_content,
-                    token_count=len(import_content.split()) * 1.5,
-                    file_path=file_path
-                ))
+                import_content = "\n".join(imports)
+                chunks.append(
+                    CodeChunk(
+                        id=self._generate_id(file_path, "imports"),
+                        chunk_type=ChunkType.IMPORTS,
+                        name="imports",
+                        content=import_content,
+                        token_count=len(import_content.split()) * 1.5,
+                        file_path=file_path,
+                    )
+                )
 
             # استخراج الفئات والدوال
             for node in ast.iter_child_nodes(tree):
@@ -176,9 +176,7 @@ class SmartChunker:
                     chunks.extend(class_chunks)
 
                 elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    func_chunk = self._extract_function_chunk(
-                        node, file_path, lines
-                    )
+                    func_chunk = self._extract_function_chunk(node, file_path, lines)
                     if func_chunk:
                         chunks.append(func_chunk)
 
@@ -189,11 +187,7 @@ class SmartChunker:
         return chunks
 
     def _extract_class_chunks(
-        self,
-        node: ast.ClassDef,
-        file_path: str,
-        lines: list[str],
-        max_chunk_size: int
+        self, node: ast.ClassDef, file_path: str, lines: list[str], max_chunk_size: int
     ) -> list[CodeChunk]:
         """استخراج قطع الفئة"""
         chunks: list[CodeChunk] = []
@@ -202,7 +196,9 @@ class SmartChunker:
         docstring = ast.get_docstring(node) or ""
 
         # توقيع الفئة
-        methods = [n.name for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+        methods = [
+            n.name for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
         signature = f"class {node.name}"
         if node.bases:
             bases = [ast.unparse(b) for b in node.bases]
@@ -211,27 +207,29 @@ class SmartChunker:
         # استخراج المحتوى
         start_line = node.lineno
         end_line = node.end_lineno or start_line
-        content = '\n'.join(lines[start_line - 1:end_line])
+        content = "\n".join(lines[start_line - 1 : end_line])
 
         # إذا كانت الفئة كبيرة، تقسيمها
         token_count = len(content.split()) * 1.5
 
         if token_count <= max_chunk_size:
             # فئة كاملة
-            chunks.append(CodeChunk(
-                id=self._generate_id(file_path, f"class_{node.name}"),
-                chunk_type=ChunkType.CLASS,
-                name=node.name,
-                content=content,
-                token_count=token_count,
-                file_path=file_path,
-                start_line=start_line,
-                end_line=end_line,
-                signature=signature,
-                docstring=docstring,
-                interfaces=methods,
-                metadata={"methods": methods}
-            ))
+            chunks.append(
+                CodeChunk(
+                    id=self._generate_id(file_path, f"class_{node.name}"),
+                    chunk_type=ChunkType.CLASS,
+                    name=node.name,
+                    content=content,
+                    token_count=token_count,
+                    file_path=file_path,
+                    start_line=start_line,
+                    end_line=end_line,
+                    signature=signature,
+                    docstring=docstring,
+                    interfaces=methods,
+                    metadata={"methods": methods},
+                )
+            )
         else:
             # تقسيم الفئة
             # أولاً: واجهة الفئة
@@ -239,18 +237,20 @@ class SmartChunker:
             interface_content += f'    """{docstring}"""\n'
             interface_content += f"    # Methods: {', '.join(methods)}\n"
 
-            chunks.append(CodeChunk(
-                id=self._generate_id(file_path, f"class_{node.name}_interface"),
-                chunk_type=ChunkType.INTERFACE,
-                name=f"{node.name}_interface",
-                content=interface_content,
-                token_count=len(interface_content.split()) * 1.5,
-                file_path=file_path,
-                start_line=start_line,
-                signature=signature,
-                docstring=docstring,
-                interfaces=methods
-            ))
+            chunks.append(
+                CodeChunk(
+                    id=self._generate_id(file_path, f"class_{node.name}_interface"),
+                    chunk_type=ChunkType.INTERFACE,
+                    name=f"{node.name}_interface",
+                    content=interface_content,
+                    token_count=len(interface_content.split()) * 1.5,
+                    file_path=file_path,
+                    start_line=start_line,
+                    signature=signature,
+                    docstring=docstring,
+                    interfaces=methods,
+                )
+            )
 
             # ثم: كل طريقة كقطعة منفصلة
             for method_node in node.body:
@@ -264,20 +264,16 @@ class SmartChunker:
         return chunks
 
     def _extract_function_chunk(
-        self,
-        node,
-        file_path: str,
-        lines: list[str],
-        class_name: str = None
+        self, node, file_path: str, lines: list[str], class_name: str = None
     ) -> CodeChunk | None:
         """استخراج قطعة دالة"""
         start_line = node.lineno
         end_line = node.end_lineno or start_line
-        content = '\n'.join(lines[start_line - 1:end_line])
+        content = "\n".join(lines[start_line - 1 : end_line])
 
         # التوقيع
         args = [a.arg for a in node.args.args]
-        if class_name and args and args[0] == 'self':
+        if class_name and args and args[0] == "self":
             args = args[1:]  # إزالة self من العرض
 
         is_async = isinstance(node, ast.AsyncFunctionDef)
@@ -291,9 +287,8 @@ class SmartChunker:
         for child in ast.walk(node):
             if isinstance(child, ast.Name):
                 dependencies.append(child.id)
-            elif isinstance(child, ast.Attribute):
-                if isinstance(child.value, ast.Name):
-                    dependencies.append(f"{child.value.id}.{child.attr}")
+            elif isinstance(child, ast.Attribute) and isinstance(child.value, ast.Name):
+                dependencies.append(f"{child.value.id}.{child.attr}")
 
         chunk_type = ChunkType.METHOD if class_name else ChunkType.FUNCTION
         name = f"{class_name}.{node.name}" if class_name else node.name
@@ -310,7 +305,7 @@ class SmartChunker:
             signature=signature,
             docstring=docstring,
             dependencies=list(set(dependencies))[:10],
-            importance=self._calculate_importance(node, content)
+            importance=self._calculate_importance(node, content),
         )
 
     def _calculate_importance(self, node, content: str) -> float:
@@ -318,8 +313,10 @@ class SmartChunker:
         importance = 0.5
 
         # دوال أكثر أهمية
-        important_names = ['main', 'run', 'execute', 'process', 'handle', 'init']
-        if node.name.lower() in important_names or any(n in node.name.lower() for n in important_names):
+        important_names = ["main", "run", "execute", "process", "handle", "init"]
+        if node.name.lower() in important_names or any(
+            n in node.name.lower() for n in important_names
+        ):
             importance += 0.3
 
         # دوال موثقة أكثر أهمية
@@ -327,40 +324,38 @@ class SmartChunker:
             importance += 0.1
 
         # دوال أطول قد تكون أكثر أهمية
-        lines = content.count('\n')
+        lines = content.count("\n")
         if lines > 50:
             importance += 0.1
 
         return min(importance, 1.0)
 
     def _chunk_javascript(
-        self,
-        file_path: str,
-        content: str,
-        max_chunk_size: int
+        self, file_path: str, content: str, max_chunk_size: int
     ) -> list[CodeChunk]:
         """تقسيم ملف JavaScript/TypeScript"""
         chunks: list[CodeChunk] = []
 
         # استخراج imports
-        import_pattern = re.compile(r'^import\s+.+?;?\s*$', re.MULTILINE)
+        import_pattern = re.compile(r"^import\s+.+?;?\s*$", re.MULTILINE)
         imports = import_pattern.findall(content)
 
         if imports:
-            import_content = '\n'.join(imports)
-            chunks.append(CodeChunk(
-                id=self._generate_id(file_path, "imports"),
-                chunk_type=ChunkType.IMPORTS,
-                name="imports",
-                content=import_content,
-                token_count=len(import_content.split()) * 1.5,
-                file_path=file_path
-            ))
+            import_content = "\n".join(imports)
+            chunks.append(
+                CodeChunk(
+                    id=self._generate_id(file_path, "imports"),
+                    chunk_type=ChunkType.IMPORTS,
+                    name="imports",
+                    content=import_content,
+                    token_count=len(import_content.split()) * 1.5,
+                    file_path=file_path,
+                )
+            )
 
         # استخراج الفئات
         class_pattern = re.compile(
-            r'(export\s+)?(default\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?\s*\{',
-            re.MULTILINE
+            r"(export\s+)?(default\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?\s*\{", re.MULTILINE
         )
 
         for match in class_pattern.finditer(content):
@@ -371,9 +366,9 @@ class SmartChunker:
             end = start
 
             for i, char in enumerate(content[start:], start):
-                if char == '{':
+                if char == "{":
                     brace_count += 1
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
                     if brace_count == 0:
                         end = i + 1
@@ -381,21 +376,22 @@ class SmartChunker:
 
             class_content = content[start:end]
 
-            chunks.append(CodeChunk(
-                id=self._generate_id(file_path, f"class_{class_name}"),
-                chunk_type=ChunkType.CLASS,
-                name=class_name,
-                content=class_content,
-                token_count=len(class_content.split()) * 1.5,
-                file_path=file_path,
-                start_line=content[:start].count('\n') + 1,
-                end_line=content[:end].count('\n') + 1
-            ))
+            chunks.append(
+                CodeChunk(
+                    id=self._generate_id(file_path, f"class_{class_name}"),
+                    chunk_type=ChunkType.CLASS,
+                    name=class_name,
+                    content=class_content,
+                    token_count=len(class_content.split()) * 1.5,
+                    file_path=file_path,
+                    start_line=content[:start].count("\n") + 1,
+                    end_line=content[:end].count("\n") + 1,
+                )
+            )
 
         # استخراج الدوال
         func_pattern = re.compile(
-            r'(export\s+)?(async\s+)?function\s+(\w+)\s*\([^)]*\)',
-            re.MULTILINE
+            r"(export\s+)?(async\s+)?function\s+(\w+)\s*\([^)]*\)", re.MULTILINE
         )
 
         for match in func_pattern.finditer(content):
@@ -408,10 +404,10 @@ class SmartChunker:
             in_func = False
 
             for i, char in enumerate(content[start:], start):
-                if char == '{':
+                if char == "{":
                     brace_count += 1
                     in_func = True
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
                     if in_func and brace_count == 0:
                         end = i + 1
@@ -419,43 +415,42 @@ class SmartChunker:
 
             func_content = content[start:end]
 
-            chunks.append(CodeChunk(
-                id=self._generate_id(file_path, f"func_{func_name}"),
-                chunk_type=ChunkType.FUNCTION,
-                name=func_name,
-                content=func_content,
-                token_count=len(func_content.split()) * 1.5,
-                file_path=file_path,
-                start_line=content[:start].count('\n') + 1,
-                end_line=content[:end].count('\n') + 1,
-                signature=match.group(0)
-            ))
+            chunks.append(
+                CodeChunk(
+                    id=self._generate_id(file_path, f"func_{func_name}"),
+                    chunk_type=ChunkType.FUNCTION,
+                    name=func_name,
+                    content=func_content,
+                    token_count=len(func_content.split()) * 1.5,
+                    file_path=file_path,
+                    start_line=content[:start].count("\n") + 1,
+                    end_line=content[:end].count("\n") + 1,
+                    signature=match.group(0),
+                )
+            )
 
         return chunks
 
-    def _chunk_generic(
-        self,
-        file_path: str,
-        content: str,
-        max_chunk_size: int
-    ) -> list[CodeChunk]:
+    def _chunk_generic(self, file_path: str, content: str, max_chunk_size: int) -> list[CodeChunk]:
         """تقسيم عام للملفات"""
         chunks: list[CodeChunk] = []
-        lines = content.split('\n')
+        lines = content.split("\n")
         total_tokens = len(content.split()) * 1.5
 
         if total_tokens <= max_chunk_size:
             # ملف كامل
-            chunks.append(CodeChunk(
-                id=self._generate_id(file_path, "full"),
-                chunk_type=ChunkType.FILE,
-                name=os.path.basename(file_path),
-                content=content,
-                token_count=total_tokens,
-                file_path=file_path,
-                start_line=1,
-                end_line=len(lines)
-            ))
+            chunks.append(
+                CodeChunk(
+                    id=self._generate_id(file_path, "full"),
+                    chunk_type=ChunkType.FILE,
+                    name=os.path.basename(file_path),
+                    content=content,
+                    token_count=total_tokens,
+                    file_path=file_path,
+                    start_line=1,
+                    end_line=len(lines),
+                )
+            )
         else:
             # تقسيم بالأسطر
             chunk_lines = []
@@ -467,17 +462,19 @@ class SmartChunker:
 
                 if current_tokens + line_tokens > max_chunk_size and chunk_lines:
                     # حفظ القطعة الحالية
-                    chunk_content = '\n'.join(chunk_lines)
-                    chunks.append(CodeChunk(
-                        id=self._generate_id(file_path, f"chunk_{start_line}_{i-1}"),
-                        chunk_type=ChunkType.LOGICAL_BLOCK,
-                        name=f"lines_{start_line}_{i-1}",
-                        content=chunk_content,
-                        token_count=current_tokens,
-                        file_path=file_path,
-                        start_line=start_line,
-                        end_line=i - 1
-                    ))
+                    chunk_content = "\n".join(chunk_lines)
+                    chunks.append(
+                        CodeChunk(
+                            id=self._generate_id(file_path, f"chunk_{start_line}_{i-1}"),
+                            chunk_type=ChunkType.LOGICAL_BLOCK,
+                            name=f"lines_{start_line}_{i-1}",
+                            content=chunk_content,
+                            token_count=current_tokens,
+                            file_path=file_path,
+                            start_line=start_line,
+                            end_line=i - 1,
+                        )
+                    )
 
                     chunk_lines = []
                     current_tokens = 0
@@ -488,17 +485,19 @@ class SmartChunker:
 
             # القطعة الأخيرة
             if chunk_lines:
-                chunk_content = '\n'.join(chunk_lines)
-                chunks.append(CodeChunk(
-                    id=self._generate_id(file_path, f"chunk_{start_line}_{len(lines)}"),
-                    chunk_type=ChunkType.LOGICAL_BLOCK,
-                    name=f"lines_{start_line}_{len(lines)}",
-                    content=chunk_content,
-                    token_count=current_tokens,
-                    file_path=file_path,
-                    start_line=start_line,
-                    end_line=len(lines)
-                ))
+                chunk_content = "\n".join(chunk_lines)
+                chunks.append(
+                    CodeChunk(
+                        id=self._generate_id(file_path, f"chunk_{start_line}_{len(lines)}"),
+                        chunk_type=ChunkType.LOGICAL_BLOCK,
+                        name=f"lines_{start_line}_{len(lines)}",
+                        content=chunk_content,
+                        token_count=current_tokens,
+                        file_path=file_path,
+                        start_line=start_line,
+                        end_line=len(lines),
+                    )
+                )
 
         return chunks
 
@@ -512,10 +511,7 @@ class SmartChunker:
         return hashlib.md5(base.encode()).hexdigest()[:12]
 
     def get_relevant_chunks(
-        self,
-        chunks: list[CodeChunk],
-        query: str,
-        limit: int = 10
+        self, chunks: list[CodeChunk], query: str, limit: int = 10
     ) -> list[CodeChunk]:
         """الحصول على القطع ذات الصلة"""
         query_lower = query.lower()
@@ -549,21 +545,19 @@ class SmartChunker:
         scored.sort(key=lambda x: x[1], reverse=True)
         return [c[0] for c in scored[:limit]]
 
-    def get_chunk_interfaces(
-        self,
-        chunks: list[CodeChunk]
-    ) -> list[CodeChunk]:
+    def get_chunk_interfaces(self, chunks: list[CodeChunk]) -> list[CodeChunk]:
         """الحصول على واجهات فقط"""
         return [
             CodeChunk(
                 id=f"{c.id}_interface",
                 chunk_type=ChunkType.INTERFACE,
                 name=c.name,
-                content=c.signature + ('\n    """' + c.docstring[:200] + '"""' if c.docstring else ''),
+                content=c.signature
+                + ('\n    """' + c.docstring[:200] + '"""' if c.docstring else ""),
                 token_count=len((c.signature + c.docstring[:200]).split()) * 1.5,
                 file_path=c.file_path,
                 signature=c.signature,
-                interfaces=c.interfaces
+                interfaces=c.interfaces,
             )
             for c in chunks
             if c.signature

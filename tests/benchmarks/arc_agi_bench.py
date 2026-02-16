@@ -19,28 +19,40 @@ Usage:
     python -m gaap_system_glm5.benchmarks.arc_agi_bench --provider deepseek --tasks 5 --attempts 3
 """
 
-import sys, os, json, time, re, argparse, random
-from typing import List, Dict, Any, Optional, Tuple
+import argparse
+import json
+import os
+import random
+import re
+import time
+from typing import Any
 
-
-from gaap_system_glm5.providers.webchat_providers import webchat_call
 from gaap_system_glm5.providers.account_manager import bootstrap_pools
+from gaap_system_glm5.providers.webchat_providers import webchat_call
 
 # =============================================================================
 # ARC Color Map (for visual grid rendering)
 # =============================================================================
 COLOR_NAMES = {
-    0: "⬛", 1: "🟦", 2: "🟥", 3: "🟩", 4: "🟨",
-    5: "⬜", 6: "🟪", 7: "🟧", 8: "🩵", 9: "🟫",
+    0: "⬛",
+    1: "🟦",
+    2: "🟥",
+    3: "🟩",
+    4: "🟨",
+    5: "⬜",
+    6: "🟪",
+    7: "🟧",
+    8: "🩵",
+    9: "🟫",
 }
 
 
-def grid_to_text(grid: List[List[int]]) -> str:
+def grid_to_text(grid: list[list[int]]) -> str:
     """Convert grid to space-separated text (official ARC format)."""
     return "\n".join(" ".join(str(c) for c in row) for row in grid)
 
 
-def grid_to_visual(grid: List[List[int]]) -> str:
+def grid_to_visual(grid: list[list[int]]) -> str:
     """Convert grid to emoji visual."""
     return "\n".join("".join(COLOR_NAMES.get(c, "❓") for c in row) for row in grid)
 
@@ -49,7 +61,8 @@ def grid_to_visual(grid: List[List[int]]) -> str:
 # Prompt Construction — v2 (Official o3-style)
 # =============================================================================
 
-def build_arc_prompt(task: Dict[str, Any], use_visual: bool = False) -> str:
+
+def build_arc_prompt(task: dict[str, Any], use_visual: bool = False) -> str:
     """Build ARC prompt using official o3-style format (proven more effective)."""
     parts = []
     parts.append(
@@ -80,8 +93,8 @@ def build_arc_prompt(task: Dict[str, Any], use_visual: bool = False) -> str:
 
 
 def build_refinement_prompt(
-    task: Dict[str, Any],
-    previous_answer: List[List[int]],
+    task: dict[str, Any],
+    previous_answer: list[list[int]],
 ) -> str:
     """Build a refinement prompt — asks model to verify and fix its answer."""
     parts = []
@@ -124,14 +137,15 @@ def build_refinement_prompt(
 # Response Parsing
 # =============================================================================
 
-def parse_grid_response(response: str) -> Optional[List[List[int]]]:
+
+def parse_grid_response(response: str) -> list[list[int]] | None:
     """
     Parse a grid from model response. Uses backscan strategy (answer is usually
     at the END of the response). Tries multiple extraction strategies.
     """
     # Strategy 1: Backscan for text grid (space-separated numbers) — official format
     # This is the most common output format for the o3-style prompt
-    lines = response.strip().split('\n')
+    lines = response.strip().split("\n")
     grid_lines = []
     found_end = False
 
@@ -141,13 +155,15 @@ def parse_grid_response(response: str) -> Optional[List[List[int]]]:
         if not clean and not found_end:
             continue
         # Skip common non-grid endings
-        if clean.startswith('```') or clean.lower().startswith(('output', 'answer', 'result', 'the ')):
+        if clean.startswith("```") or clean.lower().startswith(
+            ("output", "answer", "result", "the ")
+        ):
             if found_end:
                 break
             continue
         # Try to parse as a row of numbers
         # Match lines like "0 5 0 0 0" or "0, 5, 0, 0, 0" or "[0, 5, 0]"
-        clean_nums = clean.strip('[]').replace(',', ' ')
+        clean_nums = clean.strip("[]").replace(",", " ")
         nums = clean_nums.split()
         if nums and all(n.strip().isdigit() for n in nums if n.strip()):
             grid_lines.insert(0, [int(n.strip()) for n in nums if n.strip()])
@@ -162,7 +178,7 @@ def parse_grid_response(response: str) -> Optional[List[List[int]]]:
             return grid_lines
 
     # Strategy 2: Find JSON array in response (backscan — last match)
-    matches = re.findall(r'\[\s*\[[\d\s,\[\]]+\]\s*\]', response, re.DOTALL)
+    matches = re.findall(r"\[\s*\[[\d\s,\[\]]+\]\s*\]", response, re.DOTALL)
     if matches:
         for match in reversed(matches):
             try:
@@ -173,7 +189,7 @@ def parse_grid_response(response: str) -> Optional[List[List[int]]]:
                 continue
 
     # Strategy 3: Look for grid in code blocks (last code block)
-    code_blocks = re.findall(r'```(?:json|text|)?\s*(.*?)```', response, re.DOTALL)
+    code_blocks = re.findall(r"```(?:json|text|)?\s*(.*?)```", response, re.DOTALL)
     for block in reversed(code_blocks):
         block = block.strip()
         # Try JSON parse
@@ -184,10 +200,10 @@ def parse_grid_response(response: str) -> Optional[List[List[int]]]:
         except (json.JSONDecodeError, ValueError):
             pass
         # Try text grid parse from code block
-        block_lines = block.split('\n')
+        block_lines = block.split("\n")
         grid_from_block = []
         for bline in block_lines:
-            clean_nums = bline.strip().strip('[]').replace(',', ' ')
+            clean_nums = bline.strip().strip("[]").replace(",", " ")
             nums = clean_nums.split()
             if nums and all(n.strip().isdigit() for n in nums if n.strip()):
                 grid_from_block.append([int(n.strip()) for n in nums if n.strip()])
@@ -203,7 +219,8 @@ def parse_grid_response(response: str) -> Optional[List[List[int]]]:
 # Grid Comparison
 # =============================================================================
 
-def compare_grids(predicted: List[List[int]], expected: List[List[int]]) -> Dict[str, Any]:
+
+def compare_grids(predicted: list[list[int]], expected: list[list[int]]) -> dict[str, Any]:
     """Compare predicted vs expected grid."""
     if predicted is None:
         return {"match": False, "reason": "parse_failed", "cell_accuracy": 0.0}
@@ -242,7 +259,8 @@ def compare_grids(predicted: List[List[int]], expected: List[List[int]]) -> Dict
 # Task Loading
 # =============================================================================
 
-def load_arc_tasks(n_tasks: int = 10, split: str = "evaluation", seed: int = 42) -> List[Dict]:
+
+def load_arc_tasks(n_tasks: int = 10, split: str = "evaluation", seed: int = 42) -> list[dict]:
     """Load ARC-AGI tasks from HuggingFace, filtering for small grids."""
     from datasets import load_dataset
 
@@ -280,6 +298,7 @@ def load_arc_tasks(n_tasks: int = 10, split: str = "evaluation", seed: int = 42)
 # Main Benchmark
 # =============================================================================
 
+
 def run_arc_benchmark(
     provider: str = "kimi",
     model: str = "kimi-k2.5-thinking",
@@ -290,7 +309,7 @@ def run_arc_benchmark(
     seed: int = 42,
     max_attempts: int = 3,
     strategy: str = "refine",  # "direct" | "refine" | "multi"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Run ARC-AGI benchmark on a provider.
 
@@ -387,9 +406,13 @@ def run_arc_benchmark(
                     if acc > best_accuracy:
                         best_accuracy = acc
                         best_predicted = predicted
-                    print(f"   ❌ Attempt {attempt_num} ({attempt_type}) | {acc:.0%} cells | {latency_ms:.0f}ms")
+                    print(
+                        f"   ❌ Attempt {attempt_num} ({attempt_type}) | {acc:.0%} cells | {latency_ms:.0f}ms"
+                    )
                 else:
-                    print(f"   ❌ Attempt {attempt_num} ({attempt_type}) | parse failed | {latency_ms:.0f}ms")
+                    print(
+                        f"   ❌ Attempt {attempt_num} ({attempt_type}) | parse failed | {latency_ms:.0f}ms"
+                    )
 
                 # For direct strategy, only 1 attempt
                 if strategy == "direct":
@@ -482,6 +505,7 @@ def run_arc_benchmark(
 # CLI
 # =============================================================================
 
+
 def main():
     parser = argparse.ArgumentParser(description="ARC-AGI Benchmark v2 for GAAP")
     parser.add_argument("--provider", default="kimi", help="Provider: kimi, deepseek, glm")
@@ -489,13 +513,16 @@ def main():
     parser.add_argument("--tasks", type=int, default=10, help="Number of tasks")
     parser.add_argument("--timeout", type=int, default=180, help="Timeout per attempt (seconds)")
     parser.add_argument("--visual", action="store_true", help="Include emoji visuals in prompt")
-    parser.add_argument("--split", default="evaluation", help="Dataset split: training, evaluation, trial")
+    parser.add_argument(
+        "--split", default="evaluation", help="Dataset split: training, evaluation, trial"
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--attempts", type=int, default=3, help="Max attempts per task")
     parser.add_argument(
-        "--strategy", default="refine",
+        "--strategy",
+        default="refine",
         choices=["direct", "refine", "multi"],
-        help="Strategy: direct (1 shot), refine (1 + verify/fix), multi (N independent)"
+        help="Strategy: direct (1 shot), refine (1 + verify/fix), multi (N independent)",
     )
     args = parser.parse_args()
 

@@ -2,8 +2,6 @@
 Model Commands
 """
 
-
-
 MODELS_INFO = {
     "strategic": {
         "tier": "Tier 1 - Strategic",
@@ -100,7 +98,7 @@ def _show_model_info(model_name: str = None):
         print("❌ Model name required: gaap models info <name>")
         return
 
-    for tier_key, tier_info in MODELS_INFO.items():
+    for _tier_key, tier_info in MODELS_INFO.items():
         for model in tier_info["models"]:
             if model["name"] == model_name:
                 print(f"\n🤖 {model['name']}")

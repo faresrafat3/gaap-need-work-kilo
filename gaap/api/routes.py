@@ -13,8 +13,10 @@ from gaap.gaap_engine import GAAPEngine, GAAPRequest, create_engine
 # Simple HTTP Server (without external dependencies)
 # =============================================================================
 
+
 class Request:
     """طلب HTTP"""
+
     def __init__(self, method: str, path: str, headers: dict[str, str], body: str = ""):
         self.method = method
         self.path = path
@@ -24,12 +26,13 @@ class Request:
     def json(self) -> dict[str, Any]:
         try:
             return json.loads(self.body)
-        except:
+        except Exception:
             return {}
 
 
 class Response:
     """استجابة HTTP"""
+
     def __init__(self, status: int = 200, body: Any = None, headers: dict[str, str] = None):
         self.status = status
         self.body = body or {}
@@ -52,6 +55,7 @@ class Response:
 # API Router
 # =============================================================================
 
+
 class GAPAPIRouter:
     """موجه API"""
 
@@ -69,7 +73,12 @@ class GAPAPIRouter:
                 elif request.path == "/status":
                     return await self._status()
                 elif request.path == "/":
-                    return Response(body={"message": "GAAP API v1.0.0", "endpoints": ["/chat", "/execute", "/status", "/health"]})
+                    return Response(
+                        body={
+                            "message": "GAAP API v1.0.0",
+                            "endpoints": ["/chat", "/execute", "/status", "/health"],
+                        }
+                    )
 
             elif request.method == "POST":
                 if request.path == "/chat":
@@ -87,18 +96,12 @@ class GAPAPIRouter:
 
     async def _health(self) -> Response:
         """فحص الصحة"""
-        return Response(body={
-            "status": "healthy",
-            "timestamp": datetime.now().isoformat()
-        })
+        return Response(body={"status": "healthy", "timestamp": datetime.now().isoformat()})
 
     async def _status(self) -> Response:
         """حالة النظام"""
         stats = self.engine.get_stats()
-        return Response(body={
-            "status": "running",
-            "stats": stats
-        })
+        return Response(body={"status": "running", "stats": stats})
 
     async def _chat(self, request: Request) -> Response:
         """محادثة سريعة"""
@@ -111,10 +114,7 @@ class GAPAPIRouter:
         response_text = await self.engine.chat(data["message"])
         elapsed = (time.time() - start) * 1000
 
-        return Response(body={
-            "response": response_text,
-            "time_ms": elapsed
-        })
+        return Response(body={"response": response_text, "time_ms": elapsed})
 
     async def _execute(self, request: Request) -> Response:
         """تنفيذ مهمة كاملة"""
@@ -123,28 +123,27 @@ class GAPAPIRouter:
         if "task" not in data:
             return Response(status=400, body={"error": "Missing 'task' field"})
 
-        gaap_request = GAAPRequest(
-            text=data["task"],
-            budget_limit=data.get("budget", 10.0)
-        )
+        gaap_request = GAAPRequest(text=data["task"], budget_limit=data.get("budget", 10.0))
 
         response = await self.engine.process(gaap_request)
 
-        return Response(body={
-            "success": response.success,
-            "output": response.output,
-            "error": response.error,
-            "metrics": {
-                "time_ms": response.total_time_ms,
-                "cost_usd": response.total_cost_usd,
-                "tokens": response.total_tokens,
-                "quality_score": response.quality_score
-            },
-            "details": {
-                "intent": response.intent.intent_type.name if response.intent else None,
-                "tasks_executed": len(response.execution_results)
+        return Response(
+            body={
+                "success": response.success,
+                "output": response.output,
+                "error": response.error,
+                "metrics": {
+                    "time_ms": response.total_time_ms,
+                    "cost_usd": response.total_cost_usd,
+                    "tokens": response.total_tokens,
+                    "quality_score": response.quality_score,
+                },
+                "details": {
+                    "intent": response.intent.intent_type.name if response.intent else None,
+                    "tasks_executed": len(response.execution_results),
+                },
             }
-        })
+        )
 
     async def _batch(self, request: Request) -> Response:
         """تنفيذ مجموعة مهام"""
@@ -157,22 +156,22 @@ class GAPAPIRouter:
         for task_text in data["tasks"][:10]:  # حد 10 مهام
             request = GAAPRequest(text=task_text)
             response = await self.engine.process(request)
-            results.append({
-                "task": task_text[:50],
-                "success": response.success,
-                "output": str(response.output)[:200] if response.output else None,
-                "error": response.error
-            })
+            results.append(
+                {
+                    "task": task_text[:50],
+                    "success": response.success,
+                    "output": str(response.output)[:200] if response.output else None,
+                    "error": response.error,
+                }
+            )
 
-        return Response(body={
-            "total": len(results),
-            "results": results
-        })
+        return Response(body={"total": len(results), "results": results})
 
 
 # =============================================================================
 # HTTP Server
 # =============================================================================
+
 
 class GAAPAPIServer:
     """خادم API"""
@@ -188,11 +187,7 @@ class GAAPAPIServer:
         """بدء الخادم"""
         import asyncio
 
-        server = await asyncio.start_server(
-            self._handle_connection,
-            self.host,
-            self.port
-        )
+        server = await asyncio.start_server(self._handle_connection, self.host, self.port)
 
         self._logger.info(f"GAAP API Server running on http://{self.host}:{self.port}")
 
@@ -251,13 +246,14 @@ class GAAPAPIServer:
 # Main Entry Point
 # =============================================================================
 
+
 async def run_server(host: str = "0.0.0.0", port: int = 8080, budget: float = 100.0):
     """تشغيل الخادم"""
     # إنشاء المحرك
     engine = create_engine(
         groq_api_key=os.environ.get("GROQ_API_KEY"),
         gemini_api_key=os.environ.get("GEMINI_API_KEY"),
-        budget=budget
+        budget=budget,
     )
 
     # إنشاء وتشغيل الخادم

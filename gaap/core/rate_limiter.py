@@ -9,6 +9,7 @@ Implements multiple rate limiting strategies:
 """
 
 import asyncio
+import contextlib
 import math
 import time
 from abc import ABC, abstractmethod
@@ -109,10 +110,8 @@ class BaseRateLimiter(ABC):
     async def _notify_callbacks(self, result: RateLimitResult) -> None:
         """Notify registered callbacks"""
         for callback in self._callbacks:
-            try:
+            with contextlib.suppress(Exception):
                 await callback(result)
-            except Exception:
-                pass
 
     def get_stats(self) -> dict[str, Any]:
         """Get rate limiter statistics"""
@@ -292,10 +291,8 @@ class LeakyBucketRateLimiter(BaseRateLimiter):
         self._running = False
         if self._leak_task:
             self._leak_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._leak_task
-            except asyncio.CancelledError:
-                pass
             self._leak_task = None
 
     async def _leak_loop(self) -> None:

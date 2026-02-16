@@ -24,14 +24,13 @@ from gaap.routing.router import SmartRouter
 # Logger Setup
 # =============================================================================
 
+
 def get_logger(name: str) -> logging.Logger:
     """إنشاء مسجل"""
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
@@ -42,22 +41,25 @@ def get_logger(name: str) -> logging.Logger:
 # Fallback Configuration
 # =============================================================================
 
+
 @dataclass
 class FallbackConfig:
     """تكوين البدائل"""
-    max_fallbacks: int = 3           # الحد الأقصى للبدائل
-    retry_delay_base: float = 1.0    # تأخير أساسي
-    retry_delay_max: float = 30.0    # تأخير أقصى
+
+    max_fallbacks: int = 3  # الحد الأقصى للبدائل
+    retry_delay_base: float = 1.0  # تأخير أساسي
+    retry_delay_max: float = 30.0  # تأخير أقصى
     exponential_backoff: bool = True  # تأخير أسي
-    jitter: bool = True              # إضافة عشوائية
+    jitter: bool = True  # إضافة عشوائية
     circuit_breaker_enabled: bool = True
     circuit_breaker_threshold: int = 5  # عدد الفشل لفتح الدائرة
-    circuit_breaker_timeout: int = 60   # ثواني قبل المحاولة مجدداً
+    circuit_breaker_timeout: int = 60  # ثواني قبل المحاولة مجدداً
 
 
 @dataclass
 class ProviderHealth:
     """صحة المزود"""
+
     name: str
     is_healthy: bool = True
     consecutive_failures: int = 0
@@ -102,10 +104,12 @@ class ProviderHealth:
 # Fallback Chain
 # =============================================================================
 
+
 @dataclass
 class FallbackChain:
     """سلسلة البدائل"""
-    primary: str                           # المزود الرئيسي
+
+    primary: str  # المزود الرئيسي
     fallbacks: list[str] = field(default_factory=list)  # البدائل
     current_index: int = 0
 
@@ -135,10 +139,11 @@ class FallbackChain:
 # Fallback Manager
 # =============================================================================
 
+
 class FallbackManager:
     """
     مدير البدائل - يدير التبديل بين المزودين عند الفشل
-    
+
     الميزات:
     - سلاسل بدائل قابلة للتخصيص
     - Circuit Breaker لحماية المزودين
@@ -146,11 +151,7 @@ class FallbackManager:
     - تتبع صحة المزودين
     """
 
-    def __init__(
-        self,
-        router: SmartRouter,
-        config: FallbackConfig | None = None
-    ):
+    def __init__(self, router: SmartRouter, config: FallbackConfig | None = None):
         self._router = router
         self._config = config or FallbackConfig()
         self._logger = get_logger("gaap.fallback")
@@ -168,24 +169,12 @@ class FallbackManager:
     # Fallback Chain Management
     # =========================================================================
 
-    def define_fallback_chain(
-        self,
-        primary: str,
-        fallbacks: list[str]
-    ) -> None:
+    def define_fallback_chain(self, primary: str, fallbacks: list[str]) -> None:
         """تحديد سلسلة بدائل"""
-        self._chains[primary] = FallbackChain(
-            primary=primary,
-            fallbacks=fallbacks
-        )
-        self._logger.info(
-            f"Defined fallback chain: {primary} -> {' -> '.join(fallbacks)}"
-        )
+        self._chains[primary] = FallbackChain(primary=primary, fallbacks=fallbacks)
+        self._logger.info(f"Defined fallback chain: {primary} -> {' -> '.join(fallbacks)}")
 
-    def get_default_fallbacks(
-        self,
-        provider_type: ProviderType
-    ) -> list[str]:
+    def get_default_fallbacks(self, provider_type: ProviderType) -> list[str]:
         """الحصول على البدائل الافتراضية"""
         default_chains = {
             ProviderType.CHAT_BASED: ["groq", "gemini"],
@@ -205,29 +194,26 @@ class FallbackManager:
         primary_provider: str,
         primary_model: str,
         task: Task | None = None,
-        **kwargs
+        **kwargs,
     ) -> ChatCompletionResponse:
         """
         تنفيذ مع بدائل تلقائية
-        
+
         Args:
             messages: الرسائل
             primary_provider: المزود الرئيسي
             primary_model: النموذج الرئيسي
             task: المهمة (اختياري)
-        
+
         Returns:
             استجابة الإكمال
         """
         # بناء سلسلة البدائل
         chain = self._chains.get(primary_provider)
         if chain is None:
-            fallbacks = self.get_default_fallbacks(
-                self._get_provider_type(primary_provider)
-            )
+            fallbacks = self.get_default_fallbacks(self._get_provider_type(primary_provider))
             chain = FallbackChain(
-                primary=primary_provider,
-                fallbacks=fallbacks[:self._config.max_fallbacks]
+                primary=primary_provider, fallbacks=fallbacks[: self._config.max_fallbacks]
             )
         else:
             chain.reset()
@@ -242,9 +228,7 @@ class FallbackManager:
 
             # التحقق من صحة المزود
             if not self._is_provider_available(provider_name):
-                self._logger.warning(
-                    f"Provider {provider_name} is not available, skipping"
-                )
+                self._logger.warning(f"Provider {provider_name} is not available, skipping")
                 continue
 
             # الحصول على المزود
@@ -265,15 +249,10 @@ class FallbackManager:
 
             try:
                 self._logger.info(
-                    f"Attempting {provider_name}/{model} "
-                    f"(attempt {chain.current_index})"
+                    f"Attempting {provider_name}/{model} " f"(attempt {chain.current_index})"
                 )
 
-                response = await provider.chat_completion(
-                    messages=messages,
-                    model=model,
-                    **kwargs
-                )
+                response = await provider.chat_completion(messages=messages, model=model, **kwargs)
 
                 # نجاح!
                 self._record_success(provider_name)
@@ -281,9 +260,7 @@ class FallbackManager:
                 if chain.current_index > 1:
                     self._successful_recoveries += 1
                     self._log_fallback(
-                        primary=primary_provider,
-                        fallback=provider_name,
-                        success=True
+                        primary=primary_provider, fallback=provider_name, success=True
                     )
 
                 return response
@@ -294,16 +271,16 @@ class FallbackManager:
 
                 self._record_failure(provider_name)
 
-                attempts.append({
-                    "provider": provider_name,
-                    "model": model,
-                    "error": str(e),
-                    "latency_ms": latency,
-                })
-
-                self._logger.warning(
-                    f"Provider {provider_name} failed: {e}"
+                attempts.append(
+                    {
+                        "provider": provider_name,
+                        "model": model,
+                        "error": str(e),
+                        "latency_ms": latency,
+                    }
                 )
+
+                self._logger.warning(f"Provider {provider_name} failed: {e}")
 
                 # التحقق من Circuit Breaker
                 self._check_circuit_breaker(provider_name)
@@ -311,24 +288,16 @@ class FallbackManager:
         # فشل جميع المحاولات
         self._total_fallbacks += 1
         self._log_fallback(
-            primary=primary_provider,
-            fallback="none",
-            success=False,
-            attempts=attempts
+            primary=primary_provider, fallback="none", success=False, attempts=attempts
         )
 
         raise MaxRetriesExceededError(
             task_id=task.id if task else "unknown",
             max_retries=len(attempts),
-            last_error=str(errors[-1]) if errors else "Unknown error"
+            last_error=str(errors[-1]) if errors else "Unknown error",
         )
 
-    def _select_model(
-        self,
-        provider: BaseProvider,
-        primary_model: str,
-        attempt: int
-    ) -> str:
+    def _select_model(self, provider: BaseProvider, primary_model: str, attempt: int) -> str:
         """اختيار نموذج مناسب"""
         # محاولة استخدام نفس النموذج
         if provider.is_model_available(primary_model):
@@ -376,11 +345,12 @@ class FallbackManager:
             return True
 
         if health.circuit_open:
-            return health.should_try_circuit(
-                self._config.circuit_breaker_timeout
-            )
+            return health.should_try_circuit(self._config.circuit_breaker_timeout)
 
-        return health.is_healthy or health.consecutive_failures < self._config.circuit_breaker_threshold
+        return (
+            health.is_healthy
+            or health.consecutive_failures < self._config.circuit_breaker_threshold
+        )
 
     def _get_provider_type(self, provider_name: str) -> ProviderType:
         """الحصول على نوع المزود"""
@@ -423,11 +393,7 @@ class FallbackManager:
     # =========================================================================
 
     def _log_fallback(
-        self,
-        primary: str,
-        fallback: str,
-        success: bool,
-        attempts: list[dict] | None = None
+        self, primary: str, fallback: str, success: bool, attempts: list[dict] | None = None
     ) -> None:
         """تسجيل حدث البديل"""
         event = {
@@ -464,7 +430,8 @@ class FallbackManager:
             "successful_recoveries": self._successful_recoveries,
             "recovery_rate": (
                 self._successful_recoveries / self._total_fallbacks
-                if self._total_fallbacks > 0 else 0
+                if self._total_fallbacks > 0
+                else 0
             ),
             "recent_events": self._fallback_events[-10:],
         }
@@ -482,10 +449,11 @@ class FallbackManager:
 # Circuit Breaker
 # =============================================================================
 
+
 class CircuitBreaker:
     """
     Circuit Breaker - يحمي من الطلبات المتكررة لمزود فاشل
-    
+
     الحالات:
     - CLOSED: يعمل بشكل طبيعي
     - OPEN: يرفض الطلبات
@@ -497,12 +465,7 @@ class CircuitBreaker:
         OPEN = "open"
         HALF_OPEN = "half_open"
 
-    def __init__(
-        self,
-        failure_threshold: int = 5,
-        success_threshold: int = 3,
-        timeout: int = 60
-    ):
+    def __init__(self, failure_threshold: int = 5, success_threshold: int = 3, timeout: int = 60):
         self.failure_threshold = failure_threshold
         self.success_threshold = success_threshold
         self.timeout = timeout
@@ -562,14 +525,12 @@ class CircuitBreaker:
 # Convenience Functions
 # =============================================================================
 
+
 def create_fallback_manager(
-    router: SmartRouter,
-    max_fallbacks: int = 3,
-    circuit_breaker_threshold: int = 5
+    router: SmartRouter, max_fallbacks: int = 3, circuit_breaker_threshold: int = 5
 ) -> FallbackManager:
     """إنشاء مدير بدائل بسهولة"""
     config = FallbackConfig(
-        max_fallbacks=max_fallbacks,
-        circuit_breaker_threshold=circuit_breaker_threshold
+        max_fallbacks=max_fallbacks, circuit_breaker_threshold=circuit_breaker_threshold
     )
     return FallbackManager(router=router, config=config)

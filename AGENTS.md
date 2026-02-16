@@ -1,5 +1,11 @@
 # AGENTS.md - GAAP Development Guide
 
+> **Documentation:** See `docs/` folder for detailed guides.
+> - Architecture: `docs/ARCHITECTURE.md`
+> - API Reference: `docs/API_REFERENCE.md`
+> - Providers: `docs/PROVIDERS.md`
+> - Development: `docs/DEVELOPMENT.md`
+
 ## Build/Lint/Test Commands
 
 ### Setup
@@ -50,19 +56,31 @@ gaap doctor                     # Run diagnostics
 gaap/
 ├── core/           # Types, base classes, config, exceptions
 ├── layers/         # 4-layer architecture (L0-L3)
-├── providers/      # LLM providers (Groq, Gemini, G4F)
+├── providers/      # LLM providers (Groq, Cerebras, Gemini, G4F, WebChat)
 ├── routing/        # Smart routing & fallback
-├── security/       # Prompt firewall
+├── security/       # 7-layer prompt firewall
 ├── healing/        # Self-healing (5 levels)
-├── memory/         # Hierarchical memory (L1-L4)
+├── memory/         # 4-tier hierarchical memory
 ├── storage/        # JSON storage
 ├── cli/            # CLI commands
-└── web/            # Streamlit web UI
+├── web/            # Streamlit web UI
+├── api/            # FastAPI REST API
+└── tools/          # Built-in tools (calculator, web search, etc.)
 
 tests/
-├── unit/           # Unit tests (172 tests)
+├── unit/           # Unit tests (172+ tests)
 ├── integration/    # Integration tests
 └── benchmarks/     # Performance benchmarks
+
+docs/
+├── ARCHITECTURE.md   # Full architecture guide
+├── API_REFERENCE.md  # API documentation
+├── PROVIDERS.md      # Provider setup guide
+├── CLI_GUIDE.md      # CLI commands reference
+├── DEVELOPMENT.md    # Development guide
+├── DEPLOYMENT.md     # Deployment guide
+├── SECURITY.md       # Security guide
+└── examples/         # Code examples
 ```
 
 ## Code Style

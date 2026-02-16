@@ -26,24 +26,20 @@ G4F_MODELS = {
     "gpt-4": "gpt-4",
     "gpt-4-turbo": "gpt-4-turbo",
     "gpt-3.5-turbo": "gpt-3.5-turbo",
-
     # Claude Models
     "claude-3-5-sonnet": "claude-3.5-sonnet",
     "claude-3-5-opus": "claude-3.5-opus",
     "claude-3-opus": "claude-3-opus",
     "claude-3-sonnet": "claude-3-sonnet",
     "claude-3-haiku": "claude-3-haiku",
-
     # Gemini Models
     "gemini-pro": "gemini-pro",
     "gemini-1.5-pro": "gemini-1.5-pro",
     "gemini-1.5-flash": "gemini-1.5-flash",
-
     # Llama Models
     "llama-3-70b": "llama-3-70b",
     "llama-3-8b": "llama-3-8b",
     "llama-2-70b": "llama-2-70b",
-
     # Mistral Models
     "mixtral-8x7b": "mixtral-8x7b",
     "mistral-7b": "mistral-7b",
@@ -63,11 +59,12 @@ G4F_COSTS = {
 # G4F Provider Implementation
 # =============================================================================
 
+
 @register_provider("g4f")
 class G4FProvider(BaseProvider):
     """
     مزود G4F - وصول مجاني للنماذج
-    
+
     الميزات:
     - مجاني بالكامل
     - دعم نماذج متعددة
@@ -81,7 +78,7 @@ class G4FProvider(BaseProvider):
         base_url: str | None = None,
         default_model: str = "gpt-4o-mini",
         provider: str | None = None,  # مزود محدد (اختياري)
-        **kwargs
+        **kwargs,
     ):
         # استخراج النماذج المدعومة
         models = list(G4F_MODELS.keys())
@@ -96,7 +93,7 @@ class G4FProvider(BaseProvider):
             rate_limit_tpm=50000,
             timeout=60.0,
             max_retries=2,
-            default_model=default_model
+            default_model=default_model,
         )
 
         self._preferred_provider = provider
@@ -111,30 +108,20 @@ class G4FProvider(BaseProvider):
         try:
             # محاولة استيراد g4f
             import g4f
+
             self._g4f_module = g4f
             self._logger.info("g4f library loaded successfully")
         except ImportError:
-            self._logger.warning(
-                "g4f library not installed. "
-                "Install with: pip install g4f"
-            )
+            self._logger.warning("g4f library not installed. " "Install with: pip install g4f")
             # سنستخدم وضع المحاكاة
             self._g4f_module = None
 
-    async def _make_request(
-        self,
-        messages: list[Message],
-        model: str,
-        **kwargs
-    ) -> dict[str, Any]:
+    async def _make_request(self, messages: list[Message], model: str, **kwargs) -> dict[str, Any]:
         """تنفيذ الطلب باستخدام g4f"""
         await self._ensure_g4f_loaded()
 
         # تحويل الرسائل
-        formatted_messages = [
-            {"role": m.role.value, "content": m.content}
-            for m in messages
-        ]
+        formatted_messages = [{"role": m.role.value, "content": m.content} for m in messages]
 
         # الحصول على اسم النموذج في g4f
         g4f_model = G4F_MODELS.get(model, model)
@@ -144,11 +131,7 @@ class G4FProvider(BaseProvider):
             try:
                 # تحديد المزود
                 if self._preferred_provider:
-                    provider = getattr(
-                        self._g4f_module.Provider,
-                        self._preferred_provider,
-                        None
-                    )
+                    provider = getattr(self._g4f_module.Provider, self._preferred_provider, None)
                 else:
                     provider = None
 
@@ -158,7 +141,7 @@ class G4FProvider(BaseProvider):
                     model=g4f_model,
                     messages=formatted_messages,
                     provider=provider,
-                    **kwargs
+                    **kwargs,
                 )
 
                 # تحويل الاستجابة
@@ -166,19 +149,14 @@ class G4FProvider(BaseProvider):
                     # استجابة نصية بسيطة
                     return {
                         "id": f"g4f-{int(time.time())}",
-                        "choices": [{
-                            "index": 0,
-                            "message": {
-                                "role": "assistant",
-                                "content": response
-                            },
-                            "finish_reason": "stop"
-                        }],
-                        "usage": {
-                            "prompt_tokens": 0,
-                            "completion_tokens": 0,
-                            "total_tokens": 0
-                        }
+                        "choices": [
+                            {
+                                "index": 0,
+                                "message": {"role": "assistant", "content": response},
+                                "finish_reason": "stop",
+                            }
+                        ],
+                        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
                     }
                 else:
                     # استجابة منظمة
@@ -187,29 +165,21 @@ class G4FProvider(BaseProvider):
             except Exception as e:
                 self._logger.error(f"g4f request failed: {e}")
                 raise ProviderResponseError(
-                    provider_name=self.name,
-                    status_code=500,
-                    response_body=str(e)
+                    provider_name=self.name, status_code=500, response_body=str(e)
                 )
         else:
             # وضع المحاكاة للمطورين بدون g4f
-            return await self._simulate_response(
-                formatted_messages,
-                g4f_model
-            )
+            return await self._simulate_response(formatted_messages, g4f_model)
 
     async def _simulate_response(
-        self,
-        messages: list[dict[str, str]],
-        model: str
+        self, messages: list[dict[str, str]], model: str
     ) -> dict[str, Any]:
         """
         محاكاة استجابة للاختبار والتطوير
         عندما تكون مكتبة g4f غير متوفرة
         """
         self._logger.warning(
-            f"Using simulation mode for model {model}. "
-            "Install g4f for real responses."
+            f"Using simulation mode for model {model}. " "Install g4f for real responses."
         )
 
         # استخراج آخر رسالة مستخدم
@@ -233,34 +203,27 @@ class G4FProvider(BaseProvider):
 
         return {
             "id": f"sim-{int(time.time())}",
-            "choices": [{
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": simulated_response
-                },
-                "finish_reason": "stop"
-            }],
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": simulated_response},
+                    "finish_reason": "stop",
+                }
+            ],
             "usage": {
                 "prompt_tokens": len(user_message.split()),
                 "completion_tokens": len(simulated_response.split()),
-                "total_tokens": len(user_message.split()) + len(simulated_response.split())
-            }
+                "total_tokens": len(user_message.split()) + len(simulated_response.split()),
+            },
         }
 
     async def _stream_request(
-        self,
-        messages: list[Message],
-        model: str,
-        **kwargs
+        self, messages: list[Message], model: str, **kwargs
     ) -> AsyncIterator[str]:
         """تدفق الاستجابة"""
         await self._ensure_g4f_loaded()
 
-        formatted_messages = [
-            {"role": m.role.value, "content": m.content}
-            for m in messages
-        ]
+        formatted_messages = [{"role": m.role.value, "content": m.content} for m in messages]
 
         g4f_model = G4F_MODELS.get(model, model)
 
@@ -272,7 +235,7 @@ class G4FProvider(BaseProvider):
                     model=g4f_model,
                     messages=formatted_messages,
                     stream=True,
-                    **kwargs
+                    **kwargs,
                 )
 
                 for chunk in response:
@@ -286,9 +249,7 @@ class G4FProvider(BaseProvider):
             except Exception as e:
                 self._logger.error(f"g4f stream error: {e}")
                 raise ProviderResponseError(
-                    provider_name=self.name,
-                    status_code=500,
-                    response_body=str(e)
+                    provider_name=self.name, status_code=500, response_body=str(e)
                 )
         else:
             # محاكاة التدفق
@@ -297,19 +258,11 @@ class G4FProvider(BaseProvider):
                 yield word + " "
                 await asyncio.sleep(0.05)
 
-    def _calculate_cost(
-        self,
-        model: str,
-        input_tokens: int,
-        output_tokens: int
-    ) -> float:
+    def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
         """حساب التكلفة (مجاني)"""
         # g4f مجاني لكن نحتفظ بالتتبع
         costs = G4F_COSTS.get(model, {"input": 0.0, "output": 0.0})
-        return (
-            (input_tokens * costs["input"] / 1000) +
-            (output_tokens * costs["output"] / 1000)
-        )
+        return (input_tokens * costs["input"] / 1000) + (output_tokens * costs["output"] / 1000)
 
     def get_available_providers(self) -> list[str]:
         """الحصول على قائمة المزودين المتاحين في g4f"""
@@ -319,7 +272,7 @@ class G4FProvider(BaseProvider):
         try:
             providers = []
             for name in dir(self._g4f_module.Provider):
-                if not name.startswith('_'):
+                if not name.startswith("_"):
                     providers.append(name)
             return providers
         except Exception:
@@ -330,20 +283,18 @@ class G4FProvider(BaseProvider):
 # Convenience Functions
 # =============================================================================
 
+
 def create_g4f_provider(
-    default_model: str = "gpt-4o-mini",
-    provider: str | None = None
+    default_model: str = "gpt-4o-mini", provider: str | None = None
 ) -> G4FProvider:
     """إنشاء مزود g4f بسهولة"""
-    return G4FProvider(
-        default_model=default_model,
-        provider=provider
-    )
+    return G4FProvider(default_model=default_model, provider=provider)
 
 
 # =============================================================================
 # Model Alias Support
 # =============================================================================
+
 
 def get_g4f_model_alias(model: str) -> str:
     """الحصول على اسم النموذج في g4f"""

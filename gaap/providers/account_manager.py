@@ -4,7 +4,7 @@ Smart Account Manager — Multi-Account Pool with Proactive Monitoring
 
 Manages multiple accounts per AI provider, with:
   - Rate limit tracking & proactive warnings
-  - Session/chat quota monitoring  
+  - Session/chat quota monitoring
   - Auto-rotation to best available account
   - Credential storage & lifecycle management
   - Health dashboard for all accounts
@@ -21,13 +21,13 @@ Usage:
   pool = AccountPool("kimi")
   pool.add_account("main", credentials={...})
   pool.add_account("alt1", credentials={...})
-  
+
   # Auto-selects best account
   account = pool.best_account()
-  
+
   # Record usage after each call
   pool.record_call(account.label, success=True, latency_ms=1200, tokens_used=500)
-  
+
   # Check health proactively
   warnings = pool.get_warnings()
   dashboard = pool.dashboard()
@@ -59,13 +59,29 @@ import re as _re
 # Known provider hard rate-limit error patterns → cooldown seconds
 _HARD_RATE_LIMIT_PATTERNS = [
     # Kimi: "当前模型对话次数已达上限，3小时后恢复" (daily limit reached, 3h cooldown)
-    (_re.compile(r"(\d+)\s*小时后恢复", _re.IGNORECASE), lambda m: int(m.group(1)) * 3600, "Kimi daily limit"),
+    (
+        _re.compile(r"(\d+)\s*小时后恢复", _re.IGNORECASE),
+        lambda m: int(m.group(1)) * 3600,
+        "Kimi daily limit",
+    ),
     # Kimi: "X分钟后恢复" (X minutes cooldown)
-    (_re.compile(r"(\d+)\s*分钟后恢复", _re.IGNORECASE), lambda m: int(m.group(1)) * 60, "Kimi cooldown"),
+    (
+        _re.compile(r"(\d+)\s*分钟后恢复", _re.IGNORECASE),
+        lambda m: int(m.group(1)) * 60,
+        "Kimi cooldown",
+    ),
     # Generic "rate limit" with hours
-    (_re.compile(r"rate.?limit.*?(\d+)\s*hour", _re.IGNORECASE), lambda m: int(m.group(1)) * 3600, "Rate limit"),
+    (
+        _re.compile(r"rate.?limit.*?(\d+)\s*hour", _re.IGNORECASE),
+        lambda m: int(m.group(1)) * 3600,
+        "Rate limit",
+    ),
     # REASON_RATE_LIMIT_EXCEEDED (Kimi Connect-RPC error code)
-    (_re.compile(r"REASON_RATE_LIMIT_EXCEEDED", _re.IGNORECASE), lambda m: 3 * 3600, "Kimi rate limit (3h)"),
+    (
+        _re.compile(r"REASON_RATE_LIMIT_EXCEEDED", _re.IGNORECASE),
+        lambda m: 3 * 3600,
+        "Kimi rate limit (3h)",
+    ),
     # 已达上限 (limit reached) without specific time → assume 3h
     (_re.compile(r"已达上限", _re.IGNORECASE), lambda m: 3 * 3600, "Provider daily limit (3h)"),
 ]
@@ -74,7 +90,7 @@ _HARD_RATE_LIMIT_PATTERNS = [
 def detect_hard_cooldown(error_msg: str) -> tuple | None:
     """
     Check if an error message indicates a provider-imposed hard rate limit.
-    
+
     Returns (cooldown_seconds, reason) if detected, None otherwise.
     """
     if not error_msg:
@@ -91,13 +107,14 @@ def detect_hard_cooldown(error_msg: str) -> tuple | None:
 # Rate Limit Tracking
 # =============================================================================
 
+
 class RateLimitTracker:
     """
     Tracks request rate with sliding window.
-    
+
     Monitors:
       - Requests per minute (RPM)
-      - Requests per hour (RPH) 
+      - Requests per hour (RPH)
       - Requests per day (RPD)
       - Token usage per day
       - Consecutive errors
@@ -147,7 +164,9 @@ class RateLimitTracker:
             self._tokens_today = 0
             self._tokens_day_start = now
 
-    def record_call(self, success: bool, latency_ms: float = 0, tokens_used: int = 0, error_msg: str = ""):
+    def record_call(
+        self, success: bool, latency_ms: float = 0, tokens_used: int = 0, error_msg: str = ""
+    ):
         """Record a call result."""
         now = time.time()
         self._call_times.append(now)
@@ -212,7 +231,7 @@ class RateLimitTracker:
 
     def set_hard_cooldown(self, seconds: float, reason: str = ""):
         """Set an explicit cooldown (e.g., provider-imposed 3-hour ban).
-        
+
         Unlike the auto-cooldown from consecutive errors, this represents
         a hard server-side rate limit with a known duration.
         """
@@ -234,7 +253,7 @@ class RateLimitTracker:
         """Why this account is in cooldown."""
         if not self.in_cooldown:
             return ""
-        return getattr(self, '_cooldown_reason', 'auto-cooldown from errors')
+        return getattr(self, "_cooldown_reason", "auto-cooldown from errors")
 
     @property
     def cooldown_expires_at(self) -> float:
@@ -323,7 +342,9 @@ class RateLimitTracker:
 
         # Error warning
         if self._consecutive_errors >= 2:
-            warnings.append(f"🔴 {self._consecutive_errors} consecutive errors: {self._last_error_msg[:50]}")
+            warnings.append(
+                f"🔴 {self._consecutive_errors} consecutive errors: {self._last_error_msg[:50]}"
+            )
 
         return warnings
 
@@ -377,13 +398,14 @@ class RateLimitTracker:
 # Session Tracker
 # =============================================================================
 
+
 class SessionTracker:
     """
     Tracks chat sessions per account.
-    
+
     Monitors:
       - Active session count
-      - Messages per session  
+      - Messages per session
       - Session age
       - When to rotate sessions
     """
@@ -419,9 +441,7 @@ class SessionTracker:
         if s["messages"] >= self.max_messages_per_session:
             return True
         # Rotate if session is older than 2 hours
-        if time.time() - s["created"] > 7200:
-            return True
-        return False
+        return time.time() - s["created"] > 7200
 
     @property
     def active_count(self) -> int:
@@ -450,6 +470,7 @@ class SessionTracker:
 # Account Slot
 # =============================================================================
 
+
 class AccountStatus(Enum):
     ACTIVE = "active"
     COOLDOWN = "cooldown"
@@ -463,6 +484,7 @@ class AccountSlot:
     """
     A single account for a provider with full state tracking.
     """
+
     provider: str
     label: str  # "main", "alt1", "alt2", etc.
 
@@ -513,6 +535,7 @@ class AccountSlot:
         # Check auth via webchat_providers
         try:
             from .webchat_providers import load_auth
+
             auth = load_auth(self.provider, self.label)
             if auth is None:
                 return AccountStatus.NEEDS_LOGIN
@@ -548,8 +571,14 @@ class AccountSlot:
             return False, "Auth expired"
         return self.rate_tracker.can_call()
 
-    def record_call(self, success: bool, latency_ms: float = 0, tokens_used: int = 0,
-                    error_msg: str = "", session_id: str = ""):
+    def record_call(
+        self,
+        success: bool,
+        latency_ms: float = 0,
+        tokens_used: int = 0,
+        error_msg: str = "",
+        session_id: str = "",
+    ):
         """Record a call result."""
         self.rate_tracker.record_call(success, latency_ms, tokens_used, error_msg)
         if session_id:
@@ -562,6 +591,7 @@ class AccountSlot:
         # Auth expiry warning
         try:
             from .webchat_providers import load_auth
+
             auth = load_auth(self.provider, self.label)
             if auth:
                 remaining_hours = auth.remaining_sec / 3600
@@ -684,13 +714,23 @@ PROVIDER_DEFAULTS: dict[str, dict[str, Any]] = {
         "max_messages_per_session": 100,
         "models": [
             # GPT-5 Series
-            "gpt-5", "gpt-5-mini", "gpt-5.1", "gpt-5.2",
+            "gpt-5",
+            "gpt-5-mini",
+            "gpt-5.1",
+            "gpt-5.2",
             # Claude 4 Series
-            "claude-opus-4.6", "claude-sonnet-4.5", "claude-sonnet-4", "claude-haiku-4.5",
+            "claude-opus-4.6",
+            "claude-sonnet-4.5",
+            "claude-sonnet-4",
+            "claude-haiku-4.5",
             # Gemini
-            "gemini-3-pro-preview", "gemini-3-flash-preview", "gemini-2.5-pro",
+            "gemini-3-pro-preview",
+            "gemini-3-flash-preview",
+            "gemini-2.5-pro",
             # GPT-4 Series
-            "gpt-4.1", "gpt-4o", "gpt-4o-mini",
+            "gpt-4.1",
+            "gpt-4o",
+            "gpt-4o-mini",
         ],
         "auth_lifetime_hours": 8760,  # 1 year (GitHub OAuth)
         "notes": "GitHub Copilot API - OAuth device flow. Pro/Student account.",
@@ -712,10 +752,11 @@ PROVIDER_DEFAULTS: dict[str, dict[str, Any]] = {
 # Account Pool
 # =============================================================================
 
+
 class AccountPool:
     """
     Manages multiple accounts for a single provider.
-    
+
     Features:
       - Add/remove accounts dynamically
       - Auto-select best account for next call
@@ -769,7 +810,7 @@ class AccountPool:
     ) -> AccountSlot:
         """
         Add an account to the pool.
-        
+
         Uses PROVIDER_DEFAULTS for limits, with optional overrides.
         """
         defaults = PROVIDER_DEFAULTS.get(self.provider, {})
@@ -783,8 +824,12 @@ class AccountPool:
             max_rpm=overrides.get("max_rpm", defaults.get("max_rpm", 5)),
             max_rph=overrides.get("max_rph", defaults.get("max_rph", 100)),
             max_rpd=overrides.get("max_rpd", defaults.get("max_rpd", 1500)),
-            max_tokens_per_day=overrides.get("max_tokens_per_day", defaults.get("max_tokens_per_day", 0)),
-            max_messages_per_session=overrides.get("max_messages_per_session", defaults.get("max_messages_per_session", 50)),
+            max_tokens_per_day=overrides.get(
+                "max_tokens_per_day", defaults.get("max_tokens_per_day", 0)
+            ),
+            max_messages_per_session=overrides.get(
+                "max_messages_per_session", defaults.get("max_messages_per_session", 50)
+            ),
             notes=notes,
         )
 
@@ -820,13 +865,13 @@ class AccountPool:
     def best_account(self, model: str = "") -> AccountSlot | None:
         """
         Select the best account for next call.
-        
+
         Strategy:
           1. Filter to accounts that can call
           2. If model specified, filter to accounts that support it
           3. Sort by health score (highest first)
           4. Break ties by: fewer RPM used → fewer errors → lower latency
-        
+
         Returns None if no account is available.
         """
         candidates = []
@@ -878,7 +923,7 @@ class AccountPool:
     def should_call(self, label: str = "", model: str = "") -> tuple[bool, str, str | None]:
         """
         Proactive check: should we send this call?
-        
+
         Returns (should_proceed, reason, recommended_account_label).
         """
         if label:
@@ -910,7 +955,7 @@ class AccountPool:
     def wait_for_availability(self, model: str = "", timeout: float = 60) -> AccountSlot | None:
         """
         Wait until an account becomes available.
-        
+
         Useful for rate-limited scenarios.
         Returns the account when available, or None on timeout.
         """
@@ -951,7 +996,11 @@ class AccountPool:
             rph = f"{acct.rate_tracker.rph_current}/{acct.max_rph}"
             rpd = f"{acct.rate_tracker.rpd_current}/{acct.max_rpd}"
             errs = str(acct.rate_tracker._consecutive_errors)
-            avg = f"{acct.rate_tracker.avg_latency_ms:.0f}" if acct.rate_tracker._total_success > 0 else "-"
+            avg = (
+                f"{acct.rate_tracker.avg_latency_ms:.0f}"
+                if acct.rate_tracker._total_success > 0
+                else "-"
+            )
 
             icon = {
                 AccountStatus.ACTIVE: "✅",
@@ -977,10 +1026,7 @@ class AccountPool:
             "provider": self.provider,
             "account_count": len(self._accounts),
             "active_count": len(self.active_accounts),
-            "accounts": {
-                label: acct.to_status_dict()
-                for label, acct in self._accounts.items()
-            },
+            "accounts": {label: acct.to_status_dict() for label, acct in self._accounts.items()},
             "warnings": self.get_warnings(),
         }
 
@@ -989,10 +1035,11 @@ class AccountPool:
 # Global Pool Manager
 # =============================================================================
 
+
 class PoolManager:
     """
     Manages AccountPools for all providers.
-    
+
     Singleton pattern — one instance per process.
     """
 
@@ -1065,17 +1112,15 @@ class PoolManager:
     ) -> tuple[str, str, str, float]:
         """
         Smart call with auto-account selection and tracking.
-        
+
         Returns: (response_text, model_used, account_used, latency_ms)
-        
+
         Raises RuntimeError if no account available.
         """
         pool = self.pool(provider)
 
         # Check if we should proceed
-        should, reason, acct_label = pool.should_call(
-            label=preferred_account, model=model
-        )
+        should, reason, acct_label = pool.should_call(label=preferred_account, model=model)
 
         if not should:
             raise RuntimeError(f"[{provider}] Cannot call: {reason}")
@@ -1096,7 +1141,8 @@ class PoolManager:
 
             # Record success
             pool.record_call(
-                acct.label, success=True,
+                acct.label,
+                success=True,
                 latency_ms=latency_ms,
                 tokens_used=len(result) // 4,  # rough estimate
             )
@@ -1106,7 +1152,8 @@ class PoolManager:
         except Exception as e:
             latency_ms = (time.time() - start) * 1000
             pool.record_call(
-                acct.label, success=False,
+                acct.label,
+                success=False,
                 latency_ms=latency_ms,
                 error_msg=str(e)[:100],
             )
@@ -1122,14 +1169,17 @@ class PoolManager:
                         result2 = webchat2.call(messages, model=model, timeout=timeout)
                         latency2 = (time.time() - start2) * 1000
                         pool.record_call(
-                            fallback.label, success=True,
+                            fallback.label,
+                            success=True,
                             latency_ms=latency2,
                             tokens_used=len(result2) // 4,
                         )
                         return result2, model or webchat2.DEFAULT_MODEL, fallback.label, latency2
                     except Exception as e2:
                         pool.record_call(
-                            fallback.label, success=False, error_msg=str(e2)[:100],
+                            fallback.label,
+                            success=False,
+                            error_msg=str(e2)[:100],
                         )
 
             raise
@@ -1139,11 +1189,12 @@ class PoolManager:
 # Auto-Discovery: Populate pools from existing auth cache
 # =============================================================================
 
+
 def auto_discover_accounts() -> dict[str, AccountPool]:
     """
     Scan ~/.config/gaap/webchat_auth/ for existing auth files
     and auto-register accounts in the pool if not already registered.
-    
+
     Returns dict of {provider: pool}.
     """
     from .webchat_providers import list_accounts, load_auth
@@ -1185,10 +1236,10 @@ def bootstrap_pools() -> str:
     """
     Initialize the pool system with all discovered accounts.
     Call this at startup.
-    
+
     Returns summary string.
     """
-    discovered = auto_discover_accounts()
+    auto_discover_accounts()
     mgr = PoolManager.instance()
 
     lines = ["🔄 Account Pool Bootstrap:"]
@@ -1213,6 +1264,7 @@ def bootstrap_pools() -> str:
 # =============================================================================
 # CLI
 # =============================================================================
+
 
 def _cli():
     """Command-line interface for account management."""
@@ -1273,7 +1325,9 @@ Examples:
             scenario = defaults.get("model_scenarios", {}).get(m, "")
             extra = f" → {scenario}" if scenario else ""
             print(f"  • {m}{extra}")
-        print(f"\nLimits: {defaults.get('max_rpm', '?')} RPM, {defaults.get('max_rph', '?')} RPH, {defaults.get('max_rpd', '?')} RPD")
+        print(
+            f"\nLimits: {defaults.get('max_rpm', '?')} RPM, {defaults.get('max_rph', '?')} RPH, {defaults.get('max_rpd', '?')} RPD"
+        )
         print(f"Auth: ~{defaults.get('auth_lifetime_hours', '?')}h")
         if defaults.get("notes"):
             print(f"Notes: {defaults['notes']}")
@@ -1318,7 +1372,9 @@ Examples:
         pool = mgr.pool(args[1])
         for acct in pool.accounts:
             icon = "✅" if acct.can_call()[0] else "❌"
-            print(f"  {icon} {acct.label}: {acct.email} ({acct.account_type}) — {acct.status.value}")
+            print(
+                f"  {icon} {acct.label}: {acct.email} ({acct.account_type}) — {acct.status.value}"
+            )
 
     elif cmd == "test":
         if len(args) < 2:
@@ -1328,7 +1384,11 @@ Examples:
         label = args[2] if len(args) > 2 and args[2] else ""
         model = args[3] if len(args) > 3 else ""
 
-        print(f"  🧪 Testing {provider}" + (f" [{label}]" if label else "") + (f" model={model}" if model else ""))
+        print(
+            f"  🧪 Testing {provider}"
+            + (f" [{label}]" if label else "")
+            + (f" model={model}" if model else "")
+        )
         try:
             text, model_used, acct_used, latency = mgr.smart_call(
                 provider,
@@ -1337,7 +1397,9 @@ Examples:
                 preferred_account=label,
                 timeout=60,
             )
-            print(f"  ✅ Response: '{text[:80]}' via {acct_used} model={model_used} in {latency:.0f}ms")
+            print(
+                f"  ✅ Response: '{text[:80]}' via {acct_used} model={model_used} in {latency:.0f}ms"
+            )
         except Exception as e:
             print(f"  ❌ Error: {e}")
 

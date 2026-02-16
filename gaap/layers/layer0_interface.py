@@ -15,13 +15,12 @@ from gaap.security.firewall import PromptFirewall
 # Logger Setup
 # =============================================================================
 
+
 def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
@@ -32,8 +31,10 @@ def get_logger(name: str) -> logging.Logger:
 # Enums
 # =============================================================================
 
+
 class IntentType(Enum):
     """أنواع النوايا"""
+
     CODE_GENERATION = auto()
     CODE_REVIEW = auto()
     DEBUGGING = auto()
@@ -50,18 +51,21 @@ class IntentType(Enum):
 
 class RoutingTarget(Enum):
     """أهداف التوجيه"""
-    STRATEGIC = "layer1_strategic"     # مهمة معقدة تحتاج تخطيط
-    TACTICAL = "layer2_tactical"       # مهمة واضحة تحتاج تفصيل
-    DIRECT = "layer3_execution"        # مهمة بسيطة可以直接 تنفيذ
+
+    STRATEGIC = "layer1_strategic"  # مهمة معقدة تحتاج تخطيط
+    TACTICAL = "layer2_tactical"  # مهمة واضحة تحتاج تفصيل
+    DIRECT = "layer3_execution"  # مهمة بسيطة可以直接 تنفيذ
 
 
 # =============================================================================
 # Data Classes
 # =============================================================================
 
+
 @dataclass
 class ImplicitRequirements:
     """المتطلبات الضمنية المستخرجة"""
+
     performance: str | None = None
     security: str | None = None
     scalability: str | None = None
@@ -73,6 +77,7 @@ class ImplicitRequirements:
 @dataclass
 class StructuredIntent:
     """النية المهيكلة"""
+
     request_id: str
     timestamp: datetime
 
@@ -121,92 +126,101 @@ class StructuredIntent:
 # Intent Classifier
 # =============================================================================
 
+
 class IntentClassifier:
     """مصنف النوايا"""
 
     # أنماط التصنيف
     INTENT_PATTERNS = {
         IntentType.CODE_GENERATION: [
-            r'write\s+.{0,40}(function|class|module|script|code|program|algorithm|implementation)',
-            r'create\s+.{0,40}(function|class|module|script|code|program|algorithm|implementation|server|app|api)',
-            r'implement\s+.{0,40}(function|class|module|algorithm|search|sort|pattern|handler|endpoint)',
-            r'implement\s+\w+',
-            r'build\s+(a|an|the)\s+\w+',
-            r'develop\s+\w+',
-            r'(write|code|make)\s+(me\s+)?(a|an)\s+\w+',
-            r'(binary|linear|merge|quick|bubble)\s*search|sort',
-            r'اكتب\s+(كود|دالة|برنامج)',
-            r'أنشئ\s+\w+',
+            r"write\s+.{0,40}(function|class|module|script|code|program|algorithm|implementation)",
+            r"create\s+.{0,40}(function|class|module|script|code|program|algorithm|implementation|server|app|api)",
+            r"implement\s+.{0,40}(function|class|module|algorithm|search|sort|pattern|handler|endpoint)",
+            r"implement\s+\w+",
+            r"build\s+(a|an|the)\s+\w+",
+            r"develop\s+\w+",
+            r"(write|code|make)\s+(me\s+)?(a|an)\s+\w+",
+            r"(binary|linear|merge|quick|bubble)\s*search|sort",
+            r"اكتب\s+(كود|دالة|برنامج)",
+            r"أنشئ\s+\w+",
         ],
         IntentType.CODE_REVIEW: [
-            r'review\s+(this|the)\s+(code|implementation)',
-            r'check\s+(this|the)\s+code',
-            r'analyze\s+(this|the)\s+code',
-            r'راجع\s+(الكود|البرنامج)',
+            r"review\s+(this|the)\s+(code|implementation)",
+            r"check\s+(this|the)\s+code",
+            r"analyze\s+(this|the)\s+code",
+            r"راجع\s+(الكود|البرنامج)",
         ],
         IntentType.DEBUGGING: [
-            r'debug\s+(this|the)\s+\w+',
-            r'fix\s+(this|the|a)\s+(error|bug|issue)',
-            r'why\s+(is|does|doesn\'t)\s+\w+',
-            r'what\'?s?\s+wrong\s+with',
-            r'صلح\s+(الخطأ|المشكلة)',
-            r'حل\s+(الخطأ|المشكلة)',
+            r"debug\s+(this|the)\s+\w+",
+            r"fix\s+(this|the|a)\s+(error|bug|issue)",
+            r"why\s+(is|does|doesn\'t)\s+\w+",
+            r"what\'?s?\s+wrong\s+with",
+            r"صلح\s+(الخطأ|المشكلة)",
+            r"حل\s+(الخطأ|المشكلة)",
         ],
         IntentType.REFACTORING: [
-            r'refactor\s+(this|the)\s+\w+',
-            r'improve\s+(this|the)\s+(code|performance)',
-            r'optimize\s+\w+',
-            r'restructure\s+\w+',
-            r'أعد\s+هيكلة',
-            r'حسّن\s+(الكود|الأداء)',
+            r"refactor\s+(this|the)\s+\w+",
+            r"improve\s+(this|the)\s+(code|performance)",
+            r"optimize\s+\w+",
+            r"restructure\s+\w+",
+            r"أعد\s+هيكلة",
+            r"حسّن\s+(الكود|الأداء)",
         ],
         IntentType.DOCUMENTATION: [
-            r'write\s+(documentation|docs|comments)',
-            r'document\s+(this|the)\s+\w+',
-            r'add\s+comments\s+to',
-            r'generate\s+(docs|documentation)',
-            r'اكتب\s+(توثيق|وثائق)',
+            r"write\s+(documentation|docs|comments)",
+            r"document\s+(this|the)\s+\w+",
+            r"add\s+comments\s+to",
+            r"generate\s+(docs|documentation)",
+            r"اكتب\s+(توثيق|وثائق)",
         ],
         IntentType.TESTING: [
-            r'write\s+(tests?|test\s+cases?)',
-            r'create\s+(tests?|test\s+suite)',
-            r'generate\s+tests?',
-            r'اكتب\s+(اختبارات|اختبار)',
+            r"write\s+(tests?|test\s+cases?)",
+            r"create\s+(tests?|test\s+suite)",
+            r"generate\s+tests?",
+            r"اكتب\s+(اختبارات|اختبار)",
         ],
         IntentType.RESEARCH: [
-            r'research\s+\w+',
-            r'find\s+(information|out)\s+about',
-            r'what\s+is\s+\w+',
-            r'how\s+does\s+\w+\s+work',
-            r'ابحث\s+عن',
-            r'ما\s+هو',
+            r"research\s+\w+",
+            r"find\s+(information|out)\s+about",
+            r"what\s+is\s+\w+",
+            r"how\s+does\s+\w+\s+work",
+            r"ابحث\s+عن",
+            r"ما\s+هو",
         ],
         IntentType.PLANNING: [
-            r'plan\s+(a|an|the)\s+\w+',
-            r'design\s+(a|an|the)\s+(architecture|system)',
-            r'create\s+(a|an)?\s*(architecture|design|plan)',
-            r'خطط\s+لـ',
-            r'صمم\s+(نظام|بنية)',
+            r"plan\s+(a|an|the)\s+\w+",
+            r"design\s+(a|an|the)\s+(architecture|system)",
+            r"create\s+(a|an)?\s*(architecture|design|plan)",
+            r"خطط\s+لـ",
+            r"صمم\s+(نظام|بنية)",
         ],
         IntentType.QUESTION: [
-            r'^(what|how|why|when|where|who|which)',
-            r'^(هل|كيف|لماذا|متى|أين|من)',
-            r'\?$',
+            r"^(what|how|why|when|where|who|which)",
+            r"^(هل|كيف|لماذا|متى|أين|من)",
+            r"\?$",
         ],
         IntentType.ANALYSIS: [
-            r'analyze\s+\w+',
-            r'examine\s+\w+',
-            r'evaluate\s+\w+',
-            r'assess\s+\w+',
-            r'حلل\s+\w+',
+            r"analyze\s+\w+",
+            r"examine\s+\w+",
+            r"evaluate\s+\w+",
+            r"assess\s+\w+",
+            r"حلل\s+\w+",
         ],
     }
 
     # مؤشرات التعقيد
     COMPLEXITY_INDICATORS = {
-        'high': ['architecture', 'system', 'microservices', 'distributed', 'scale', 'بنية', 'نظام موزع'],
-        'medium': ['module', 'component', 'service', 'api', 'وحدة', 'مكون'],
-        'low': ['function', 'method', 'variable', 'helper', 'دالة', 'متغير'],
+        "high": [
+            "architecture",
+            "system",
+            "microservices",
+            "distributed",
+            "scale",
+            "بنية",
+            "نظام موزع",
+        ],
+        "medium": ["module", "component", "service", "api", "وحدة", "مكون"],
+        "low": ["function", "method", "variable", "helper", "دالة", "متغير"],
     }
 
     def __init__(self):
@@ -243,9 +257,9 @@ class IntentClassifier:
         """تقدير التعقيد"""
         text_lower = text.lower()
 
-        high_count = sum(1 for kw in self.COMPLEXITY_INDICATORS['high'] if kw in text_lower)
-        medium_count = sum(1 for kw in self.COMPLEXITY_INDICATORS['medium'] if kw in text_lower)
-        low_count = sum(1 for kw in self.COMPLEXITY_INDICATORS['low'] if kw in text_lower)
+        high_count = sum(1 for kw in self.COMPLEXITY_INDICATORS["high"] if kw in text_lower)
+        medium_count = sum(1 for kw in self.COMPLEXITY_INDICATORS["medium"] if kw in text_lower)
+        low_count = sum(1 for kw in self.COMPLEXITY_INDICATORS["low"] if kw in text_lower)
 
         # طول النص كعامل إضافي
         length_factor = len(text.split()) / 100
@@ -266,32 +280,33 @@ class IntentClassifier:
 # Request Parser
 # =============================================================================
 
+
 class RequestParser:
     """محلل الطلبات"""
 
     # أنماط استخراج المتطلبات الضمنية
     REQUIREMENT_PATTERNS = {
-        'performance': [
-            (r'(fast|quick|speedy|high\s+performance)', 'high_throughput'),
-            (r'(real-?time|instant|immediate)', 'real_time'),
-            (r'(slow|latency|response\s+time)', 'latency_optimization'),
+        "performance": [
+            (r"(fast|quick|speedy|high\s+performance)", "high_throughput"),
+            (r"(real-?time|instant|immediate)", "real_time"),
+            (r"(slow|latency|response\s+time)", "latency_optimization"),
         ],
-        'security': [
-            (r'(secure|security|encrypted|auth)', 'security_required'),
-            (r'(gdpr|compliance|privacy)', 'compliance_required'),
-            (r'(pci|hipaa|sox)', 'regulatory_compliance'),
+        "security": [
+            (r"(secure|security|encrypted|auth)", "security_required"),
+            (r"(gdpr|compliance|privacy)", "compliance_required"),
+            (r"(pci|hipaa|sox)", "regulatory_compliance"),
         ],
-        'scalability': [
-            (r'(scalable|scale|distributed)', 'horizontal_scaling'),
-            (r'(million|billion|large\s+scale)', 'high_scale'),
+        "scalability": [
+            (r"(scalable|scale|distributed)", "horizontal_scaling"),
+            (r"(million|billion|large\s+scale)", "high_scale"),
         ],
-        'budget': [
-            (r'(budget|cheap|cost-?effective|affordable)', 'budget_conscious'),
-            (r'(enterprise|production)', 'production_grade'),
+        "budget": [
+            (r"(budget|cheap|cost-?effective|affordable)", "budget_conscious"),
+            (r"(enterprise|production)", "production_grade"),
         ],
-        'timeline': [
-            (r'(\d+)\s*(days?|weeks?|months?)', 'timeline_constraint'),
-            (r'(asap|urgent|quickly|soon)', 'urgent'),
+        "timeline": [
+            (r"(\d+)\s*(days?|weeks?|months?)", "timeline_constraint"),
+            (r"(asap|urgent|quickly|soon)", "urgent"),
         ],
     }
 
@@ -317,8 +332,8 @@ class RequestParser:
 
         # أنماط الأهداف
         goal_patterns = [
-            r'(?:build|create|develop|implement|write)\s+(?:a|an|the)?\s*(.+?)(?:\s+that|\s+with|\s+for|\s*$)',
-            r'(?:need|want|require)\s+(?:to\s+)?(.+?)(?:\s+that|\s+with|\s+for|\s*$)',
+            r"(?:build|create|develop|implement|write)\s+(?:a|an|the)?\s*(.+?)(?:\s+that|\s+with|\s+for|\s*$)",
+            r"(?:need|want|require)\s+(?:to\s+)?(.+?)(?:\s+that|\s+with|\s+for|\s*$)",
         ]
 
         for pattern in goal_patterns:
@@ -337,37 +352,37 @@ class RequestParser:
         implicit = ImplicitRequirements()
 
         # الأداء
-        for pattern, value in self.REQUIREMENT_PATTERNS['performance']:
+        for pattern, value in self.REQUIREMENT_PATTERNS["performance"]:
             if re.search(pattern, text_lower):
                 implicit.performance = value
                 break
 
         # الأمان
-        for pattern, value in self.REQUIREMENT_PATTERNS['security']:
+        for pattern, value in self.REQUIREMENT_PATTERNS["security"]:
             if re.search(pattern, text_lower):
                 implicit.security = value
                 break
 
         # القابلية للتوسع
-        for pattern, value in self.REQUIREMENT_PATTERNS['scalability']:
+        for pattern, value in self.REQUIREMENT_PATTERNS["scalability"]:
             if re.search(pattern, text_lower):
                 implicit.scalability = value
                 break
 
         # الامتثال
-        compliance_keywords = ['gdpr', 'hipaa', 'pci', 'sox', 'iso']
+        compliance_keywords = ["gdpr", "hipaa", "pci", "sox", "iso"]
         for kw in compliance_keywords:
             if kw in text_lower:
                 implicit.compliance.append(kw.upper())
 
         # الميزانية
-        for pattern, value in self.REQUIREMENT_PATTERNS['budget']:
+        for pattern, value in self.REQUIREMENT_PATTERNS["budget"]:
             if re.search(pattern, text_lower):
                 implicit.budget = value
                 break
 
         # الجدول الزمني
-        for pattern, value in self.REQUIREMENT_PATTERNS['timeline']:
+        for pattern, value in self.REQUIREMENT_PATTERNS["timeline"]:
             if re.search(pattern, text_lower):
                 implicit.timeline = value
                 break
@@ -379,22 +394,22 @@ class RequestParser:
         constraints = {}
 
         # قيود اللغة
-        lang_pattern = r'(?:using|in|with)\s+(python|javascript|typescript|java|go|rust)'
+        lang_pattern = r"(?:using|in|with)\s+(python|javascript|typescript|java|go|rust)"
         lang_match = re.search(lang_pattern, text, re.IGNORECASE)
         if lang_match:
-            constraints['language'] = lang_match.group(1).lower()
+            constraints["language"] = lang_match.group(1).lower()
 
         # قيود الإطار
-        framework_pattern = r'(?:using|with)\s+(react|vue|angular|django|flask|fastapi|express)'
+        framework_pattern = r"(?:using|with)\s+(react|vue|angular|django|flask|fastapi|express)"
         framework_match = re.search(framework_pattern, text, re.IGNORECASE)
         if framework_match:
-            constraints['framework'] = framework_match.group(1).lower()
+            constraints["framework"] = framework_match.group(1).lower()
 
         # قيود النظام الأساسي
-        platform_pattern = r'(?:on|for)\s+(aws|azure|gcp|docker|kubernetes)'
+        platform_pattern = r"(?:on|for)\s+(aws|azure|gcp|docker|kubernetes)"
         platform_match = re.search(platform_pattern, text, re.IGNORECASE)
         if platform_match:
-            constraints['platform'] = platform_match.group(1).lower()
+            constraints["platform"] = platform_match.group(1).lower()
 
         return constraints
 
@@ -403,10 +418,11 @@ class RequestParser:
 # Layer 0 Interface
 # =============================================================================
 
+
 class Layer0Interface(BaseLayer):
     """
     طبقة الواجهة - المدخل الرئيسي لنظام GAAP
-    
+
     المسؤوليات:
     - فحص أمني للمدخلات (Prompt Firewall)
     - تصنيف نية المستخدم
@@ -415,11 +431,7 @@ class Layer0Interface(BaseLayer):
     - تهيئة السياق الأولي
     """
 
-    def __init__(
-        self,
-        firewall_strictness: str = "high",
-        enable_behavioral_analysis: bool = True
-    ):
+    def __init__(self, firewall_strictness: str = "high", enable_behavioral_analysis: bool = True):
         super().__init__(LayerType.INTERFACE)
 
         # المكونات
@@ -444,8 +456,8 @@ class Layer0Interface(BaseLayer):
             text = input_data
             context = {}
         elif isinstance(input_data, dict):
-            text = input_data.get('text', '')
-            context = input_data.get('context', {})
+            text = input_data.get("text", "")
+            context = input_data.get("context", {})
         else:
             raise ValueError("Invalid input format")
 
@@ -465,7 +477,7 @@ class Layer0Interface(BaseLayer):
                 "risk_level": security_result.risk_level.name,
                 "detected_patterns": security_result.detected_patterns[:5],
                 "scan_time_ms": security_result.scan_time_ms,
-            }
+            },
         )
 
         # إذا لم يكن آمناً
@@ -473,11 +485,11 @@ class Layer0Interface(BaseLayer):
             self._requests_blocked += 1
             structured.routing_target = RoutingTarget.DIRECT
             structured.routing_reason = f"Security risk: {security_result.risk_level.name}"
-            structured.metadata['blocked'] = True
+            structured.metadata["blocked"] = True
             return structured
 
         # 1.5. حفظ النص الأصلي للاستخدام في الطبقات اللاحقة
-        structured.metadata['original_text'] = text
+        structured.metadata["original_text"] = text
 
         # 2. تصنيف النية
         intent_type, confidence = self.classifier.classify(text)
@@ -496,7 +508,7 @@ class Layer0Interface(BaseLayer):
 
         # 4. تقدير التعقيد
         complexity = self.classifier.estimate_complexity(text)
-        structured.metadata['complexity'] = complexity.name
+        structured.metadata["complexity"] = complexity.name
 
         # 5. تحديد التوجيه
         routing_target, routing_reason = self._determine_routing(
@@ -506,9 +518,7 @@ class Layer0Interface(BaseLayer):
         structured.routing_reason = routing_reason
 
         # 6. تحديد النقاد الموصى بهم
-        structured.recommended_critics = self._recommend_critics(
-            intent_type, implicit, constraints
-        )
+        structured.recommended_critics = self._recommend_critics(intent_type, implicit, constraints)
 
         # 7. تحديد الأدوات الموصى بها
         structured.recommended_tools = self._recommend_tools(intent_type, complexity)
@@ -517,8 +527,8 @@ class Layer0Interface(BaseLayer):
         structured.context_snapshot = {
             "text_length": len(text),
             "word_count": len(text.split()),
-            "has_code_blocks": '```' in text,
-            "has_questions": '?' in text,
+            "has_code_blocks": "```" in text,
+            "has_questions": "?" in text,
         }
 
         self._requests_processed += 1
@@ -532,11 +542,7 @@ class Layer0Interface(BaseLayer):
         return structured
 
     def _determine_routing(
-        self,
-        intent_type: IntentType,
-        complexity: TaskComplexity,
-        confidence: float,
-        text: str
+        self, intent_type: IntentType, complexity: TaskComplexity, confidence: float, text: str
     ) -> tuple[RoutingTarget, str]:
         """تحديد التوجيه"""
 
@@ -564,10 +570,16 @@ class Layer0Interface(BaseLayer):
         if intent_type in strategic_intents or complexity == TaskComplexity.ARCHITECTURAL:
             return RoutingTarget.STRATEGIC, "Complex task requiring strategic planning"
 
-        if intent_type in tactical_intents or complexity in (TaskComplexity.COMPLEX, TaskComplexity.MODERATE):
+        if intent_type in tactical_intents or complexity in (
+            TaskComplexity.COMPLEX,
+            TaskComplexity.MODERATE,
+        ):
             return RoutingTarget.TACTICAL, "Task requiring tactical decomposition"
 
-        if intent_type in direct_intents or complexity in (TaskComplexity.SIMPLE, TaskComplexity.TRIVIAL):
+        if intent_type in direct_intents or complexity in (
+            TaskComplexity.SIMPLE,
+            TaskComplexity.TRIVIAL,
+        ):
             return RoutingTarget.DIRECT, "Simple task for direct execution"
 
         # إذا كانت الثقة منخفضة، نذهب للاستراتيجي
@@ -578,58 +590,52 @@ class Layer0Interface(BaseLayer):
         return RoutingTarget.TACTICAL, "Default tactical routing"
 
     def _recommend_critics(
-        self,
-        intent_type: IntentType,
-        implicit: ImplicitRequirements,
-        constraints: dict[str, Any]
+        self, intent_type: IntentType, implicit: ImplicitRequirements, constraints: dict[str, Any]
     ) -> list[str]:
         """توصية بالنقاد"""
-        critics = ['logic']  # دائماً ناقد المنطق
+        critics = ["logic"]  # دائماً ناقد المنطق
 
         # بناءً على النية
         intent_critics = {
-            IntentType.CODE_GENERATION: ['performance', 'style'],
-            IntentType.CODE_REVIEW: ['security', 'performance'],
-            IntentType.DEBUGGING: ['logic', 'security'],
-            IntentType.REFACTORING: ['performance', 'style'],
-            IntentType.TESTING: ['logic'],
-            IntentType.PLANNING: ['scalability'],
+            IntentType.CODE_GENERATION: ["performance", "style"],
+            IntentType.CODE_REVIEW: ["security", "performance"],
+            IntentType.DEBUGGING: ["logic", "security"],
+            IntentType.REFACTORING: ["performance", "style"],
+            IntentType.TESTING: ["logic"],
+            IntentType.PLANNING: ["scalability"],
         }
 
         critics.extend(intent_critics.get(intent_type, []))
 
         # بناءً على المتطلبات الضمنية
         if implicit.security:
-            critics.append('security')
+            critics.append("security")
         if implicit.performance:
-            critics.append('performance')
+            critics.append("performance")
         if implicit.compliance:
-            critics.append('compliance')
+            critics.append("compliance")
 
         return list(set(critics))
 
-    def _recommend_tools(
-        self,
-        intent_type: IntentType,
-        complexity: TaskComplexity
-    ) -> list[str]:
+    def _recommend_tools(self, intent_type: IntentType, complexity: TaskComplexity) -> list[str]:
         """توصية بالأدوات"""
         tools = []
 
         if intent_type == IntentType.RESEARCH:
-            tools.extend(['perplexity', 'web_search'])
+            tools.extend(["perplexity", "web_search"])
 
         if complexity in (TaskComplexity.COMPLEX, TaskComplexity.ARCHITECTURAL):
-            tools.append('tot_strategic')
+            tools.append("tot_strategic")
 
         if intent_type == IntentType.DEBUGGING:
-            tools.append('self_healing')
+            tools.append("self_healing")
 
         return tools
 
     def _generate_request_id(self) -> str:
         """توليد معرف طلب"""
         import uuid
+
         return f"req_{int(time.time()*1000)}_{uuid.uuid4().hex[:8]}"
 
     def get_stats(self) -> dict[str, Any]:
@@ -648,12 +654,11 @@ class Layer0Interface(BaseLayer):
 # Convenience Functions
 # =============================================================================
 
+
 def create_interface(
-    firewall_strictness: str = "high",
-    enable_behavioral: bool = True
+    firewall_strictness: str = "high", enable_behavioral: bool = True
 ) -> Layer0Interface:
     """إنشاء طبقة الواجهة"""
     return Layer0Interface(
-        firewall_strictness=firewall_strictness,
-        enable_behavioral_analysis=enable_behavioral
+        firewall_strictness=firewall_strictness, enable_behavioral_analysis=enable_behavioral
     )

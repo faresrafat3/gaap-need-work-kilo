@@ -65,7 +65,6 @@ def main():
     for key, info in PROVIDERS_INFO.items():
         has_key, key_display = get_provider_status(info["env_key"])
         status_icon = ":white_check_mark:" if has_key else ":x:"
-        status_color = "green" if has_key else "red"
 
         with st.container(border=True):
             col1, col2, col3 = st.columns([2, 2, 1])
@@ -108,7 +107,7 @@ def main():
         st.markdown("### Setup Guide")
         st.markdown("""
         To configure providers:
-        
+
         1. Create `.gaap_env` file
         2. Add your API keys:
            ```

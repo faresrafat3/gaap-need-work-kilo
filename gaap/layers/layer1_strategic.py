@@ -1,4 +1,5 @@
 # Layer 1: Strategic Layer
+import contextlib
 import json
 import logging
 import time
@@ -10,18 +11,27 @@ from typing import Any, Optional
 from gaap.core.base import BaseLayer
 from gaap.core.types import LayerType, Message, MessageRole
 from gaap.layers.layer0_interface import StructuredIntent
+from gaap.mad.critic_prompts import (
+    ARCH_SYSTEM_PROMPTS,
+    ArchitectureCriticType,
+    build_architecture_prompt,
+)
+from gaap.mad.response_parser import (
+    CriticParseError,
+    fallback_architecture_evaluation,
+    parse_architecture_critic_response,
+)
 
 # =============================================================================
 # Logger Setup
 # =============================================================================
 
+
 def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
@@ -32,8 +42,10 @@ def get_logger(name: str) -> logging.Logger:
 # Enums
 # =============================================================================
 
+
 class ArchitectureParadigm(Enum):
     """أنماط البنية المعمارية"""
+
     MONOLITH = "monolith"
     MODULAR_MONOLITH = "modular_monolith"
     MICROSERVICES = "microservices"
@@ -45,6 +57,7 @@ class ArchitectureParadigm(Enum):
 
 class DataStrategy(Enum):
     """استراتيجيات البيانات"""
+
     SINGLE_DB = "single_database"
     POLYGLOT = "polyglot"
     CQRS = "cqrs"
@@ -53,6 +66,7 @@ class DataStrategy(Enum):
 
 class CommunicationPattern(Enum):
     """أنماط الاتصال"""
+
     REST = "rest"
     GRAPHQL = "graphql"
     GRPC = "grpc"
@@ -64,19 +78,22 @@ class CommunicationPattern(Enum):
 # Data Classes
 # =============================================================================
 
+
 @dataclass
 class ArchitectureDecision:
     """قرار معماري"""
-    aspect: str              # الجانب (مثل: paradigm, database, etc.)
-    choice: str              # الاختيار
-    reasoning: str           # السبب
-    trade_offs: list[str]    # التنازلات
-    confidence: float        # الثقة
+
+    aspect: str  # الجانب (مثل: paradigm, database, etc.)
+    choice: str  # الاختيار
+    reasoning: str  # السبب
+    trade_offs: list[str]  # التنازلات
+    confidence: float  # الثقة
 
 
 @dataclass
 class ArchitectureSpec:
     """مواصفات معمارية"""
+
     spec_id: str
     timestamp: datetime
 
@@ -130,12 +147,13 @@ class ArchitectureSpec:
 @dataclass
 class ToTNode:
     """عقدة في شجرة الأفكار"""
+
     id: str
     level: int
     content: str
     score: float = 0.0
-    children: list['ToTNode'] = field(default_factory=list)
-    parent: Optional['ToTNode'] = None
+    children: list["ToTNode"] = field(default_factory=list)
+    parent: Optional["ToTNode"] = None
     explored: bool = False
     pruned: bool = False
 
@@ -144,10 +162,11 @@ class ToTNode:
 # Tree of Thoughts Strategic
 # =============================================================================
 
+
 class ToTStrategic:
     """
     شجرة الأفكار الاستراتيجية
-    
+
     تستكشف فضاء الحلول على 5 مستويات:
     - L0: النمط المعماري
     - L1: استراتيجية البيانات
@@ -163,9 +182,7 @@ class ToTStrategic:
         self._explored_nodes = 0
 
     async def explore(
-        self,
-        intent: StructuredIntent,
-        context: dict[str, Any] | None = None
+        self, intent: StructuredIntent, context: dict[str, Any] | None = None
     ) -> tuple[ArchitectureSpec, ToTNode]:
         """استكشاف فضاء الحلول"""
 
@@ -173,7 +190,7 @@ class ToTStrategic:
         root = ToTNode(
             id="root",
             level=0,
-            content=intent.explicit_goals[0] if intent.explicit_goals else "Design system"
+            content=intent.explicit_goals[0] if intent.explicit_goals else "Design system",
         )
 
         # بناء الشجرة
@@ -189,10 +206,7 @@ class ToTStrategic:
         return spec, root
 
     async def _build_tree(
-        self,
-        node: ToTNode,
-        intent: StructuredIntent,
-        context: dict[str, Any] | None
+        self, node: ToTNode, intent: StructuredIntent, context: dict[str, Any] | None
     ) -> None:
         """بناء الشجرة"""
         if node.level >= self.max_depth:
@@ -203,7 +217,7 @@ class ToTStrategic:
 
         # تقييم وتقليم
         scored_options = []
-        for opt in options[:self.branching_factor]:
+        for opt in options[: self.branching_factor]:
             score = self._evaluate_option(opt, node.level, intent)
             if score > 0.3:  # تقليم الدرجات المنخفضة
                 child = ToTNode(
@@ -211,7 +225,7 @@ class ToTStrategic:
                     level=node.level + 1,
                     content=opt,
                     score=score,
-                    parent=node
+                    parent=node,
                 )
                 node.children.append(child)
                 scored_options.append((child, score))
@@ -228,21 +242,16 @@ class ToTStrategic:
         """توليد الخيارات حسب المستوى"""
         options_map = {
             0: list(ArchitectureParadigm),  # النمط المعماري
-            1: list(DataStrategy),          # استراتيجية البيانات
+            1: list(DataStrategy),  # استراتيجية البيانات
             2: list(CommunicationPattern),  # نمط الاتصال
             3: ["kubernetes", "docker", "serverless", "vm"],  # البنية التحتية
             4: ["prometheus", "datadog", "cloudwatch", "custom"],  # المراقبة
         }
 
         options = options_map.get(level, [])
-        return [opt.value if hasattr(opt, 'value') else opt for opt in options]
+        return [opt.value if hasattr(opt, "value") else opt for opt in options]
 
-    def _evaluate_option(
-        self,
-        option: str,
-        level: int,
-        intent: StructuredIntent
-    ) -> float:
+    def _evaluate_option(self, option: str, level: int, intent: StructuredIntent) -> float:
         """تقييم خيار"""
         score = 0.5  # درجة أساسية
 
@@ -284,16 +293,9 @@ class ToTStrategic:
 
         return path
 
-    def _path_to_spec(
-        self,
-        path: list[ToTNode],
-        intent: StructuredIntent
-    ) -> ArchitectureSpec:
+    def _path_to_spec(self, path: list[ToTNode], intent: StructuredIntent) -> ArchitectureSpec:
         """تحويل المسار لمواصفات"""
-        spec = ArchitectureSpec(
-            spec_id=f"spec_{int(time.time()*1000)}",
-            timestamp=datetime.now()
-        )
+        spec = ArchitectureSpec(spec_id=f"spec_{int(time.time() * 1000)}", timestamp=datetime.now())
 
         # استخراج القرارات من المسار
         for node in path[1:]:  # تخطي الجذر
@@ -301,29 +303,25 @@ class ToTStrategic:
             content = node.content
 
             if level == 1:
-                try:
+                with contextlib.suppress(BaseException):
                     spec.paradigm = ArchitectureParadigm(content)
-                except:
-                    pass
             elif level == 2:
-                try:
+                with contextlib.suppress(BaseException):
                     spec.data_strategy = DataStrategy(content)
-                except:
-                    pass
             elif level == 3:
-                try:
+                with contextlib.suppress(BaseException):
                     spec.communication = CommunicationPattern(content)
-                except:
-                    pass
 
         # إضافة قرار
-        spec.decisions.append(ArchitectureDecision(
-            aspect="architecture_paradigm",
-            choice=spec.paradigm.value,
-            reasoning=f"Selected based on requirements: {intent.implicit_requirements.scalability or 'balanced'}",
-            trade_offs=["Complexity trade-off", "Team expertise required"],
-            confidence=0.85
-        ))
+        spec.decisions.append(
+            ArchitectureDecision(
+                aspect="architecture_paradigm",
+                choice=spec.paradigm.value,
+                reasoning=f"Selected based on requirements: {intent.implicit_requirements.scalability or 'balanced'}",
+                trade_offs=["Complexity trade-off", "Team expertise required"],
+                confidence=0.85,
+            )
+        )
 
         spec.selected_path_score = sum(n.score for n in path) / len(path) if path else 0
 
@@ -334,26 +332,43 @@ class ToTStrategic:
 # MAD Architecture Panel
 # =============================================================================
 
+
 class MADArchitecturePanel:
     """
     لجنة الجدل المعماري (Multi-Agent Debate)
-    
-    تتكون من 4 نقاد بمنظورات مختلفة:
+
+    تتكون من 4+ نقاد بمنظورات مختلفة:
     - Scalability Critic: التوسع
     - Pragmatism Critic: الواقعية
     - Cost Critic: التكلفة
     - Robustness Critic: المتانة
+    - Maintainability Critic: الصيانة
+    - Security Architecture Critic: الأمان
     """
 
-    def __init__(self, max_rounds: int = 3, consensus_threshold: float = 0.85):
+    ARCH_CRITICS = [
+        ArchitectureCriticType.SCALABILITY,
+        ArchitectureCriticType.PRAGMATISM,
+        ArchitectureCriticType.COST,
+        ArchitectureCriticType.ROBUSTNESS,
+    ]
+
+    def __init__(
+        self,
+        max_rounds: int = 3,
+        consensus_threshold: float = 0.85,
+        provider=None,
+        critic_model: str | None = None,
+    ):
         self.max_rounds = max_rounds
         self.consensus_threshold = consensus_threshold
+        self.provider = provider
+        self.critic_model = critic_model or "llama-3.3-70b-versatile"
         self._logger = get_logger("gaap.layer1.mad")
+        self._llm_failures = 0
 
     async def debate(
-        self,
-        spec: ArchitectureSpec,
-        intent: StructuredIntent
+        self, spec: ArchitectureSpec, intent: StructuredIntent
     ) -> tuple[ArchitectureSpec, bool]:
         """إجراء الجدل"""
 
@@ -362,7 +377,7 @@ class MADArchitecturePanel:
             evaluations = await self._evaluate_all(spec, intent, round_num)
 
             # حساب الإجماع
-            avg_score = sum(e['score'] for e in evaluations) / len(evaluations)
+            avg_score = sum(e["score"] for e in evaluations) / len(evaluations)
 
             # هل وصلنا لإجماع؟
             if avg_score >= self.consensus_threshold:
@@ -370,8 +385,7 @@ class MADArchitecturePanel:
                 spec.debate_rounds = round_num + 1
 
                 self._logger.info(
-                    f"MAD consensus reached at round {round_num + 1}: "
-                    f"score={avg_score:.2f}"
+                    f"MAD consensus reached at round {round_num + 1}: score={avg_score:.2f}"
                 )
 
                 return spec, True
@@ -385,33 +399,92 @@ class MADArchitecturePanel:
         return spec, False
 
     async def _evaluate_all(
-        self,
-        spec: ArchitectureSpec,
-        intent: StructuredIntent,
-        round_num: int
+        self, spec: ArchitectureSpec, intent: StructuredIntent, round_num: int
     ) -> list[dict[str, Any]]:
-        """تقييم جميع النقاد"""
+        """تقييم جميع النقاد - يستخدم LLM إذا توفر"""
+        if self.provider is None:
+            return self._evaluate_all_fallback(spec, intent)
+
         evaluations = []
-
-        # ناقد التوسع
-        evaluations.append(self._scalability_eval(spec, intent))
-
-        # ناقد الواقعية
-        evaluations.append(self._pragmatism_eval(spec, intent))
-
-        # ناقد التكلفة
-        evaluations.append(self._cost_eval(spec, intent))
-
-        # ناقد المتانة
-        evaluations.append(self._robustness_eval(spec, intent))
+        for critic_type in self.ARCH_CRITICS:
+            result = await self._evaluate_with_llm(spec, intent, critic_type)
+            evaluations.append(result)
 
         return evaluations
 
-    def _scalability_eval(
-        self,
-        spec: ArchitectureSpec,
-        intent: StructuredIntent
+    async def _evaluate_with_llm(
+        self, spec: ArchitectureSpec, intent: StructuredIntent, critic_type: ArchitectureCriticType
     ) -> dict[str, Any]:
+        """تقييم بناقد محدد باستخدام LLM"""
+        try:
+            system_prompt = ARCH_SYSTEM_PROMPTS.get(
+                critic_type, ARCH_SYSTEM_PROMPTS[ArchitectureCriticType.SCALABILITY]
+            )
+            user_prompt = build_architecture_prompt(spec, intent)
+
+            messages = [
+                Message(role=MessageRole.SYSTEM, content=system_prompt),
+                Message(role=MessageRole.USER, content=user_prompt),
+            ]
+
+            response = await self.provider.chat_completion(
+                messages=messages,
+                model=self.critic_model,
+                temperature=0.3,
+                max_tokens=2048,
+            )
+
+            if not response.choices or not response.choices[0].message.content:
+                self._logger.warning(f"LLM call failed for {critic_type.name}, using fallback")
+                self._llm_failures += 1
+                return self._get_fallback_eval(spec, intent, critic_type)
+
+            parsed = parse_architecture_critic_response(
+                response.choices[0].message.content, critic_type
+            )
+
+            return {
+                "critic": critic_type.name.lower(),
+                "score": parsed["score"] / 100.0,
+                "issues": parsed["issues"],
+                "suggestions": parsed["suggestions"],
+                "reasoning": parsed["reasoning"],
+            }
+
+        except CriticParseError as e:
+            self._logger.warning(f"Parse error for {critic_type.name}: {e}")
+            self._llm_failures += 1
+            return self._get_fallback_eval(spec, intent, critic_type)
+        except Exception as e:
+            self._logger.warning(f"LLM evaluation failed for {critic_type.name}: {e}")
+            self._llm_failures += 1
+            return self._get_fallback_eval(spec, intent, critic_type)
+
+    def _get_fallback_eval(
+        self, spec: ArchitectureSpec, intent: StructuredIntent, critic_type: ArchitectureCriticType
+    ) -> dict[str, Any]:
+        """تقييم احتياطي"""
+        result = fallback_architecture_evaluation(critic_type, spec, intent)
+        return {
+            "critic": critic_type.name.lower(),
+            "score": result["score"] / 100.0,
+            "issues": result["issues"],
+            "suggestions": result["suggestions"],
+            "reasoning": result["reasoning"],
+        }
+
+    def _evaluate_all_fallback(
+        self, spec: ArchitectureSpec, intent: StructuredIntent
+    ) -> list[dict[str, Any]]:
+        """تقييم جميع النقاد بالـ fallback (بدون LLM)"""
+        evaluations = []
+        evaluations.append(self._scalability_eval(spec, intent))
+        evaluations.append(self._pragmatism_eval(spec, intent))
+        evaluations.append(self._cost_eval(spec, intent))
+        evaluations.append(self._robustness_eval(spec, intent))
+        return evaluations
+
+    def _scalability_eval(self, spec: ArchitectureSpec, intent: StructuredIntent) -> dict[str, Any]:
         """تقييم التوسع"""
         score = 0.5
         issues = []
@@ -429,14 +502,10 @@ class MADArchitecturePanel:
             "critic": "scalability",
             "score": min(max(score, 0), 1),
             "issues": issues,
-            "suggestions": ["Consider horizontal scaling patterns"] if score < 0.7 else []
+            "suggestions": ["Consider horizontal scaling patterns"] if score < 0.7 else [],
         }
 
-    def _pragmatism_eval(
-        self,
-        spec: ArchitectureSpec,
-        intent: StructuredIntent
-    ) -> dict[str, Any]:
+    def _pragmatism_eval(self, spec: ArchitectureSpec, intent: StructuredIntent) -> dict[str, Any]:
         """تقييم الواقعية"""
         score = 0.7  # افتراضي جيد
         issues = []
@@ -457,14 +526,10 @@ class MADArchitecturePanel:
             "critic": "pragmatism",
             "score": min(max(score, 0), 1),
             "issues": issues,
-            "suggestions": ["Start simple, evolve later"] if score < 0.7 else []
+            "suggestions": ["Start simple, evolve later"] if score < 0.7 else [],
         }
 
-    def _cost_eval(
-        self,
-        spec: ArchitectureSpec,
-        intent: StructuredIntent
-    ) -> dict[str, Any]:
+    def _cost_eval(self, spec: ArchitectureSpec, intent: StructuredIntent) -> dict[str, Any]:
         """تقييم التكلفة"""
         score = 0.6
         issues = []
@@ -487,14 +552,10 @@ class MADArchitecturePanel:
             "critic": "cost",
             "score": score,
             "issues": issues,
-            "suggestions": ["Consider managed services to reduce ops cost"] if score < 0.6 else []
+            "suggestions": ["Consider managed services to reduce ops cost"] if score < 0.6 else [],
         }
 
-    def _robustness_eval(
-        self,
-        spec: ArchitectureSpec,
-        intent: StructuredIntent
-    ) -> dict[str, Any]:
+    def _robustness_eval(self, spec: ArchitectureSpec, intent: StructuredIntent) -> dict[str, Any]:
         """تقييم المتانة"""
         score = 0.6
         issues = []
@@ -502,37 +563,40 @@ class MADArchitecturePanel:
         if intent.implicit_requirements and intent.implicit_requirements.security:
             score += 0.2
 
-        if spec.communication in (CommunicationPattern.MESSAGE_QUEUE, CommunicationPattern.EVENT_BUS):
+        if spec.communication in (
+            CommunicationPattern.MESSAGE_QUEUE,
+            CommunicationPattern.EVENT_BUS,
+        ):
             score += 0.1  # أفضل للتحمل
 
         return {
             "critic": "robustness",
             "score": min(max(score, 0), 1),
             "issues": issues,
-            "suggestions": ["Add circuit breakers", "Implement retry logic"] if score < 0.7 else []
+            "suggestions": ["Add circuit breakers", "Implement retry logic"] if score < 0.7 else [],
         }
 
     def _apply_critiques(
-        self,
-        spec: ArchitectureSpec,
-        evaluations: list[dict[str, Any]]
+        self, spec: ArchitectureSpec, evaluations: list[dict[str, Any]]
     ) -> ArchitectureSpec:
         """تطبيق النقادات"""
 
         # جمع الاقتراحات
         all_suggestions = []
         for eval_result in evaluations:
-            if eval_result['score'] < 0.7:
-                all_suggestions.extend(eval_result.get('suggestions', []))
+            if eval_result["score"] < 0.7:
+                all_suggestions.extend(eval_result.get("suggestions", []))
 
         # إضافة المخاطر
         for eval_result in evaluations:
-            for issue in eval_result.get('issues', []):
-                spec.risks.append({
-                    "source": eval_result['critic'],
-                    "issue": issue,
-                    "severity": "medium" if eval_result['score'] > 0.5 else "high"
-                })
+            for issue in eval_result.get("issues", []):
+                spec.risks.append(
+                    {
+                        "source": eval_result["critic"],
+                        "issue": issue,
+                        "severity": "medium" if eval_result["score"] > 0.5 else "high",
+                    }
+                )
 
         return spec
 
@@ -541,17 +605,14 @@ class MADArchitecturePanel:
 # Strategic Planner
 # =============================================================================
 
+
 class StrategicPlanner:
     """المخطط الاستراتيجي"""
 
     def __init__(self):
         self._logger = get_logger("gaap.layer1.planner")
 
-    async def create_plan(
-        self,
-        spec: ArchitectureSpec,
-        intent: StructuredIntent
-    ) -> dict[str, Any]:
+    async def create_plan(self, spec: ArchitectureSpec, intent: StructuredIntent) -> dict[str, Any]:
         """إنشاء خطة"""
         plan = {
             "phases": [],
@@ -570,31 +631,29 @@ class StrategicPlanner:
         return plan
 
     def _determine_phases(
-        self,
-        spec: ArchitectureSpec,
-        intent: StructuredIntent
+        self, spec: ArchitectureSpec, intent: StructuredIntent
     ) -> list[dict[str, Any]]:
         """تحديد المراحل"""
         phases = [
             {
                 "name": "Foundation",
                 "tasks": ["Setup project structure", "Configure build system"],
-                "duration": "1-2 days"
+                "duration": "1-2 days",
             },
             {
                 "name": "Core Development",
                 "tasks": ["Implement core components", "Database setup"],
-                "duration": "1-2 weeks"
+                "duration": "1-2 weeks",
             },
             {
                 "name": "Integration",
                 "tasks": ["API integration", "Authentication"],
-                "duration": "3-5 days"
+                "duration": "3-5 days",
             },
             {
                 "name": "Testing & QA",
                 "tasks": ["Unit tests", "Integration tests"],
-                "duration": "3-5 days"
+                "duration": "3-5 days",
             },
         ]
 
@@ -602,20 +661,18 @@ class StrategicPlanner:
 
     def _create_milestones(self, phases: list[dict]) -> list[dict]:
         """إنشاء معالم"""
-        return [
-            {"name": f"{p['name']} Complete", "phase": p['name']}
-            for p in phases
-        ]
+        return [{"name": f"{p['name']} Complete", "phase": p["name"]} for p in phases]
 
 
 # =============================================================================
 # Layer 1 Strategic
 # =============================================================================
 
+
 class Layer1Strategic(BaseLayer):
     """
     طبقة التخطيط الاستراتيجي (LLM-Powered)
-    
+
     المسؤوليات:
     - تحويل الطلب المبهم إلى خطة معمارية مخصصة
     - استخدام الـ LLM لتحليل الطلب واقتراح المعمارية الأنسب
@@ -723,20 +780,16 @@ Return ONLY the JSON object, no markdown fences, no explanation."""
         tot_branching: int = 4,
         mad_rounds: int = 3,
         consensus_threshold: float = 0.85,
-        provider=None
+        provider=None,
     ):
         super().__init__(LayerType.STRATEGIC)
 
         self._provider = provider
 
         # Fallback components (used when LLM is unavailable)
-        self.tot = ToTStrategic(
-            max_depth=tot_depth,
-            branching_factor=tot_branching
-        )
+        self.tot = ToTStrategic(max_depth=tot_depth, branching_factor=tot_branching)
         self.mad_panel = MADArchitecturePanel(
-            max_rounds=mad_rounds,
-            consensus_threshold=consensus_threshold
+            max_rounds=mad_rounds, consensus_threshold=consensus_threshold
         )
         self.planner = StrategicPlanner()
 
@@ -759,7 +812,7 @@ Return ONLY the JSON object, no markdown fences, no explanation."""
 
         self._logger.info(f"Strategic planning for request {intent.request_id}")
 
-        original_text = intent.metadata.get('original_text', '')
+        original_text = intent.metadata.get("original_text", "")
 
         # محاولة التخطيط بالـ LLM أولاً
         spec = None
@@ -780,21 +833,21 @@ Return ONLY the JSON object, no markdown fences, no explanation."""
             spec, tree = await self.tot.explore(intent)
             spec, consensus = await self.mad_panel.debate(spec, intent)
             plan = await self.planner.create_plan(spec, intent)
-            spec.metadata['plan'] = plan
+            spec.metadata["plan"] = plan
             self._fallback_strategies += 1
             source = "fallback"
 
         # حفظ بيانات النية الأصلية لاستخدامها في L2
-        spec.metadata['original_intent'] = {
-            'request_id': intent.request_id,
-            'intent_type': intent.intent_type.name,
-            'explicit_goals': intent.explicit_goals,
-            'constraints': intent.constraints,
-            'context_snapshot': intent.context_snapshot,
-            'recommended_tools': intent.recommended_tools,
-            'original_text': original_text,
+        spec.metadata["original_intent"] = {
+            "request_id": intent.request_id,
+            "intent_type": intent.intent_type.name,
+            "explicit_goals": intent.explicit_goals,
+            "constraints": intent.constraints,
+            "context_snapshot": intent.context_snapshot,
+            "recommended_tools": intent.recommended_tools,
+            "original_text": original_text,
         }
-        spec.metadata['strategy_source'] = source
+        spec.metadata["strategy_source"] = source
 
         # تقدير الموارد (إذا لم يحددها الـ LLM)
         if not spec.estimated_resources:
@@ -811,9 +864,7 @@ Return ONLY the JSON object, no markdown fences, no explanation."""
         return spec
 
     async def _llm_strategize(
-        self,
-        intent: StructuredIntent,
-        original_text: str
+        self, intent: StructuredIntent, original_text: str
     ) -> ArchitectureSpec | None:
         """تخطيط استراتيجي باستخدام الـ LLM"""
         prompt = self.STRATEGY_PROMPT.format(
@@ -826,12 +877,9 @@ Return ONLY the JSON object, no markdown fences, no explanation."""
         messages = [
             Message(
                 role=MessageRole.SYSTEM,
-                content="You are a precise software architecture engine. Output only valid JSON objects."
+                content="You are a precise software architecture engine. Output only valid JSON objects.",
             ),
-            Message(
-                role=MessageRole.USER,
-                content=prompt
-            ),
+            Message(role=MessageRole.USER, content=prompt),
         ]
 
         response = await self._provider.chat_completion(
@@ -858,18 +906,18 @@ Return ONLY the JSON object, no markdown fences, no explanation."""
         cleaned = raw.strip()
 
         # إزالة thinking tags
-        cleaned = _re.sub(r'<think>.*?</think>', '', cleaned, flags=_re.DOTALL).strip()
+        cleaned = _re.sub(r"<think>.*?</think>", "", cleaned, flags=_re.DOTALL).strip()
 
         # إزالة markdown code fences
-        if cleaned.startswith('```'):
-            lines = cleaned.split('\n')
+        if cleaned.startswith("```"):
+            lines = cleaned.split("\n")
             start_idx = 1
             end_idx = len(lines)
             for i in range(len(lines) - 1, 0, -1):
-                if lines[i].strip() == '```':
+                if lines[i].strip() == "```":
                     end_idx = i
                     break
-            cleaned = '\n'.join(lines[start_idx:end_idx])
+            cleaned = "\n".join(lines[start_idx:end_idx])
 
         # محاولة parse مباشرة
         try:
@@ -881,7 +929,8 @@ Return ONLY the JSON object, no markdown fences, no explanation."""
 
         # استخراج JSON object من النص
         import re as _re2
-        brace_match = _re2.search(r'\{[\s\S]*\}', cleaned)
+
+        brace_match = _re2.search(r"\{[\s\S]*\}", cleaned)
         if brace_match:
             try:
                 data = json.loads(brace_match.group())
@@ -894,73 +943,71 @@ Return ONLY the JSON object, no markdown fences, no explanation."""
         return None
 
     def _build_spec_from_llm(
-        self,
-        data: dict[str, Any],
-        intent: StructuredIntent
+        self, data: dict[str, Any], intent: StructuredIntent
     ) -> ArchitectureSpec:
         """بناء ArchitectureSpec من بيانات الـ LLM"""
-        spec = ArchitectureSpec(
-            spec_id=f"spec_{int(time.time()*1000)}",
-            timestamp=datetime.now()
-        )
+        spec = ArchitectureSpec(spec_id=f"spec_{int(time.time() * 1000)}", timestamp=datetime.now())
 
         # النمط المعماري
-        paradigm_str = str(data.get('paradigm', 'modular_monolith')).lower().strip()
+        paradigm_str = str(data.get("paradigm", "modular_monolith")).lower().strip()
         spec.paradigm = self.PARADIGM_MAP.get(paradigm_str, ArchitectureParadigm.MODULAR_MONOLITH)
 
         # استراتيجية البيانات
-        ds_str = str(data.get('data_strategy', 'single_database')).lower().strip()
+        ds_str = str(data.get("data_strategy", "single_database")).lower().strip()
         spec.data_strategy = self.DATA_STRATEGY_MAP.get(ds_str, DataStrategy.SINGLE_DB)
 
         # نمط الاتصال
-        comm_str = str(data.get('communication', 'rest')).lower().strip()
+        comm_str = str(data.get("communication", "rest")).lower().strip()
         spec.communication = self.COMM_MAP.get(comm_str, CommunicationPattern.REST)
 
         # Tech stack
-        tech = data.get('tech_stack', {})
+        tech = data.get("tech_stack", {})
         if isinstance(tech, dict):
             spec.tech_stack = tech
 
         # Components
-        components = data.get('components', [])
+        components = data.get("components", [])
         if isinstance(components, list):
             spec.components = components
 
         # Decisions
-        decisions = data.get('decisions', [])
+        decisions = data.get("decisions", [])
         if isinstance(decisions, list):
             for d in decisions:
                 if isinstance(d, dict):
-                    spec.decisions.append(ArchitectureDecision(
-                        aspect=str(d.get('aspect', 'general')),
-                        choice=str(d.get('choice', '')),
-                        reasoning=str(d.get('reasoning', '')),
-                        trade_offs=d.get('trade_offs', []),
-                        confidence=float(d.get('confidence', 0.8)),
-                    ))
+                    spec.decisions.append(
+                        ArchitectureDecision(
+                            aspect=str(d.get("aspect", "general")),
+                            choice=str(d.get("choice", "")),
+                            reasoning=str(d.get("reasoning", "")),
+                            trade_offs=d.get("trade_offs", []),
+                            confidence=float(d.get("confidence", 0.8)),
+                        )
+                    )
 
         # Risks
-        risks = data.get('risks', [])
+        risks = data.get("risks", [])
         if isinstance(risks, list):
             spec.risks = risks
 
         # Phases → plan
-        phases = data.get('phases', [])
+        phases = data.get("phases", [])
         if isinstance(phases, list) and phases:
-            spec.metadata['plan'] = {
-                'phases': phases,
-                'milestones': [
-                    {'name': f"{p.get('name', 'Phase')} Complete", 'phase': p.get('name', '')}
-                    for p in phases if isinstance(p, dict)
+            spec.metadata["plan"] = {
+                "phases": phases,
+                "milestones": [
+                    {"name": f"{p.get('name', 'Phase')} Complete", "phase": p.get("name", "")}
+                    for p in phases
+                    if isinstance(p, dict)
                 ],
             }
 
         # Resource estimates from LLM
-        complexity = data.get('complexity_score', 0.5)
-        est_time = data.get('estimated_time', '1-2 weeks')
+        complexity = data.get("complexity_score", 0.5)
+        est_time = data.get("estimated_time", "1-2 weeks")
         spec.estimated_resources = {
-            'complexity_score': float(complexity) if isinstance(complexity, (int, float)) else 0.5,
-            'estimated_time': str(est_time),
+            "complexity_score": float(complexity) if isinstance(complexity, (int, float)) else 0.5,
+            "estimated_time": str(est_time),
         }
 
         # Mark as LLM-generated
@@ -972,9 +1019,7 @@ Return ONLY the JSON object, no markdown fences, no explanation."""
         return spec
 
     def _estimate_resources(
-        self,
-        spec: ArchitectureSpec,
-        intent: StructuredIntent
+        self, spec: ArchitectureSpec, intent: StructuredIntent
     ) -> dict[str, Any]:
         """تقدير الموارد (fallback)"""
         estimates = {
@@ -1005,14 +1050,9 @@ Return ONLY the JSON object, no markdown fences, no explanation."""
 # Convenience Functions
 # =============================================================================
 
+
 def create_strategic_layer(
-    tot_depth: int = 5,
-    mad_rounds: int = 3,
-    provider=None
+    tot_depth: int = 5, mad_rounds: int = 3, provider=None
 ) -> Layer1Strategic:
     """إنشاء طبقة استراتيجية"""
-    return Layer1Strategic(
-        tot_depth=tot_depth,
-        mad_rounds=mad_rounds,
-        provider=provider
-    )
+    return Layer1Strategic(tot_depth=tot_depth, mad_rounds=mad_rounds, provider=provider)

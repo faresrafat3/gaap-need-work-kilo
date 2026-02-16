@@ -1,6 +1,5 @@
-from .base import (
+from .base import (  # Base Classes; Context; Result; Decorators; Utilities
     BaseAgent,
-    # Base Classes
     BaseComponent,
     BaseCritic,
     BaseHealer,
@@ -8,31 +7,25 @@ from .base import (
     BaseMemory,
     BasePlugin,
     BaseProvider,
-    # Context
     ContextManager,
     ExecutionContext,
-    # Result
     ExecutionResult,
     create_iacp_message,
     gather_with_concurrency,
-    # Decorators
     measure_time,
     run_with_timeout,
-    # Utilities
     setup_logger,
     validate_input,
     with_retry,
 )
-from .config import (
+from .config import (  # Manager; Dataclasses; Functions
     BudgetConfig,
     ConfigBuilder,
-    # Manager
     ConfigManager,
     ContextManagementConfig,
     CriticConfig,
     ExecutionConfig,
     ExternalConnectorsConfig,
-    # Dataclasses
     FirewallConfig,
     GAAPConfig,
     MetaLearningConfig,
@@ -46,45 +39,37 @@ from .config import (
     TacticalDecomposerConfig,
     get_config,
     get_config_manager,
-    # Functions
     get_default_config,
     init_config,
     load_config,
 )
-from .exceptions import (
+from .exceptions import (  # Configuration; Context; Base; Healing; MAD; Plugin; Provider; Routing; Security; Task; Utilities
     BudgetExceededError,
     CapabilityError,
     CircularDependencyError,
     ConfigLoadError,
-    # Configuration
     ConfigurationError,
     ConsensusNotReachedError,
-    # Context
     ContextError,
     ContextLoadError,
     ContextOverflowError,
     CriticError,
-    # Base
     GAAPException,
-    # Healing
     HealingError,
     HealingFailedError,
     HumanEscalationError,
     InvalidConfigValueError,
-    # MAD
     MADError,
     MaxRetriesExceededError,
     MemoryAccessError,
     MissingConfigError,
     ModelNotFoundError,
     NoAvailableProviderError,
-    # Plugin
     PluginError,
     PluginExecutionError,
     PluginLoadError,
     PromptInjectionError,
     ProviderAuthenticationError,
-    # Provider
     ProviderError,
     ProviderNotAvailableError,
     ProviderNotFoundError,
@@ -92,14 +77,11 @@ from .exceptions import (
     ProviderResponseError,
     ProviderTimeoutError,
     RoutingConflictError,
-    # Routing
     RoutingError,
     SandboxEscapeError,
-    # Security
     SecurityError,
     SecurityScanError,
     TaskDependencyError,
-    # Task
     TaskError,
     TaskExecutionError,
     TaskTimeoutError,
@@ -107,11 +89,9 @@ from .exceptions import (
     TokenExpiredError,
     get_error_severity,
     is_recoverable,
-    # Utilities
     wrap_exception,
 )
-from .types import (
-    # Constants
+from .types import (  # Constants; Data Classes; TypedDicts; Enums
     CONTEXT_LIMITS,
     CRITIC_WEIGHTS,
     DEFAULT_CONTEXT_BUDGETS,
@@ -140,7 +120,6 @@ from .types import (
     LayerType,
     MADDecision,
     MemoryType,
-    # Data Classes
     Message,
     MessageRole,
     ModelInfo,
@@ -151,13 +130,11 @@ from .types import (
     RoutingDecision,
     SecurityRiskLevel,
     SecurityScanResult,
-    # TypedDicts
     StructuredIntentDict,
     SystemMetrics,
     Task,
     TaskComplexity,
     TaskContext,
-    # Enums
     TaskPriority,
     TaskResult,
     TaskType,

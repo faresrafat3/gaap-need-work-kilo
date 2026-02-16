@@ -2,11 +2,12 @@
 Unit tests for GAAP healing system
 """
 
-import pytest
 import asyncio
 
-from gaap.core.types import Task, TaskPriority, TaskType, HealingLevel
+import pytest
+
 from gaap.core.exceptions import ProviderRateLimitError, ProviderTimeoutError
+from gaap.core.types import HealingLevel
 
 
 class TestHealingLevels:

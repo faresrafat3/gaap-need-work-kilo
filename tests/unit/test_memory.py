@@ -2,11 +2,10 @@
 Unit tests for Memory system
 """
 
-import pytest
 import asyncio
-from unittest.mock import MagicMock, AsyncMock
-from typing import Dict, Any, List
 from datetime import datetime, timedelta
+
+import pytest
 
 
 class TestMemoryTiers:

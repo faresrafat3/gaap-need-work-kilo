@@ -48,13 +48,14 @@ WEBCHAT_MODELS = {
 # WebChat Bridge Provider
 # =============================================================================
 
+
 class WebChatBridgeProvider(BaseProvider):
     """
     جسر بين webchat_call() وواجهة BaseProvider
-    
+
     يسمح باستخدام مزودي WebChat (Kimi, GLM, DeepSeek)
     داخل GAAPEngine مع كل الطبقات (SmartRouter, FallbackManager, etc.)
-    
+
     Multi-Account Support:
       - Auto-discovers authenticated accounts from disk
       - Uses AccountPool for smart rotation (best health score)
@@ -63,11 +64,7 @@ class WebChatBridgeProvider(BaseProvider):
     """
 
     def __init__(
-        self,
-        webchat_provider: str = "kimi",
-        account: str = "default",
-        timeout: int = 120,
-        **kwargs
+        self, webchat_provider: str = "kimi", account: str = "default", timeout: int = 120, **kwargs
     ):
         self._webchat_provider = webchat_provider
         self._account = account  # preferred account (fallback to others)
@@ -79,6 +76,7 @@ class WebChatBridgeProvider(BaseProvider):
         self._pool_initialized = False
         try:
             from .account_manager import PoolManager, auto_discover_accounts
+
             mgr = PoolManager.instance()
             auto_discover_accounts()
             self._pool = mgr.pool(webchat_provider)
@@ -117,7 +115,7 @@ class WebChatBridgeProvider(BaseProvider):
 
     def _select_account(self, model: str = "") -> str:
         """Select the best available account using AccountPool.
-        
+
         Returns the account label to use for the next call.
         Falls back to self._account if pool is not available.
         """
@@ -150,16 +148,20 @@ class WebChatBridgeProvider(BaseProvider):
         return best_label
 
     def _record_call_result(
-        self, account: str, success: bool,
-        latency_ms: float = 0, tokens_used: int = 0,
-        error_msg: str = ""
+        self,
+        account: str,
+        success: bool,
+        latency_ms: float = 0,
+        tokens_used: int = 0,
+        error_msg: str = "",
     ):
         """Record call result in AccountPool and detect hard cooldowns."""
         if not self._pool:
             return
 
         self._pool.record_call(
-            account, success=success,
+            account,
+            success=success,
             latency_ms=latency_ms,
             tokens_used=tokens_used,
             error_msg=error_msg[:100] if error_msg else "",
@@ -169,6 +171,7 @@ class WebChatBridgeProvider(BaseProvider):
         if not success and error_msg:
             try:
                 from .account_manager import detect_hard_cooldown
+
                 result = detect_hard_cooldown(error_msg)
                 if result:
                     cooldown_sec, reason = result
@@ -176,6 +179,7 @@ class WebChatBridgeProvider(BaseProvider):
                     if acct:
                         acct.rate_tracker.set_hard_cooldown(cooldown_sec, reason)
                         import datetime
+
                         expires = datetime.datetime.now() + datetime.timedelta(seconds=cooldown_sec)
                         self._logger.warning(
                             f"🚫 Hard rate limit on '{account}': {reason} "
@@ -195,12 +199,7 @@ class WebChatBridgeProvider(BaseProvider):
         """كل نماذج webchat تعتبر TIER_1 أو TIER_2"""
         return self._model_tier
 
-    async def _make_request(
-        self,
-        messages: list[Message],
-        model: str,
-        **kwargs
-    ) -> dict[str, Any]:
+    async def _make_request(self, messages: list[Message], model: str, **kwargs) -> dict[str, Any]:
         """تنفيذ الطلب عبر webchat_call() مع إدارة ذاكرة + retry + multi-account"""
         # Memory check before making LLM call
         guard = get_guard()
@@ -209,10 +208,12 @@ class WebChatBridgeProvider(BaseProvider):
         # تحويل Message objects لقواميس
         formatted_messages = []
         for m in messages:
-            formatted_messages.append({
-                "role": m.role.value,
-                "content": m.content,
-            })
+            formatted_messages.append(
+                {
+                    "role": m.role.value,
+                    "content": m.content,
+                }
+            )
 
         # Select best account (via AccountPool or default)
         current_account = self._select_account(model)
@@ -243,12 +244,13 @@ class WebChatBridgeProvider(BaseProvider):
                     raise ProviderResponseError(
                         provider_name=self.name,
                         status_code=500,
-                        response_body="Empty response from webchat provider"
+                        response_body="Empty response from webchat provider",
                     )
 
                 # Record success
                 self._record_call_result(
-                    current_account, success=True,
+                    current_account,
+                    success=True,
                     latency_ms=call_latency,
                     tokens_used=len(content.split()) * 2,
                 )
@@ -259,14 +261,16 @@ class WebChatBridgeProvider(BaseProvider):
 
                 result = {
                     "id": f"webchat-{self._webchat_provider}-{current_account}-{int(time.time())}",
-                    "choices": [{
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": content,
-                        },
-                        "finish_reason": "stop",
-                    }],
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": content,
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
                     "usage": {
                         "prompt_tokens": input_tokens,
                         "completion_tokens": output_tokens,
@@ -291,7 +295,7 @@ class WebChatBridgeProvider(BaseProvider):
                 raise ProviderResponseError(
                     provider_name=self.name,
                     status_code=500,
-                    response_body=f"webchat_providers not available: {e}"
+                    response_body=f"webchat_providers not available: {e}",
                 )
             except Exception as e:
                 last_error = e
@@ -300,7 +304,8 @@ class WebChatBridgeProvider(BaseProvider):
 
                 # Record failure
                 self._record_call_result(
-                    current_account, success=False,
+                    current_account,
+                    success=False,
                     error_msg=full_err,
                 )
                 tried_accounts.add(current_account)
@@ -309,6 +314,7 @@ class WebChatBridgeProvider(BaseProvider):
                 is_hard_limit = False
                 try:
                     from .account_manager import detect_hard_cooldown
+
                     if detect_hard_cooldown(full_err):
                         is_hard_limit = True
                 except Exception:
@@ -326,11 +332,23 @@ class WebChatBridgeProvider(BaseProvider):
                         continue
 
                 # Only retry transient connection errors, NOT timeouts.
-                is_transient = any(k in err_str for k in [
-                    "connect", "reset", "refused",
-                    "temporarily", "429", "503", "network",
-                    "exhausted", "concurrency",
-                ]) and "timeout" not in err_str
+                is_transient = (
+                    any(
+                        k in err_str
+                        for k in [
+                            "connect",
+                            "reset",
+                            "refused",
+                            "temporarily",
+                            "429",
+                            "503",
+                            "network",
+                            "exhausted",
+                            "concurrency",
+                        ]
+                    )
+                    and "timeout" not in err_str
+                )
 
                 if is_transient and attempt < max_retries:
                     # Try switching account for concurrency/exhausted errors
@@ -359,9 +377,7 @@ class WebChatBridgeProvider(BaseProvider):
                 self._logger.error(f"webchat_call failed on '{current_account}': {e}")
                 gc.collect()
                 raise ProviderResponseError(
-                    provider_name=self.name,
-                    status_code=500,
-                    response_body=str(e)
+                    provider_name=self.name, status_code=500, response_body=str(e)
                 )
 
         # Should not reach here, but safety net
@@ -369,26 +385,18 @@ class WebChatBridgeProvider(BaseProvider):
         raise ProviderResponseError(
             provider_name=self.name,
             status_code=500,
-            response_body=str(last_error) if last_error else "Unknown error after retries"
+            response_body=str(last_error) if last_error else "Unknown error after retries",
         )
 
     async def _stream_request(
-        self,
-        messages: list[Message],
-        model: str,
-        **kwargs
+        self, messages: list[Message], model: str, **kwargs
     ) -> AsyncIterator[str]:
         """WebChat لا يدعم التدفق — نستخدم الطلب العادي"""
         response = await self._make_request(messages, model, **kwargs)
         content = response["choices"][0]["message"]["content"]
         yield content
 
-    def _calculate_cost(
-        self,
-        model: str,
-        input_tokens: int,
-        output_tokens: int
-    ) -> float:
+    def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
         """WebChat مجاني"""
         return 0.0
 
@@ -397,14 +405,15 @@ class WebChatBridgeProvider(BaseProvider):
 # Convenience Functions
 # =============================================================================
 
+
 def create_kimi_provider(
     model: str = "kimi-k2.5-thinking",
     account: str = "default",
     timeout: int = 120,
 ) -> WebChatBridgeProvider:
     """إنشاء مزود Kimi مع دعم الحسابات المتعددة.
-    
-    Auto-discovers all authenticated Kimi accounts and uses 
+
+    Auto-discovers all authenticated Kimi accounts and uses
     AccountPool for smart rotation between them.
     """
     provider = WebChatBridgeProvider(

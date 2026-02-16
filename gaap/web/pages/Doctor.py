@@ -103,7 +103,6 @@ def main():
 
         for name, success, detail in results:
             icon = ":white_check_mark:" if success else ":x:"
-            color = "green" if success else "red"
 
             with st.container(border=True):
                 col1, col2 = st.columns([3, 2])
@@ -146,7 +145,7 @@ def main():
 
                 store = get_store()
                 store.save("test", {"test": True})
-                loaded = store.load("test")
+                store.load("test")
                 st.success("Storage OK")
             except Exception as e:
                 st.error(f"Storage Error: {e}")
@@ -165,13 +164,13 @@ def main():
         st.markdown("### Help")
         st.markdown("""
         **Common Issues:**
-        
+
         1. **No API keys**: Create `.gaap_env` file with your keys
-        
+
         2. **Import errors**: Run `pip install -e .`
-        
+
         3. **Storage errors**: Check `~/.gaap/` permissions
-        
+
         4. **Connection errors**: Check your internet connection
         """)
 

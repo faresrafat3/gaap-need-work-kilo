@@ -35,21 +35,18 @@ __all__ = [
     "IntentClassifier",
     "IntentType",
     "StructuredIntent",
-
     # Layer 1
     "Layer1Strategic",
     "StrategicPlanner",
     "ToTStrategic",
     "ArchitectureParadigm",
     "ArchitectureSpec",
-
     # Layer 2
     "Layer2Tactical",
     "TacticalDecomposer",
     "DependencyResolver",
     "AtomicTask",
     "TaskGraph",
-
     # Layer 3
     "Layer3Execution",
     "ExecutorPool",
