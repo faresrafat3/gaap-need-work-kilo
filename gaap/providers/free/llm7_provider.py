@@ -54,7 +54,7 @@ class LLM7Provider:
         self,
         base_url: str | None = None,
         timeout: int = 120,
-    ):
+    ) -> None:
         self.base_url = base_url or self.BASE_URL
         self.timeout = timeout
         self.name = "llm7"
@@ -71,7 +71,7 @@ class LLM7Provider:
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> SimpleChatResponse:
         """Execute chat completion via LLM7.io"""
         model = model or self.DEFAULT_MODEL
@@ -139,7 +139,7 @@ class LLM7Provider:
         self,
         text: str | list[str],
         model: str = "text-embedding-3-small",
-        **kwargs,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Generate embeddings"""
         return {
