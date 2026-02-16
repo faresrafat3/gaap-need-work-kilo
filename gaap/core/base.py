@@ -118,7 +118,7 @@ class BaseComponent(ABC):
         """الحصول على المقاييس"""
         return self._metrics.copy()
 
-    def log(self, level: str, message: str, **kwargs) -> None:
+    def log(self, level: str, message: str, **kwargs: Any) -> None:
         """تسجيل رسالة"""
         log_method = getattr(self._logger, level.lower(), self._logger.info)
         log_method(f"[{self.id}] {message}", **kwargs)
@@ -198,7 +198,7 @@ class BaseAgent(BaseComponent, Generic[T, R]):
             types.append(TaskType.TESTING)
         return types
 
-    def _can_handle_complexity(self, complexity) -> bool:
+    def _can_handle_complexity(self, complexity: Any) -> bool:
         """التحقق من القدرة على التعامل مع التعقيد"""
         return True  # يمكن تجاوزه في الفئات الفرعية
 
@@ -227,8 +227,7 @@ class BaseAgent(BaseComponent, Generic[T, R]):
     async def execute_with_timeout(self, task: Task, timeout_seconds: float = 300) -> TaskResult:
         """تنفيذ مع مهلة زمنية"""
         try:
-            async with asyncio.timeout(timeout_seconds):
-                return await self.execute(task)
+            return await asyncio.wait_for(self.execute(task), timeout=timeout_seconds)
         except asyncio.TimeoutError:
             raise TaskTimeoutError(task_id=task.id, timeout_seconds=timeout_seconds)
 
@@ -269,13 +268,13 @@ class BaseProvider(BaseComponent):
         self,
         name: str,
         models: list[str],
-        provider_type=None,
+        provider_type: Any = None,
         api_key: str | None = None,
         base_url: str | None = None,
         rate_limit: int = 60,
         timeout: int = 120,
         max_retries: int = 3,
-    ):
+    ) -> None:
         super().__init__(name=name, layer=LayerType.EXTERNAL)
         self.models = models
         self.provider_type = provider_type
@@ -291,14 +290,14 @@ class BaseProvider(BaseComponent):
 
     @abstractmethod
     async def chat_completion(
-        self, messages: list[Message], model: str, **kwargs
+        self, messages: list[Message], model: str, **kwargs: Any
     ) -> ChatCompletionResponse:
         """إكمال محادثة"""
         pass
 
     @abstractmethod
     async def stream_chat_completion(
-        self, messages: list[Message], model: str, **kwargs
+        self, messages: list[Message], model: str, **kwargs: Any
     ) -> AsyncIterator[str]:
         """إكمال محادثة بتدفق"""
         pass
@@ -443,7 +442,7 @@ class BaseHealer(BaseComponent):
     - تصعيد عند الضرورة
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(name="Healer", layer=LayerType.EXECUTION)
         self._healing_history: dict[str, list[dict[str, Any]]] = {}
         self._max_level = HealingLevel.L5_HUMAN_ESCALATION
@@ -738,12 +737,12 @@ class ExecutionResult(Generic[T]):
     artifacts: list[str] = field(default_factory=list)
 
     @classmethod
-    def ok(cls, data: T, **kwargs) -> "ExecutionResult[T]":
+    def ok(cls, data: T, **kwargs: Any) -> "ExecutionResult[T]":
         """إنشاء نتيجة ناجحة"""
         return cls(success=True, data=data, **kwargs)
 
     @classmethod
-    def fail(cls, error: str, **kwargs) -> "ExecutionResult[T]":
+    def fail(cls, error: str, **kwargs: Any) -> "ExecutionResult[T]":
         """إنشاء نتيجة فاشلة"""
         return cls(success=False, error=error, **kwargs)
 
@@ -753,31 +752,34 @@ class ExecutionResult(Generic[T]):
 # =============================================================================
 
 
-def measure_time(func: Callable) -> Callable:
+def measure_time(func: Callable[..., T]) -> Callable[..., T]:
     """مُزخرف لقياس وقت التنفيذ"""
 
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: Any, **kwargs: Any) -> T:
         start = time.time()
         try:
-            result = await func(*args, **kwargs)
+            result: T = await func(*args, **kwargs)  # type: ignore[misc]
             return result
         finally:
             elapsed = time.time() - start
             if hasattr(args[0], "record_metric"):
                 args[0].record_metric(f"{func.__name__}_time", elapsed)
 
-    return wrapper
+    return wrapper  # type: ignore[return-value]
 
 
-def with_retry(max_retries: int = 3, delay: float = 1.0):
+def with_retry(
+    max_retries: int = 3, delay: float = 1.0
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """مُزخرف لإعادة المحاولة"""
 
-    def decorator(func: Callable) -> Callable:
-        async def wrapper(*args, **kwargs):
-            last_error = None
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        async def wrapper(*args: Any, **kwargs: Any) -> T:
+            last_error: Exception | None = None
             for attempt in range(max_retries):
                 try:
-                    return await func(*args, **kwargs)
+                    result: T = await func(*args, **kwargs)  # type: ignore[misc]
+                    return result
                 except GAAPException as e:
                     last_error = e
                     if attempt < max_retries - 1:
@@ -786,21 +788,24 @@ def with_retry(max_retries: int = 3, delay: float = 1.0):
                 task_id="unknown", max_retries=max_retries, last_error=str(last_error)
             )
 
-        return wrapper
+        return wrapper  # type: ignore[return-value]
 
     return decorator
 
 
-def validate_input(validator: Callable[[Any], bool]):
+def validate_input(
+    validator: Callable[[Any], bool],
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """مُزخرف للتحقق من المدخلات"""
 
-    def decorator(func: Callable) -> Callable:
-        async def wrapper(*args, **kwargs):
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        async def wrapper(*args: Any, **kwargs: Any) -> T:
             if not validator(args[1] if len(args) > 1 else kwargs):
                 raise ValueError("Input validation failed")
-            return await func(*args, **kwargs)
+            result: T = await func(*args, **kwargs)  # type: ignore[misc]
+            return result
 
-        return wrapper
+        return wrapper  # type: ignore[return-value]
 
     return decorator
 
@@ -815,8 +820,7 @@ async def run_with_timeout(
 ) -> T | None:
     """تشغيل مع مهلة زمنية"""
     try:
-        async with asyncio.timeout(timeout):
-            return await coro
+        return await asyncio.wait_for(coro, timeout=timeout)
     except asyncio.TimeoutError:
         return default
 
@@ -825,7 +829,7 @@ async def gather_with_concurrency(*coros: Awaitable[T], limit: int = 10) -> list
     """تشغيل متوازي مع حد للتزامن"""
     semaphore = asyncio.Semaphore(limit)
 
-    async def run_with_semaphore(coro):
+    async def run_with_semaphore(coro: Awaitable[T]) -> T:
         async with semaphore:
             return await coro
 

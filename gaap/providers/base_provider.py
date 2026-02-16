@@ -323,7 +323,9 @@ class BaseProvider(ABC):
     # =========================================================================
 
     @abstractmethod
-    async def _make_request(self, messages: list[Message], model: str, **kwargs) -> dict[str, Any]:
+    async def _make_request(
+        self, messages: list[Message], model: str, **kwargs: Any
+    ) -> dict[str, Any]:
         """
         تنفيذ الطلب الفعلي للمزود
 
@@ -333,7 +335,7 @@ class BaseProvider(ABC):
 
     @abstractmethod
     async def _stream_request(
-        self, messages: list[Message], model: str, **kwargs
+        self, messages: list[Message], model: str, **kwargs: Any
     ) -> AsyncGenerator[str, None]:
         """
         تنفيذ الطلب المتدفق
@@ -359,7 +361,7 @@ class BaseProvider(ABC):
         max_tokens: int = 4096,
         top_p: float = 1.0,
         stop: list[str] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> ChatCompletionResponse:
         """
         إكمال محادثة
@@ -456,7 +458,7 @@ class BaseProvider(ABC):
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        **kwargs,
+        **kwargs: Any,
     ) -> AsyncIterator[str]:
         """
         إكمال محادثة بتدفق
@@ -478,7 +480,7 @@ class BaseProvider(ABC):
                 max_tokens=max_tokens,
                 **kwargs,
             )
-            async for chunk in stream:  # type: ignore[misc]
+            async for chunk in stream:
                 yield chunk
         except Exception as e:
             self._logger.error(f"Stream error: {e}")
@@ -513,10 +515,10 @@ class BaseProvider(ABC):
     # =========================================================================
 
     @asynccontextmanager
-    async def _timeout_context(self):
+    async def _timeout_context(self) -> AsyncGenerator[None, None]:
         """سياق مع مهلة زمنية"""
         try:
-            async with asyncio.timeout(self.timeout):
+            async with asyncio.timeout(self.timeout):  # type: ignore[attr-defined]
                 yield
         except asyncio.TimeoutError:
             raise ProviderTimeoutError(provider_name=self.name, timeout_seconds=self.timeout)
@@ -630,7 +632,7 @@ class ProviderFactory:
 
     @classmethod
     def create(
-        cls, name: str, api_key: str | None = None, base_url: str | None = None, **kwargs
+        cls, name: str, api_key: str | None = None, base_url: str | None = None, **kwargs: Any
     ) -> BaseProvider:
         """إنشاء مزود"""
         provider_class = cls._providers.get(name.lower())
@@ -639,7 +641,8 @@ class ProviderFactory:
                 provider_name=name, available_providers=list(cls._providers.keys())
             )
 
-        return provider_class(api_key=api_key, base_url=base_url, **kwargs)
+        provider: BaseProvider = provider_class(api_key=api_key, base_url=base_url, **kwargs)
+        return provider
 
     @classmethod
     def list_providers(cls) -> list[str]:
@@ -652,10 +655,10 @@ class ProviderFactory:
 # =============================================================================
 
 
-def register_provider(name: str):
+def register_provider(name: str) -> Callable[[type], type]:
     """مُزخرف لتسجيل مزود"""
 
-    def decorator(cls):
+    def decorator(cls: type) -> type:
         ProviderFactory.register(name, cls)
         return cls
 
