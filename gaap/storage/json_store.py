@@ -68,7 +68,7 @@ class JSONStore:
         """Get item by ID"""
         data = self.load(name, [])
         for item in data:
-            if item.get("id") == item_id:
+            if isinstance(item, dict) and item.get("id") == item_id:
                 return item
         return None
 
@@ -127,24 +127,26 @@ def get_store() -> JSONStore:
 def save_history(
     role: str,
     content: str,
-    provider: str = None,
-    model: str = None,
-    tokens: int = None,
-    cost: float = None,
+    provider: str | None = None,
+    model: str | None = None,
+    tokens: int | None = None,
+    cost: float | None = None,
 ) -> str:
     """Save a message to history"""
     store = get_store()
-    return store.append(
-        "history",
-        {
-            "role": role,
-            "content": content,
-            "provider": provider,
-            "model": model,
-            "tokens": tokens,
-            "cost": cost,
-        },
-    )
+    item: dict[str, Any] = {
+        "role": role,
+        "content": content,
+    }
+    if provider is not None:
+        item["provider"] = provider
+    if model is not None:
+        item["model"] = model
+    if tokens is not None:
+        item["tokens"] = tokens
+    if cost is not None:
+        item["cost"] = cost
+    return store.append("history", item)
 
 
 def load_history(limit: int = 100) -> list[dict[str, Any]]:
@@ -173,7 +175,8 @@ def save_config(key: str, value: Any) -> None:
 def load_config() -> dict[str, Any]:
     """Load all config"""
     store = get_store()
-    return store.load("config", {})
+    config = store.load("config", {})
+    return config if isinstance(config, dict) else {}
 
 
 def get_config(key: str, default: Any = None) -> Any:
@@ -183,14 +186,14 @@ def get_config(key: str, default: Any = None) -> Any:
 
 
 def save_stats(
-    requests: int = None,
-    tokens: int = None,
-    cost: float = None,
-    errors: int = None,
+    requests: int | None = None,
+    tokens: int | None = None,
+    cost: float | None = None,
+    errors: int | None = None,
 ) -> None:
     """Update statistics"""
     store = get_store()
-    stats = store.load(
+    loaded = store.load(
         "stats",
         {
             "total_requests": 0,
@@ -202,19 +205,22 @@ def save_stats(
             "daily": {},
         },
     )
+    stats: dict[str, Any] = loaded if isinstance(loaded, dict) else {}
 
     if requests:
-        stats["total_requests"] += requests
+        stats["total_requests"] = stats.get("total_requests", 0) + requests
     if tokens:
-        stats["total_tokens"] += tokens
+        stats["total_tokens"] = stats.get("total_tokens", 0) + tokens
     if cost:
-        stats["total_cost"] += cost
+        stats["total_cost"] = stats.get("total_cost", 0.0) + cost
     if errors:
-        stats["total_errors"] += errors
+        stats["total_errors"] = stats.get("total_errors", 0) + errors
 
     today = datetime.now().strftime("%Y-%m-%d")
-    if today not in stats["daily"]:
-        stats["daily"][today] = {"requests": 0, "tokens": 0, "cost": 0.0}
+    daily = stats.get("daily", {})
+    if today not in daily:
+        daily[today] = {"requests": 0, "tokens": 0, "cost": 0.0}
+    stats["daily"] = daily
 
     if requests:
         stats["daily"][today]["requests"] += requests
@@ -229,7 +235,7 @@ def save_stats(
 def load_stats() -> dict[str, Any]:
     """Load statistics"""
     store = get_store()
-    return store.load(
+    loaded = store.load(
         "stats",
         {
             "total_requests": 0,
@@ -241,6 +247,7 @@ def load_stats() -> dict[str, Any]:
             "daily": {},
         },
     )
+    return loaded if isinstance(loaded, dict) else {}
 
 
 def record_request(
