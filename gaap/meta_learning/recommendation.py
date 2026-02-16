@@ -19,7 +19,7 @@ class Recommendation:
 class RecommendationEngine:
     """محرك التوصيات - يولد توصيات بناءً على التحليل"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._recommendations: list[Recommendation] = []
 
     def generate_recommendations(
@@ -44,7 +44,7 @@ class RecommendationEngine:
         self, patterns: list[Any], analyses: dict[str, Any]
     ) -> list[Recommendation]:
         """توصيات المزودين"""
-        recs = []
+        recs: list[Recommendation] = []
 
         if not hasattr(patterns, "__iter__"):
             return recs
@@ -194,7 +194,7 @@ class RecommendationEngine:
 
     def _error_recommendations(self, analyses: dict[str, Any]) -> list[Recommendation]:
         """توصيات معالجة الأخطاء"""
-        recs = []
+        recs: list[Recommendation] = []
         stats = analyses.get("statistics", {})
         failure_patterns = stats.get("failure_patterns", {})
 

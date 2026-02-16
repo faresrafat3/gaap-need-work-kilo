@@ -29,7 +29,7 @@ class PatternExtractor:
 
     def analyze_tasks(self, task_history: list[dict[str, Any]]) -> list[Pattern]:
         """تحليل تاريخ المهام واستخراج الأنماط"""
-        patterns_found = []
+        patterns_found: list[Pattern] = []
 
         for task in task_history:
             task_type = task.get("type", "unknown")

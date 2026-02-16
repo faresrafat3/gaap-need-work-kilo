@@ -50,23 +50,24 @@ class ExperienceAnalyzer:
 
     def analyze_outcomes(self, history: list[dict[str, Any]]) -> dict[str, Any]:
         """تحليل جميع النتائج"""
-        analyses = {
-            "successes": [],
-            "failures": [],
-            "statistics": {},
-        }
+        successes: list[SuccessAnalysis] = []
+        failures: list[FailureAnalysis] = []
 
         for task in history:
             outcome = self._analyze_single_outcome(task)
             self._outcomes.append(outcome)
 
             if outcome.success:
-                analyses["successes"].append(self._analyze_success(outcome))
+                successes.append(self._analyze_success(outcome))
             else:
-                analyses["failures"].append(self._analyze_failure(outcome))
+                failures.append(self._analyze_failure(outcome))
 
-        analyses["statistics"] = self._calculate_statistics()
-        analyses["lessons"] = self._extract_lessons()
+        analyses: dict[str, Any] = {
+            "successes": successes,
+            "failures": failures,
+            "statistics": self._calculate_statistics(),
+            "lessons": self._extract_lessons(),
+        }
 
         return analyses
 
@@ -225,7 +226,7 @@ class ExperienceAnalyzer:
 
     def _extract_lessons(self) -> list[str]:
         """استخراج دروس عامة من جميع النتائج"""
-        lessons = []
+        lessons: list[str] = []
 
         if not self._outcomes:
             return lessons

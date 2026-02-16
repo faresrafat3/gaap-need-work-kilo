@@ -170,7 +170,7 @@ class ProcedureLearner:
 
     def _get_task_type_counts(self) -> dict[str, int]:
         """عدد الإجراءات لكل نوع مهمة"""
-        counts = {}
+        counts: dict[str, int] = {}
         for proc in self._procedures.values():
             counts[proc.task_type] = counts.get(proc.task_type, 0) + 1
         return counts
