@@ -238,7 +238,9 @@ class ModelNotFoundError(ProviderError):
 
     error_code = "GAAP_PRV_007"
 
-    def __init__(self, model_name: str, provider_name: str, available_models: list[str], **kwargs: Any) -> None:
+    def __init__(
+        self, model_name: str, provider_name: str, available_models: list[str], **kwargs: Any
+    ) -> None:
         super().__init__(
             message=f"Model '{model_name}' not found in provider '{provider_name}'",
             details={
@@ -256,7 +258,9 @@ class ProviderResponseError(ProviderError):
 
     error_code = "GAAP_PRV_008"
 
-    def __init__(self, provider_name: str, status_code: int, response_body: str, **kwargs: Any) -> None:
+    def __init__(
+        self, provider_name: str, status_code: int, response_body: str, **kwargs: Any
+    ) -> None:
         super().__init__(
             message=f"Provider '{provider_name}' returned error {status_code}",
             details={
@@ -417,8 +421,8 @@ class TaskExecutionError(TaskError):
     error_code = "GAAP_TSK_006"
 
     def __init__(
-        self, task_id: str, error_message: str, healing_level: str | None = None, **kwargs
-    ):
+        self, task_id: str, error_message: str, healing_level: str | None = None, **kwargs: Any
+    ) -> None:
         suggestions = ["Retry the task"]
         if healing_level:
             suggestions.append(f"Self-healing attempted at level: {healing_level}")
@@ -755,7 +759,10 @@ class PluginExecutionError(PluginError):
 
 
 def wrap_exception(
-    original: Exception, gaap_exception_class: type, message: str | None = None, **kwargs
+    original: Exception,
+    gaap_exception_class: type[GAAPException],
+    message: str | None = None,
+    **kwargs: Any,
 ) -> GAAPException:
     """
     تغليف استثناء عادي في استثناء GAAP
