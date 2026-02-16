@@ -17,9 +17,9 @@ from gaap.layers.layer1_strategic import ArchitectureSpec, Layer1Strategic
 from gaap.layers.layer2_tactical import AtomicTask, Layer2Tactical, TaskCategory, TaskGraph
 from gaap.layers.layer3_execution import ExecutionResult, Layer3Execution
 from gaap.memory.hierarchical import HierarchicalMemory
+from gaap.providers.base_provider import BaseProvider
 from gaap.providers.free_tier import GeminiProvider, GroqProvider
 from gaap.providers.unified_gaap_provider import UnifiedGAAPProvider
-from gaap.providers.base_provider import BaseProvider
 from gaap.routing.fallback import FallbackManager
 from gaap.routing.router import RoutingStrategy, SmartRouter
 from gaap.security.firewall import AuditTrail, PromptFirewall

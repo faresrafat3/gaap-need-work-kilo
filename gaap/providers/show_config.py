@@ -6,8 +6,6 @@ Shows clean, filtered configuration for all providers
 Only primary models kept for production use
 """
 
-from typing import Any
-
 from gaap.providers.multi_provider_config import (
     FAILED_PROVIDERS,
     WORKING_PROVIDERS,

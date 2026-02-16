@@ -3,7 +3,7 @@ import asyncio
 import json
 import os
 import time
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Any
 

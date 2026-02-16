@@ -2,8 +2,6 @@ import hashlib
 import logging
 from typing import Any
 
-from typing import Any, Union
-
 from gaap.cache.disk_cache import DiskCache
 from gaap.cache.memory_cache import MemoryCache
 
@@ -21,7 +19,7 @@ class ResponseCache:
         self.backend_name = backend
 
         if backend == "disk":
-            self._cache: Union[DiskCache, MemoryCache] = DiskCache(
+            self._cache: DiskCache | MemoryCache = DiskCache(
                 storage_path=storage_path,
                 ttl_seconds=ttl_seconds,
                 max_size=max_size,

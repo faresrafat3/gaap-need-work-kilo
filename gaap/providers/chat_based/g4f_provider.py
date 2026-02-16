@@ -3,7 +3,7 @@ import asyncio
 
 # استيراد من المسار النسبي
 import time
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator
 from typing import Any
 
 from gaap.core.exceptions import (
