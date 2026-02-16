@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 # Layer 2: Tactical Layer
 import json
 import logging

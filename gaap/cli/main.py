@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 # CLI Main
 import argparse
 import asyncio

@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 # Context Orchestrator
 import logging
 import os

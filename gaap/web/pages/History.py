@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 """
 History Page - View Conversation History
 """

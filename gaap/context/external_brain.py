@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 # External Brain
 import hashlib
 import json

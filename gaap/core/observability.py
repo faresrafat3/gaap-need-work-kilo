@@ -7,7 +7,6 @@ Provides comprehensive observability for the GAAP system:
 - Automatic instrumentation helpers
 """
 
-# mypy: ignore-errors
 
 import asyncio
 import time

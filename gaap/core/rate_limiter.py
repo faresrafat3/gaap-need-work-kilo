@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 """
 Advanced Rate Limiting Module
 

@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 # Hierarchical Context Layer
 import logging
 import os
@@ -94,7 +93,7 @@ class HierarchicalContextLoader:
         ContextLevel.LEVEL_4_DEPENDENCIES: 100000,
     }
 
-    def __init__(self, project_path: str):
+    def __init__(self, project_path: str) -> None:
         self.project_path = project_path
         self._logger = logging.getLogger("gaap.context.hcl")
 
@@ -187,7 +186,7 @@ class HierarchicalContextLoader:
             name=os.path.basename(self.project_path),
             level=ContextLevel.LEVEL_0_OVERVIEW,
             content=overview,
-            token_count=len(overview.split()) * 1.5,
+            token_count=int(len(overview.split()) * 1.5),
             children=[f"module:{m}" for m in modules],
         )
 
@@ -228,7 +227,7 @@ class HierarchicalContextLoader:
             name="Modules",
             level=ContextLevel.LEVEL_1_MODULE,
             content=modules_content,
-            token_count=len(modules_content.split()) * 1.5,
+            token_count=int(len(modules_content.split()) * 1.5),
         )
 
         return node
@@ -275,7 +274,7 @@ class HierarchicalContextLoader:
             name=module_name,
             level=level,
             content=content,
-            token_count=len(content.split()) * 1.5,
+            token_count=int(len(content.split()) * 1.5),
             children=children,
         )
 
@@ -308,7 +307,7 @@ class HierarchicalContextLoader:
             name=os.path.basename(file_path),
             level=level,
             content=content,
-            token_count=len(content.split()) * 1.5,
+            token_count=int(len(content.split()) * 1.5),
             file_path=file_path,
         )
 
@@ -392,7 +391,7 @@ class HierarchicalContextLoader:
             exports=components[:10],
             main_components=components[:20],
             line_count=len(lines),
-            estimated_tokens=len(content.split()) * 1.5,
+            estimated_tokens=int(len(content.split()) * 1.5),
         )
 
     def _summarize_javascript(self, path: str, content: str) -> FileSummary:
@@ -434,7 +433,7 @@ class HierarchicalContextLoader:
             exports=exports[:10],
             main_components=components[:20],
             line_count=len(lines),
-            estimated_tokens=len(content.split()) * 1.5,
+            estimated_tokens=int(len(content.split()) * 1.5),
         )
 
     def _summarize_generic(self, path: str, content: str) -> FileSummary:
@@ -450,7 +449,7 @@ class HierarchicalContextLoader:
             exports=[],
             main_components=[],
             line_count=len(lines),
-            estimated_tokens=len(content.split()) * 1.5,
+            estimated_tokens=int(len(content.split()) * 1.5),
         )
 
     def _build_file_summary_content(self, summary: FileSummary) -> str:

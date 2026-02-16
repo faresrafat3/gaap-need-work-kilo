@@ -1,10 +1,6 @@
 # AGENTS.md - GAAP Development Guide
 
-> **Documentation:** See `docs/` folder for detailed guides.
-> - Architecture: `docs/ARCHITECTURE.md`
-> - API Reference: `docs/API_REFERENCE.md`
-> - Providers: `docs/PROVIDERS.md`
-> - Development: `docs/DEVELOPMENT.md`
+> **Docs:** `docs/ARCHITECTURE.md` | `docs/API_REFERENCE.md` | `docs/PROVIDERS.md` | `docs/DEVELOPMENT.md`
 
 ## Build/Lint/Test Commands
 
@@ -17,38 +13,35 @@ pip install streamlit pandas plotly
 
 ### Testing
 ```bash
-pytest                          # All tests
-pytest tests/unit/ -v           # Unit tests only
-pytest tests/integration/ -v    # Integration tests
-pytest -k "provider" -v         # Tests matching pattern
+pytest                              # All tests
+pytest tests/unit/ -v               # Unit tests only
+pytest tests/integration/ -v        # Integration tests
+pytest -k "provider" -v             # Tests matching pattern
+pytest -x                           # Stop on first failure
+pytest --lf                         # Last failed tests only
+pytest -m "not slow"                # Skip slow tests
 pytest --cov=gaap --cov-report=term-missing
 
-# Single test file
-pytest tests/unit/test_router.py -v
-
-# Single test function
+# Single test
 pytest tests/unit/test_router.py::test_route_selection -v
-
-# Single test class
-pytest tests/unit/test_healing.py::TestSelfHealing -v
 ```
 
 ### Linting & Formatting
 ```bash
-black gaap/ tests/              # Format code
-isort gaap/ tests/              # Sort imports
-ruff check gaap/ tests/ --fix   # Lint with auto-fix
-mypy gaap/                      # Type check
-make check                      # Run all checks
+black gaap/ tests/                  # Format code
+isort gaap/ tests/                  # Sort imports
+ruff check gaap/ tests/ --fix       # Lint with auto-fix
+mypy gaap/ --ignore-missing-imports # Type check
+make check                          # Run all checks (format + lint + typecheck + test)
 ```
 
 ### CLI & Web
 ```bash
-gaap --help                     # CLI help
-gaap chat "Hello"               # Quick chat
-gaap interactive                # Interactive mode
-gaap web                        # Start web UI
-gaap doctor                     # Run diagnostics
+gaap --help                         # CLI help
+gaap chat "Hello"                   # Quick chat
+gaap interactive                    # Interactive mode
+gaap web                            # Start web UI
+gaap doctor                         # Run diagnostics
 ```
 
 ## Project Structure
@@ -56,7 +49,7 @@ gaap doctor                     # Run diagnostics
 gaap/
 ├── core/           # Types, base classes, config, exceptions
 ├── layers/         # 4-layer architecture (L0-L3)
-├── providers/      # LLM providers (Groq, Cerebras, Gemini, G4F, WebChat)
+├── providers/      # LLM providers (Groq, Gemini, G4F, WebChat)
 ├── routing/        # Smart routing & fallback
 ├── security/       # 7-layer prompt firewall
 ├── healing/        # Self-healing (5 levels)
@@ -65,32 +58,22 @@ gaap/
 ├── cli/            # CLI commands
 ├── web/            # Streamlit web UI
 ├── api/            # FastAPI REST API
-└── tools/          # Built-in tools (calculator, web search, etc.)
+└── tools/          # Built-in tools
 
 tests/
-├── unit/           # Unit tests (172+ tests)
+├── unit/           # Unit tests
 ├── integration/    # Integration tests
 └── benchmarks/     # Performance benchmarks
-
-docs/
-├── ARCHITECTURE.md   # Full architecture guide
-├── API_REFERENCE.md  # API documentation
-├── PROVIDERS.md      # Provider setup guide
-├── CLI_GUIDE.md      # CLI commands reference
-├── DEVELOPMENT.md    # Development guide
-├── DEPLOYMENT.md     # Deployment guide
-├── SECURITY.md       # Security guide
-└── examples/         # Code examples
 ```
 
 ## Code Style
 
-### Imports (isort profile: black)
+### Imports (isort profile: black, line-length: 100)
 ```python
 # Standard library
 import asyncio
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 # Third-party
 from aiohttp import ClientSession
@@ -100,40 +83,27 @@ from gaap.core.types import Task, TaskResult
 from gaap.core.exceptions import GAAPException
 ```
 
-### Naming
+### Naming Conventions
 - **Classes**: PascalCase (`BaseProvider`, `TaskResult`)
 - **Functions/Methods**: snake_case (`chat_completion`, `get_stats`)
 - **Constants**: SCREAMING_SNAKE_CASE (`MAX_RETRIES`, `MODEL_COSTS`)
 - **Private**: underscore prefix (`_logger`, `_memory`)
 - **Type variables**: single letter (`T`, `R`)
 
-### Types & Dataclasses
+### Types (mypy strict mode)
 ```python
-from dataclasses import dataclass, field
-from typing import Dict, Optional, Any
-from enum import Enum, auto
-
 @dataclass
 class TaskResult:
     success: bool
     output: Any
-    error: Optional[str] = None
-    metrics: Dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    metrics: dict[str, Any] = field(default_factory=dict)
 
-class TaskPriority(Enum):
-    CRITICAL = auto()
-    HIGH = auto()
-    NORMAL = auto()
-```
+def process(self, request: Request) -> Response:
+    ...
 
-### Async Patterns
-```python
-async def process(self, request: Request) -> Response:
-    async with asyncio.timeout(self.timeout):
-        result = await self._execute(request)
-    return result
-
-results = await asyncio.gather(*tasks, return_exceptions=True)
+async def fetch(self) -> AsyncIterator[str]:
+    ...
 ```
 
 ### Error Handling
@@ -151,18 +121,12 @@ except ProviderRateLimitError as e:
 
 ### Logging
 ```python
-import logging
 logger = logging.getLogger("gaap.provider.groq")
-logger.debug(f"Processing with model {model}")
-logger.info(f"Provider initialized")
-logger.warning(f"Rate limit: {current}/{limit}")
-logger.error(f"Request failed: {error}")
+logger.info(f"Processing with model {model}")
 ```
 
 ### Testing
 ```python
-import pytest
-
 @pytest.mark.asyncio
 async def test_provider(mock_provider):
     result = await mock_provider.chat_completion(
@@ -170,16 +134,6 @@ async def test_provider(mock_provider):
         model="llama-3.3-70b"
     )
     assert result.success
-```
-
-## Environment
-
-Create `.gaap_env` file:
-```bash
-GROQ_API_KEY=gsk_...
-GEMINI_API_KEY=...
-MISTRAL_API_KEY=...
-CEREBRAS_API_KEY=...
 ```
 
 ## Architecture
@@ -191,10 +145,41 @@ CEREBRAS_API_KEY=...
 | L2 | Tactical | Task decomposition, DAG |
 | L3 | Execution | Task execution, quality check |
 
+## Environment
+
+Create `.gaap_env` file:
+```bash
+GROQ_API_KEY=gsk_...
+GEMINI_API_KEY=...
+MISTRAL_API_KEY=...
+CEREBRAS_API_KEY=...
+```
+
 ## Before Committing
 
-1. `black gaap/ tests/` - Format
-2. `isort gaap/ tests/` - Sort imports
-3. `ruff check gaap/ tests/` - Lint
-4. `pytest` - All tests pass
-5. Never commit secrets/API keys
+1. `make check` - Run all checks (recommended)
+2. Or manually: `black gaap/ tests/` → `isort gaap/ tests/` → `ruff check gaap/ tests/` → `pytest`
+3. Never commit secrets/API keys
+
+---
+
+## Kilo Knowledge System
+
+> نظام التوثيق المعرفي - يتعلم Kilo من كل جلسة
+
+### Commands
+| Command | Description |
+|---------|-------------|
+| `/compact` | حفظ المعرفة وتنظيف السياق |
+| `/knowledge add` | إضافة درس/حل جديد |
+| `/knowledge search <query>` | بحث في المعرفة |
+| `/wisdom` | أهم الدروس المستفادة |
+
+### Key Lessons
+1. **لا تستخدم `# mypy: ignore-errors`** - حل سطحي يخفي المشكلة
+2. **تحويل صريح**: `int(len(x) * 1.5)` وليس `len(x) * 1.5`
+3. **إضافة return type**: `def foo() -> None:` لكل دالة
+
+### Storage
+- `~/.kilo/knowledge/` - معرفة عامة
+- `.kilo/` - معرفة المشروع

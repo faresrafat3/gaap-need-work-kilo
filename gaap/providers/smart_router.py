@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 """
 Smart Multi-Provider Router
 ===========================

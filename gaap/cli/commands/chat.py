@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 """
 Chat Commands
 """

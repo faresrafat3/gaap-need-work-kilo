@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 """
 Config Page - Manage Configuration
 """

@@ -8,7 +8,6 @@ Provides unified logging configuration with:
 - Correlation IDs for request tracing
 """
 
-# mypy: ignore-errors
 
 import logging
 import os

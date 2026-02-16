@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 # Smart Chunking
 import ast
 import hashlib
@@ -83,10 +82,14 @@ class SmartChunker:
     MAX_CHUNK_TOKENS = 2000
     MIN_CHUNK_TOKENS = 50
 
-    def __init__(self, project_path: str):
+    def __init__(self, project_path: str) -> None:
         self.project_path = project_path
         self._logger = logging.getLogger("gaap.context.chunker")
         self._chunk_cache: dict[str, list[CodeChunk]] = {}
+
+    def _estimate_tokens(self, text: str) -> int:
+        """تقدير عدد الرموز من النص"""
+        return int(len(text.split()) * 1.5)
 
     # =========================================================================
     # Chunking Methods
@@ -144,7 +147,7 @@ class SmartChunker:
                         chunk_type=ChunkType.MODULE_DOC,
                         name="module_docstring",
                         content=module_doc,
-                        token_count=len(module_doc.split()) * 1.5,
+                        token_count=self._estimate_tokens(module_doc),
                         file_path=file_path,
                         start_line=1,
                         end_line=module_doc.count("\n") + 1,
@@ -165,7 +168,7 @@ class SmartChunker:
                         chunk_type=ChunkType.IMPORTS,
                         name="imports",
                         content=import_content,
-                        token_count=len(import_content.split()) * 1.5,
+                        token_count=self._estimate_tokens(import_content),
                         file_path=file_path,
                     )
                 )
@@ -213,7 +216,7 @@ class SmartChunker:
         content = "\n".join(lines[start_line - 1 : end_line])
 
         # إذا كانت الفئة كبيرة، تقسيمها
-        token_count = len(content.split()) * 1.5
+        token_count = self._estimate_tokens(content)
 
         if token_count <= max_chunk_size:
             # فئة كاملة
@@ -246,7 +249,7 @@ class SmartChunker:
                     chunk_type=ChunkType.INTERFACE,
                     name=f"{node.name}_interface",
                     content=interface_content,
-                    token_count=len(interface_content.split()) * 1.5,
+                    token_count=self._estimate_tokens(interface_content),
                     file_path=file_path,
                     start_line=start_line,
                     signature=signature,
@@ -267,7 +270,7 @@ class SmartChunker:
         return chunks
 
     def _extract_function_chunk(
-        self, node, file_path: str, lines: list[str], class_name: str = None
+        self, node: Any, file_path: str, lines: list[str], class_name: str | None = None
     ) -> CodeChunk | None:
         """استخراج قطعة دالة"""
         start_line = node.lineno
@@ -301,7 +304,7 @@ class SmartChunker:
             chunk_type=chunk_type,
             name=name,
             content=content,
-            token_count=len(content.split()) * 1.5,
+            token_count=self._estimate_tokens(content),
             file_path=file_path,
             start_line=start_line,
             end_line=end_line,
@@ -311,7 +314,7 @@ class SmartChunker:
             importance=self._calculate_importance(node, content),
         )
 
-    def _calculate_importance(self, node, content: str) -> float:
+    def _calculate_importance(self, node: Any, content: str) -> float:
         """حساب أهمية الدالة"""
         importance = 0.5
 
@@ -351,7 +354,7 @@ class SmartChunker:
                     chunk_type=ChunkType.IMPORTS,
                     name="imports",
                     content=import_content,
-                    token_count=len(import_content.split()) * 1.5,
+                    token_count=self._estimate_tokens(import_content),
                     file_path=file_path,
                 )
             )
@@ -385,7 +388,7 @@ class SmartChunker:
                     chunk_type=ChunkType.CLASS,
                     name=class_name,
                     content=class_content,
-                    token_count=len(class_content.split()) * 1.5,
+                    token_count=self._estimate_tokens(class_content),
                     file_path=file_path,
                     start_line=content[:start].count("\n") + 1,
                     end_line=content[:end].count("\n") + 1,
@@ -424,7 +427,7 @@ class SmartChunker:
                     chunk_type=ChunkType.FUNCTION,
                     name=func_name,
                     content=func_content,
-                    token_count=len(func_content.split()) * 1.5,
+                    token_count=self._estimate_tokens(func_content),
                     file_path=file_path,
                     start_line=content[:start].count("\n") + 1,
                     end_line=content[:end].count("\n") + 1,
@@ -438,7 +441,7 @@ class SmartChunker:
         """تقسيم عام للملفات"""
         chunks: list[CodeChunk] = []
         lines = content.split("\n")
-        total_tokens = len(content.split()) * 1.5
+        total_tokens = self._estimate_tokens(content)
 
         if total_tokens <= max_chunk_size:
             # ملف كامل
@@ -456,12 +459,12 @@ class SmartChunker:
             )
         else:
             # تقسيم بالأسطر
-            chunk_lines = []
-            current_tokens = 0
+            chunk_lines: list[str] = []
+            current_tokens: int = 0
             start_line = 1
 
             for i, line in enumerate(lines, 1):
-                line_tokens = len(line.split()) * 1.5
+                line_tokens = self._estimate_tokens(line)
 
                 if current_tokens + line_tokens > max_chunk_size and chunk_lines:
                     # حفظ القطعة الحالية
@@ -521,7 +524,7 @@ class SmartChunker:
         scored: list[tuple] = []
 
         for chunk in chunks:
-            score = 0
+            score: float = 0
 
             # تطابق الاسم
             if query_lower in chunk.name.lower():
@@ -540,7 +543,7 @@ class SmartChunker:
                 score += 2
 
             # تعديل بالأهمية
-            score *= chunk.importance
+            score = score * chunk.importance
 
             if score > 0:
                 scored.append((chunk, score))
@@ -557,7 +560,9 @@ class SmartChunker:
                 name=c.name,
                 content=c.signature
                 + ('\n    """' + c.docstring[:200] + '"""' if c.docstring else ""),
-                token_count=len((c.signature + c.docstring[:200]).split()) * 1.5,
+                token_count=self._estimate_tokens(
+                    c.signature + (c.docstring[:200] if c.docstring else "")
+                ),
                 file_path=c.file_path,
                 signature=c.signature,
                 interfaces=c.interfaces,

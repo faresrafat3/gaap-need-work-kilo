@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 """
 Unified Provider - Primary + Fallback Chain
 =============================================

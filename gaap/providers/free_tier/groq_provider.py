@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 # Groq Provider
 import asyncio
 import json

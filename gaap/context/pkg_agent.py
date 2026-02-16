@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 # Package Agent
 import ast
 import logging

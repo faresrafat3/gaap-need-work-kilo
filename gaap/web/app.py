@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 """
 GAAP Web UI - Main Dashboard
 

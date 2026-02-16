@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 # Layer 3: Execution Layer
 import asyncio
 import logging

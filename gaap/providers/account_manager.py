@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 """
 Smart Account Manager — Multi-Account Pool with Proactive Monitoring
 =====================================================================

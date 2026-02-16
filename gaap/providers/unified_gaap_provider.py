@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 import asyncio
 import time
 from collections.abc import AsyncGenerator

@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 # G4F Provider
 import asyncio
 
