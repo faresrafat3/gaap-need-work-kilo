@@ -19,7 +19,9 @@ from gaap.core.types import (
     TaskResult,
     TaskType,
 )
+from gaap.core.world_model import Action, WorldModel
 from gaap.layers.layer1_strategic import ArchitectureSpec
+from gaap.memory import VECTOR_MEMORY_AVAILABLE
 
 # =============================================================================
 # Logger Setup
@@ -455,6 +457,11 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         self._llm_decompositions = 0
         self._fallback_decompositions = 0
 
+        if VECTOR_MEMORY_AVAILABLE:
+            self._world_model = WorldModel(provider=provider)
+        else:
+            self._world_model = None
+
     async def decompose(self, spec: ArchitectureSpec, goals: list[str]) -> list[AtomicTask]:
         """
         تفكيك المواصفات لمهام ذرية
@@ -483,7 +490,52 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
             spec, original_text, intent_type, explicit_goals
         )
         self._fallback_decompositions += 1
+
+        # التفكير قبل التنفيذ: تحليل المخاطر
+        if self._world_model:
+            tasks = await self._think_before_act(tasks)
+
         return tasks
+
+    async def _think_before_act(self, tasks: list["AtomicTask"]) -> list["AtomicTask"]:
+        """استخدام World Model للتنبؤ بالمخاطر قبل التنفيذ"""
+        if not self._world_model:
+            return tasks
+
+        safe_tasks = []
+        for task in tasks:
+            action = Action(
+                name=task.name,
+                description=task.description,
+                task_type=task.task_type if hasattr(task, "task_type") else "general",
+                is_destructive=self._is_destructive_task(task),
+            )
+            try:
+                prediction = await self._world_model.predict_outcome(action)
+                task.metadata["risk_level"] = prediction.risk_level
+                task.metadata["success_probability"] = prediction.success_probability
+
+                if prediction.risk_level > 0.8:
+                    self._logger.warning(
+                        f"Task '{task.name}' has high risk ({prediction.risk_level:.0%}): "
+                        f"{prediction.potential_issues[0] if prediction.potential_issues else 'unknown'}"
+                    )
+                    if prediction.suggestions:
+                        task.metadata["safety_suggestions"] = prediction.suggestions
+
+                safe_tasks.append(task)
+            except Exception as e:
+                self._logger.debug(f"World model prediction failed for {task.name}: {e}")
+                safe_tasks.append(task)
+
+        return safe_tasks
+
+    def _is_destructive_task(self, task: "AtomicTask") -> bool:
+        """تحديد إذا كانت المهمة مدمرة"""
+        destructive_keywords = ["delete", "remove", "drop", "truncate", "destroy", "wipe"]
+        name_lower = task.name.lower()
+        desc_lower = task.description.lower()
+        return any(kw in name_lower or kw in desc_lower for kw in destructive_keywords)
 
     async def _llm_decompose(
         self, spec: ArchitectureSpec, original_text: str, intent_type: str, goals: list[str]
