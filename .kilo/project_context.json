@@ -1,25 +1,35 @@
 {
-  "name": "GAAP",
-  "type": "llm_orchestration",
+  "name": "GAAP (Generative Agentic Architecture Platform) - Evolution 2026",
+  "type": "autonomous_cognitive_system",
+  "status": "active_evolution",
   "language": "python",
-  "frameworks": ["asyncio", "aiohttp", "dataclasses", "pytest"],
+  "frameworks": ["asyncio", "pydantic", "chromadb", "networkx", "docker"],
   "test_framework": "pytest",
   "coding_style": {
-    "comments_language": "arabic",
+    "comments_language": "arabic_english_mix",
     "type_hints": true,
-    "async_preferred": true
+    "async_preferred": true,
+    "docstring_format": "google",
+    "strict_typing": true
   },
   "architecture": {
-    "layers": ["L0_Interface", "L1_Strategic", "L2_Tactical", "L3_Execution"],
-    "providers": ["Groq", "Gemini", "G4F", "WebChat"],
-    "memory_tiers": 4
+    "paradigm": "OODA Loop (Observe-Orient-Decide-Act)",
+    "layers": {
+      "L0": "Interface & Security Firewall",
+      "L1": "Strategic (Graph of Thoughts)",
+      "L2": "Tactical (Rolling Wave Planning)",
+      "L3": "Execution (Zero-Trust Sandbox)"
+    },
+    "memory": "Hybrid MemoRAG (Vector + Graph)",
+    "healing": "Reflexion-based Self-Correction"
   },
-  "known_issues": [
-    {
-      "issue": "mypy errors in providers",
-      "status": "partially_fixed",
-      "notes": "بعض الملفات تحتاج إصلاح إضافي"
-    }
+  "strategic_directives": [
+    "READ docs/evolution_plan_2026/MASTER_ROADMAP.md FIRST",
+    "ENFORCE docs/evolution_plan_2026/16_AXIOMATIC_CORE.md ALWAYS",
+    "NEVER execute code outside the Sandbox",
+    "ALWAYS search for existing tools before writing new ones"
   ],
-  "created_at": "2026-02-16"
+  "roadmap_location": "docs/evolution_plan_2026/",
+  "sota_references": "docs/evolution_plan_2026/20_SOTA_RESEARCH_HUB.md",
+  "last_audit": "2026-02-17"
 }
