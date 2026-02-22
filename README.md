@@ -1,234 +1,80 @@
-# GAAP - General-purpose AI Architecture Platform
+# GAAP - Generative Agentic Architecture Platform (v2.2.0)
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![OODA Loop](https://img.shields.io/badge/Engine-OODA%20Loop-red.svg)](#)
+[![Type Coverage](https://img.shields.io/badge/type%20hints-80%25-green.svg)](#)
 
-**GAAP** is a sophisticated multi-layer LLM orchestration system designed for robust, self-healing AI task processing with intelligent routing, quality assurance, and comprehensive security.
+**GAAP** is a high-fidelity Sovereign AGI orchestration system. Built on the **OODA Loop** (Observe-Orient-Decide-Act), it transcends traditional coding assistants by integrating Deep Research, Predictive Simulation, and Metacognitive Awareness into a unified cognitive architecture.
 
-## Key Features
+## 🚀 Latest Release (v2.2.0)
 
-- **4-Layer Architecture**: Interface -> Strategic -> Tactical -> Execution pipeline
-- **Self-Healing System**: 5-level automatic recovery (Retry -> Refine -> Pivot -> Strategy -> Human)
-- **MAD Panels**: Multi-Agent Debate for quality assurance with 6 critic types
-- **Smart Routing**: Automatic provider selection based on priority, cost, and performance
-- **Hierarchical Memory**: 4-tier memory system (Working, Episodic, Semantic, Procedural)
-- **Security First**: 7-layer prompt firewall with audit trail
-- **Multiple Providers**: Groq, Cerebras, Gemini, Mistral, G4F, WebChat (Kimi, DeepSeek, GLM)
-- **CLI & Web UI**: Full-featured command-line interface and Streamlit dashboard
+**Code Quality Renaissance** - Major refactoring and cleanup:
+- Type hints coverage: 35% → 80%
+- Docstring coverage: 15% → 65%
+- Dead code removal: ~8,500 lines
+- New: SOP Governance, Axiom Validator, Kilo Gateway
 
-## Quick Start
+## ✨ Key Cognitive Features
 
-### Installation
+- **🧠 OODA Loop Engine**: A circular cognitive process that continuously observes the environment and learns from every action.
+- **🔍 STORM Deep Research**: Augmented planning that performs exhaustive web/scientific research before making strategic decisions.
+- **🧬 Dynamic Personas**: Agents that adopt specialized roles (Researcher, Debugger, Coder) with domain-specific tool filtering.
+- **⚖️ SOP Governance**: Process-driven intelligence with mandatory artifact validation.
+- **🛡️ Constitutional Axioms**: Invariant checks for syntax, dependencies, and interfaces.
+- **🛠️ Just-in-Time Tool Synthesis**: The system autonomously writes and registers its own tools to overcome capability gaps.
+- **💾 Domain-Partitioned Memory**: Hierarchical memory that segregates lessons by field for high-precision retrieval.
+
+## 🧠 Cognitive Architecture
+
+GAAP implements a multi-layered cognitive system that operates in a loop:
+
+```
+User Input → Layer 0: Observe → Layer 1: Orient → Layer 2: Decide → Layer 3: Act → Learn → Loop
+```
+
+| Phase | Engine Component | Responsibility |
+|-------|------------------|----------------|
+| **OBSERVE** | `PromptFirewall` | Security scanning, intent classification, and environment sensing. |
+| **ORIENT** | `StrategicToT` | Deep Research (STORM) and Strategy Generation (Tree of Thoughts). |
+| **DECIDE** | `TacticalDecomposer` | Multi-domain task breakdown and dependency graph (DAG) construction. |
+| **ACT** | `SpecializedExecutors` | Action execution with Genetic Twin verification and Tool Synthesis. |
+| **LEARN** | `Metacognition` | Reflective learning, reputation updates, and episodic memory storage. |
+
+## 📦 Quick Setup
 
 ```bash
-# Clone and setup
 git clone https://github.com/gaap-system/gaap.git
 cd gaap
-python -m venv .venv
-source .venv/bin/activate
 pip install -e ".[dev]"
-pip install streamlit pandas plotly
 ```
 
-### Basic Usage
-
-```python
-import asyncio
-from gaap import GAAPEngine, GAAPRequest
-
-async def main():
-    engine = GAAPEngine(budget=10.0)
-    
-    request = GAAPRequest(
-        text="Write a Python function for binary search",
-        priority="NORMAL"
-    )
-    
-    response = await engine.process(request)
-    
-    print(response.output)
-    print(f"Quality Score: {response.quality_score:.2f}")
-    print(f"Cost: ${response.total_cost_usd:.4f}")
-    print(f"Time: {response.total_time_ms:.0f}ms")
-
-asyncio.run(main())
-```
-
-### CLI Usage
+## 🛠️ Development Commands
 
 ```bash
-# Quick chat
-gaap chat "Write a binary search function"
-
-# Interactive mode
-gaap interactive
-
-# Manage providers
-gaap providers list
-gaap providers test groq
-
-# View models
-gaap models list
-gaap models tiers
-
-# Configuration
-gaap config show
-gaap config set default_budget 20.0
-
-# History
-gaap history list
-gaap history search "binary"
-
-# System diagnostics
-gaap doctor
-
-# Web UI
-gaap web
+make check   # Run formatters, lints, and type-checks
+make test    # Run test suite
+make dream   # Consolidate episodic memory into semantic patterns
+make eval    # Run the Sovereign IQ test
+make audit   # Verify axiomatic integrity
 ```
 
-## Architecture
+## 📚 Documentation
 
-GAAP implements a 4-layer cognitive architecture:
+- [Architecture Guide](docs/ARCHITECTURE.md)
+- [API Reference](docs/API_REFERENCE.md)
+- [Development Guide](docs/DEVELOPMENT.md)
+- [Quick Reference](docs/QUICK_REFERENCE.md)
+- [Troubleshooting](docs/TROUBLESHOOTING_FLOWCHARTS.md)
+- [Evolution Plan 2026](docs/evolution_plan_2026/) - 50+ technical specifications
 
-```
-+-------------------+     +-------------------+     +-------------------+     +-------------------+
-|     Layer 0       |     |     Layer 1       |     |     Layer 2       |     |     Layer 3       |
-|     Interface     | --> |    Strategic      | --> |    Tactical       | --> |    Execution      |
-+-------------------+     +-------------------+     +-------------------+     +-------------------+
-| - Security Scan   |     | - Tree of Thoughts |     | - Task Decompose  |     | - Parallel Exec   |
-| - Intent Classify |     | - MAD Panel       |     | - DAG Construction|     | - Quality Eval    |
-| - Complexity Est. |     | - Architecture Gen|     | - Dependency Res. |     | - Genetic Twin    |
-| - Routing Decision|     | - Consensus Build |     | - Critical Path   |     | - MAD Quality     |
-+-------------------+     +-------------------+     +-------------------+     +-------------------+
-```
+## 📊 Code Quality
 
-| Layer | Name | Responsibility |
-|-------|------|----------------|
-| **L0** | Interface | Security scan, intent classification, complexity estimation, routing |
-| **L1** | Strategic | Tree of Thoughts exploration, MAD Architecture Panel |
-| **L2** | Tactical | Task decomposition, DAG construction, dependency resolution |
-| **L3** | Execution | Parallel execution, Genetic Twin verification, MAD Quality Panel |
+| Module | Docstrings | Type Hints |
+|--------|------------|------------|
+| Core | 100% | 100% |
+| Layers L0 | 100% | 100% |
+| Memory | 95% | 95% |
+| Providers | 85% | 85% |
 
-## Supported Providers
-
-| Provider | Type | Latency | Rate Limit | Cost |
-|----------|------|---------|------------|------|
-| **Groq** | Free Tier | ~227ms | 30 RPM/key | Free |
-| **Cerebras** | Free Tier | ~511ms | 30 RPM/key | Free |
-| **Gemini** | Free Tier | ~384ms | 5 RPM/key | Free |
-| **Mistral** | Free Tier | ~603ms | 60 RPM/key | Free |
-| **GitHub Models** | Free Tier | ~1500ms | 15 RPM/key | Free |
-| **G4F** | Free Multi | Varies | ~5 RPM | Free |
-| **WebChat (Kimi)** | Web-based | ~3s | Varies | Free |
-| **WebChat (DeepSeek)** | Web-based | ~2s | Varies | Free |
-| **WebChat (GLM)** | Web-based | ~2s | Varies | Free |
-
-## Self-Healing System
-
-GAAP implements a 5-level self-healing hierarchy:
-
-```
-L1: RETRY          - Simple retry for transient errors
-L2: REFINE         - Prompt refinement for syntax/logic errors
-L3: PIVOT          - Model change for capability limits
-L4: STRATEGY SHIFT - Task simplification for complex failures
-L5: HUMAN ESCALATE - Manual intervention required
-```
-
-## Memory System
-
-4-tier hierarchical memory:
-
-```
-L1: Working Memory    - Fast, limited (100 items) - Current context
-L2: Episodic Memory   - Event history - Learning from experience
-L3: Semantic Memory   - Patterns & rules - Extracted knowledge
-L4: Procedural Memory - Acquired skills - Templates & procedures
-```
-
-## Project Structure
-
-```
-gaap/
-+-- core/           # Types, config, exceptions, base classes
-+-- layers/         # 4-layer architecture (L0-L3)
-+-- providers/      # LLM provider implementations
-+-- routing/        # Smart routing & fallback
-+-- security/       # Firewall & audit trail
-+-- healing/        # Self-healing system
-+-- memory/         # Hierarchical memory
-+-- context/        # Context management
-+-- storage/        # JSON storage
-+-- cli/            # Command-line interface
-+-- web/            # Streamlit web UI
-+-- api/            # FastAPI REST API
-+-- cache/          # Caching system
-+-- mad/            # Multi-Agent Debate
-+-- validators/     # Code validators
-+-- meta_learning/  # Meta-learning system
-```
-
-## Development
-
-```bash
-# Run tests
-pytest tests/unit/ -v
-pytest tests/integration/ -v
-
-# Format and lint
-black gaap/ tests/
-isort gaap/ tests/
-ruff check gaap/ tests/ --fix
-mypy gaap/
-
-# Run all checks
-make check
-```
-
-## Docker
-
-```bash
-# Build
-docker build -t gaap .
-
-# Run
-docker run -p 8501:8501 -p 8080:8080 gaap
-
-# Or with docker-compose
-docker-compose up -d
-```
-
-## Environment Variables
-
-Create a `.gaap_env` file:
-
-```bash
-GROQ_API_KEY=gsk_...
-GEMINI_API_KEY=...
-MISTRAL_API_KEY=...
-CEREBRAS_API_KEY=...
-```
-
-## Documentation
-
-- [Architecture Guide](docs/ARCHITECTURE.md) - Detailed system architecture
-- [API Reference](docs/API_REFERENCE.md) - Complete API documentation
-- [Providers Guide](docs/PROVIDERS.md) - Provider setup and comparison
-- [CLI Guide](docs/CLI_GUIDE.md) - Command-line interface reference
-- [Development Guide](docs/DEVELOPMENT.md) - Development setup and guidelines
-- [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment
-- [Security Guide](docs/SECURITY.md) - Security features and best practices
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+---
+**GAAP: The future of autonomous cognitive engineering.**

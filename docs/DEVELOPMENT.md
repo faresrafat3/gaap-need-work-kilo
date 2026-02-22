@@ -516,9 +516,144 @@ git commit --no-verify
 
 ---
 
+## Code Quality Standards
+
+### Type Hints
+
+All new code must include type hints. Target: 80%+ coverage.
+
+```python
+# ✅ Good
+async def process(
+    request: GAAPRequest,
+    timeout: float = 30.0,
+) -> GAAPResponse | None:
+    ...
+
+# ❌ Bad
+async def process(request, timeout=30.0):
+    ...
+```
+
+### Error Handling
+
+Never use silent exception handling. Always log or propagate.
+
+```python
+# ✅ Good: Specific exceptions with logging
+try:
+    result = await api.call()
+except RateLimitError as e:
+    logger.warning(f"Rate limited: {e}")
+    return await retry_with_backoff()
+except APIError as e:
+    logger.error(f"API error: {e}")
+    raise
+
+# ❌ Bad: Silent catch-all
+try:
+    result = await api.call()
+except Exception:
+    pass
+```
+
+### Nesting
+
+Maximum nesting level: 5. Extract helper functions for complex logic.
+
+```python
+# ✅ Good: Extracted helper
+async def process_request(request: Request) -> Result:
+    if not request.valid:
+        return Result.error("Invalid request")
+    
+    validated = self._validate_request(request)
+    return self._execute(validated)
+
+def _validate_request(self, request: Request) -> ValidatedRequest:
+    ...
+
+def _execute(self, request: ValidatedRequest) -> Result:
+    ...
+
+# ❌ Bad: Deep nesting
+async def process_request(request):
+    if request:
+        if request.valid:
+            if request.data:
+                for item in request.data:
+                    if item:
+                        # 5+ levels deep!
+                        ...
+```
+
+### Constants
+
+Define constants at module level, not inline magic numbers.
+
+```python
+# ✅ Good
+MAX_RETRIES: Final[int] = 3
+DEFAULT_TIMEOUT: Final[float] = 30.0
+MEMORY_LIMIT_MB: Final[int] = int(os.getenv("GAAP_MEMORY_LIMIT_MB", "4000"))
+
+# ❌ Bad
+if memory > 4000:  # Magic number
+    ...
+```
+
+### Docstrings
+
+Use Google-style docstrings with Args, Returns, Raises, and Example.
+
+```python
+async def process_task(
+    task: Task,
+    provider: BaseProvider,
+    timeout: float = 30.0,
+) -> TaskResult:
+    """
+    Process a single task using the specified provider.
+    
+    Args:
+        task: The task to process.
+        provider: The LLM provider to use.
+        timeout: Maximum execution time in seconds.
+    
+    Returns:
+        TaskResult containing the output and metrics.
+    
+    Raises:
+        TaskTimeoutError: If execution exceeds timeout.
+        ProviderError: If provider fails.
+    
+    Example:
+        >>> task = Task(description="Write hello world")
+        >>> result = await process_task(task, provider)
+        >>> print(result.output)
+        print("Hello, World!")
+    """
+```
+
+### Quality Checklist
+
+Before submitting a PR, ensure:
+
+- [ ] All functions have type hints
+- [ ] All public functions have docstrings
+- [ ] No `except Exception: pass` patterns
+- [ ] Nesting level ≤ 5
+- [ ] No magic numbers (use constants)
+- [ ] Tests pass: `pytest tests/`
+- [ ] Linting passes: `ruff check gaap/`
+- [ ] Type check passes: `mypy gaap/`
+
+---
+
 ## Resources
 
 - [Architecture Guide](ARCHITECTURE.md)
 - [API Reference](API_REFERENCE.md)
 - [Contributing Guide](../CONTRIBUTING.md)
-- [Examples](examples/)
+- [Examples](../examples/)
+- [Evolution Plan 2026](evolution_plan_2026/)

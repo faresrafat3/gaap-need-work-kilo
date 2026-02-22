@@ -18,33 +18,45 @@ This document provides a comprehensive overview of GAAP's architecture, includin
 
 ## Overview
 
-GAAP implements a **4-layer cognitive architecture** inspired by how humans approach complex problems:
+GAAP implements a **Sovereign Cognitive Architecture** based on the **OODA Loop** (Observe-Orient-Decide-Act), designed for autonomous problem-solving across multiple domains (Research, Diagnostics, and Software Engineering).
 
+```mermaid
+graph TD
+    User([User Input]) --> L0[Layer 0: Observe]
+    
+    subgraph OODA_Loop [The Sovereign Cycle]
+        L0 --> Firewall[7-Layer Prompt Firewall]
+        Firewall --> Intent[Intent & Complexity Analysis]
+        
+        Intent --> L1[Layer 1: Orient]
+        L1 --> DeepResearch[STORM Deep Research Engine]
+        DeepResearch --> StratTree[Dynamic ToT / MCTS Strategy]
+        
+        StratTree --> L2[Layer 2: Decide]
+        L2 --> TaskDecomp[Adaptive Task Decomposition]
+        TaskDecomp --> TaskGraph[Dynamic DAG Construction]
+        
+        TaskGraph --> L3[Layer 3: Act]
+        L3 --> MetaCog[Metacognition & Confidence Check]
+        MetaCog --> Execution[Specialized Persona Execution]
+        Execution --> ToolSynth[Just-in-Time Tool Synthesis]
+        
+        L3 --> Quality[MAD Quality Panel - Specialized Critics]
+        Quality --> Learn[Layer 4: Learn]
+        Learn --> EpisodicMemory[Categorized Memory Storage]
+        EpisodicMemory --> L0
+    end
+    
+    Learn --> Final([Final Output])
 ```
-User Input
-    |
-    v
-+-------------------+     +-------------------+     +-------------------+     +-------------------+
-|     Layer 0       |     |     Layer 1       |     |     Layer 2       |     |     Layer 3       |
-|     Interface     | --> |    Strategic      | --> |    Tactical       | --> |    Execution      |
-+-------------------+     +-------------------+     +-------------------+     +-------------------+
-| Security Scan     |     | Tree of Thoughts  |     | Task Decompose    |     | Parallel Exec     |
-| Intent Classify   |     | MAD Panel         |     | DAG Construction  |     | Quality Eval      |
-| Complexity Est.   |     | Architecture Gen  |     | Dependency Res.   |     | Genetic Twin      |
-| Routing Decision  |     | Consensus Build   |     | Critical Path     |     | MAD Quality       |
-+-------------------+     +-------------------+     +-------------------+     +-------------------+
-    |                         |                         |                         |
-    v                         v                         v                         v
-StructuredIntent        ArchitectureSpec            TaskGraph               ExecutionResult
-```
 
-### Key Principles
+### Core Evolution Principles (v2.1 Sovereign)
 
-1. **Progressive Refinement**: Each layer adds more detail and structure
-2. **Intelligent Routing**: Simple tasks bypass complex layers
-3. **Quality Assurance**: Multiple checkpoints throughout the pipeline
-4. **Self-Healing**: Automatic recovery at every stage
-5. **Security First**: Early threat detection and blocking
+1. **Contextual Adaptation**: Strategies, tasks, and agents adapt dynamically to the intent (Research vs. Coding).
+2. **Predictive Simulation**: Actions are rehearsed in the GhostFS Holodeck before actual execution.
+3. **Recursive Growth**: The system synthesizes its own tools when faced with capability gaps.
+4. **Metacognitive Doubt**: Agents monitor their own confidence levels and thoughts in real-time.
+5. **Domain-Specific Memory**: Experiences are partitioned by domain to ensure relevant retrieval.
 
 ---
 
