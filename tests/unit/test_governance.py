@@ -5,6 +5,7 @@ Tests: SOPStore, SOPGatekeeper, RoleDefinition, SOPExecution
 
 import tempfile
 from pathlib import Path
+from unittest.mock import Mock, AsyncMock
 
 import pytest
 
@@ -438,3 +439,233 @@ class TestArtifactValidation:
         result = sop_gatekeeper.validate_artifact("task_001", "cvss_score", "")
 
         assert result is False
+
+
+class TestSOPExecutionMixin:
+    """Tests for SOPExecutionMixin"""
+
+    def test_detect_role_from_task_type(self):
+        """Test detecting role from task type"""
+        from gaap.layers.sop_mixin import SOPExecutionMixin
+        from gaap.core.types import TaskType
+
+        class MockExecutor(SOPExecutionMixin):
+            pass
+
+        executor = MockExecutor()
+        executor._init_sop(sop_enabled=True)
+
+        task = Mock()
+        task.type = TaskType.CODE_GENERATION
+
+        role = executor._detect_role(task)
+        assert role == "coder"
+
+    def test_detect_role_from_name(self):
+        """Test detecting role from task name"""
+        from gaap.layers.sop_mixin import SOPExecutionMixin
+
+        class MockExecutor(SOPExecutionMixin):
+            pass
+
+        executor = MockExecutor()
+        executor._init_sop(sop_enabled=True)
+
+        task = Mock()
+        task.name = "Security review for authentication"
+        task.description = ""
+
+        role = executor._detect_role(task)
+        assert role == "critic"
+
+    def test_start_and_end_sop_tracking(self):
+        """Test starting and ending SOP tracking"""
+        from gaap.layers.sop_mixin import SOPExecutionMixin
+
+        class MockExecutor(SOPExecutionMixin):
+            pass
+
+        executor = MockExecutor()
+        executor._init_sop(sop_enabled=True)
+
+        task = Mock()
+        task.id = "test_task"
+        task.type = None
+        task.name = "Write code"
+        task.description = ""
+
+        execution = executor._start_sop_tracking(task)
+        assert execution is not None
+        assert execution.task_id == "test_task"
+
+        summary = executor._end_sop_tracking()
+        assert summary["sop_enabled"] is True
+
+    def test_complete_step_tracking(self):
+        """Test completing SOP step"""
+        from gaap.layers.sop_mixin import SOPExecutionMixin
+
+        class MockExecutor(SOPExecutionMixin):
+            pass
+
+        executor = MockExecutor()
+        executor._init_sop(sop_enabled=True)
+
+        task = Mock()
+        task.id = "test_task"
+        task.type = None
+        task.name = "Write code"
+        task.description = ""
+
+        executor._start_sop_tracking(task)
+        executor._complete_step(1, "Requirements analyzed")
+
+        pending = executor._get_pending_steps()
+        assert all(s.step_id != 1 for s in pending)
+
+    def test_skip_step_triggers_reflexion(self):
+        """Test skipping step triggers reflexion"""
+        from gaap.layers.sop_mixin import SOPExecutionMixin
+
+        class MockExecutor(SOPExecutionMixin):
+            pass
+
+        executor = MockExecutor()
+        executor._init_sop(sop_enabled=True)
+
+        task = Mock()
+        task.id = "test_task"
+        task.type = None
+        task.name = "Write code"
+        task.description = ""
+
+        executor._start_sop_tracking(task)
+        executor._skip_step(1, "Not applicable for this task")
+
+        assert executor._requires_reflexion() is True
+        prompt = executor._get_reflexion_prompt()
+        assert prompt is not None
+        assert "Not applicable" in prompt
+
+    def test_artifact_registration(self):
+        """Test artifact registration"""
+        from gaap.layers.sop_mixin import SOPExecutionMixin
+
+        class MockExecutor(SOPExecutionMixin):
+            pass
+
+        executor = MockExecutor()
+        executor._init_sop(sop_enabled=True)
+
+        task = Mock()
+        task.id = "test_task"
+        task.type = None
+        task.name = "Write code"
+        task.description = ""
+
+        executor._start_sop_tracking(task)
+        result = executor._register_artifact("source_code", "def foo(): pass")
+
+        assert result is True
+
+    def test_sop_completion_validation(self):
+        """Test SOP completion validation"""
+        from gaap.layers.sop_mixin import SOPExecutionMixin
+
+        class MockExecutor(SOPExecutionMixin):
+            pass
+
+        executor = MockExecutor()
+        executor._init_sop(sop_enabled=True)
+
+        task = Mock()
+        task.id = "test_task"
+        task.type = None
+        task.name = "Write code"
+        task.description = ""
+
+        executor._start_sop_tracking(task)
+
+        status = executor._validate_sop_completion()
+        assert status["complete"] is False
+
+
+class TestSOPIntegration:
+    """Tests for SOP integration with Layer3"""
+
+    @pytest.fixture
+    def mock_router(self):
+        """Create mock router"""
+        router = Mock()
+        router.route = AsyncMock(return_value=Mock())
+        return router
+
+    @pytest.fixture
+    def mock_fallback(self):
+        """Create mock fallback"""
+        return Mock()
+
+    def test_layer3_with_sop_enabled(self, mock_router, mock_fallback):
+        """Test Layer3 with SOP enabled"""
+        from gaap.layers.layer3_execution import Layer3Execution
+
+        layer = Layer3Execution(
+            router=mock_router,
+            fallback=mock_fallback,
+            enable_sop=True,
+        )
+
+        assert layer._sop_enabled is True
+
+    def test_layer3_with_sop_disabled(self, mock_router, mock_fallback):
+        """Test Layer3 with SOP disabled"""
+        from gaap.layers.layer3_execution import Layer3Execution
+
+        layer = Layer3Execution(
+            router=mock_router,
+            fallback=mock_fallback,
+            enable_sop=False,
+        )
+
+        assert layer._sop_enabled is False
+
+    def test_layer3_detects_role(self, mock_router, mock_fallback):
+        """Test Layer3 detects role from task"""
+        from gaap.layers.layer3_execution import Layer3Execution
+        from gaap.core.types import TaskType
+
+        layer = Layer3Execution(
+            router=mock_router,
+            fallback=mock_fallback,
+            enable_sop=True,
+        )
+
+        task = Mock()
+        task.id = "test"
+        task.type = TaskType.RESEARCH
+
+        role = layer._detect_role(task)
+        assert role == "researcher"
+
+    def test_sop_summary_in_result(self, mock_router, mock_fallback):
+        """Test SOP summary is included in result"""
+        from gaap.layers.layer3_execution import Layer3Execution
+
+        layer = Layer3Execution(
+            router=mock_router,
+            fallback=mock_fallback,
+            enable_sop=True,
+        )
+
+        task = Mock()
+        task.id = "test_task"
+        task.type = None
+        task.name = "Write code"
+        task.description = "Test"
+        task.priority = None
+
+        layer._start_sop_tracking(task)
+        summary = layer._get_sop_summary()
+
+        assert "sop_enabled" in summary
+        assert summary["role"] == "Code Generator"

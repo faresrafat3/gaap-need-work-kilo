@@ -34,6 +34,7 @@ from gaap.providers.base_provider import BaseProvider
 from gaap.routing.fallback import FallbackManager
 from gaap.routing.router import SmartRouter
 from gaap.tools.synthesizer import ToolSynthesizer  # Autonomous Tool Growth
+from gaap.layers.sop_mixin import SOPExecutionMixin  # SOP Governance
 
 
 # =============================================================================
@@ -806,7 +807,25 @@ class QualityPipeline:
         self.twin_system = twin_system
         self._logger = get_logger("gaap.layer3.quality")
 
+        self._artifacts: dict[str, Any] = {}
         self._validation_count = 0
+
+    def register_artifact(self, name: str, content: Any) -> None:
+        """Register an artifact for SOP validation"""
+        self._artifacts[name] = content
+        self._logger.debug(f"Registered artifact: {name}")
+
+    def get_artifact(self, name: str) -> Any | None:
+        """Get a registered artifact"""
+        return self._artifacts.get(name)
+
+    def get_all_artifacts(self) -> dict[str, Any]:
+        """Get all registered artifacts"""
+        return self._artifacts.copy()
+
+    def clear_artifacts(self) -> None:
+        """Clear all registered artifacts"""
+        self._artifacts.clear()
 
     async def process(
         self, artifact: Any, task: AtomicTask, is_critical: bool = False
@@ -829,7 +848,7 @@ class QualityPipeline:
 # =============================================================================
 
 
-class Layer3Execution(BaseLayer):
+class Layer3Execution(BaseLayer, SOPExecutionMixin):
     """
     طبقة التنفيذ والجودة
 
@@ -850,8 +869,11 @@ class Layer3Execution(BaseLayer):
         provider: BaseProvider | None = None,
         enable_vector_memory: bool = True,
         enable_preflight: bool = True,
+        enable_sop: bool = True,
     ):
         super().__init__(LayerType.EXECUTION)
+
+        self._init_sop(sop_enabled=enable_sop)
 
         self.max_parallel = max_parallel
         self.executor_pool = ExecutorPool(router, fallback, max_parallel)
@@ -893,6 +915,9 @@ class Layer3Execution(BaseLayer):
             raise ValueError("Expected AtomicTask")
 
         self._logger.info(f"Executing task {task.id}: {task.name}")
+
+        # Start SOP tracking
+        self._start_sop_tracking(task)
 
         # Pre-flight check for code tasks (Existing logic)
         code_match = None
@@ -957,6 +982,9 @@ class Layer3Execution(BaseLayer):
 
             self._artifacts_produced += 1
 
+            # Register artifact for SOP validation
+            self._register_artifact("source_code", artifact)
+
             if self._lesson_store:
                 await self._learn_from_execution(task, result, evaluations)
 
@@ -985,6 +1013,25 @@ class Layer3Execution(BaseLayer):
                     or getattr(new_tool.module, "execute", None),
                 )
                 return await self.process(task)  # Recursive retry with new capability
+
+        # SOP completion validation
+        if result.success and self._sop_enabled:
+            sop_result = self._validate_sop_completion(task.id)
+            if not sop_result["complete"]:
+                self._logger.warning(
+                    f"SOP incomplete for {task.id}: {sop_result.get('reason', 'unknown')}"
+                )
+                result.metadata["sop_status"] = sop_result
+
+            # Handle reflexion if required
+            if self._requires_reflexion():
+                reflexion_prompt = self._get_reflexion_prompt()
+                if reflexion_prompt:
+                    result.metadata["reflexion_required"] = True
+                    result.metadata["reflexion_prompt"] = reflexion_prompt
+                    self._logger.info(f"Reflexion triggered for task {task.id}")
+
+            result.metadata["sop_summary"] = self._get_sop_summary()
 
         return result
 
@@ -1085,7 +1132,7 @@ def run(**kwargs):
                     )
                 )
             else:
-                final_results.append(result)  # type: ignore[arg-type]
+                final_results.append(result)  # type: ignore[arg-type]  # type: ignore[arg-type]
 
         return final_results
 
