@@ -57,7 +57,6 @@ def engine(mock_provider, mock_firewall):
     engine = GAAPEngine(
         providers=[mock_provider],
         budget=100.0,
-        enable_context=False,
         enable_healing=False,
         enable_memory=False,
         enable_security=False,

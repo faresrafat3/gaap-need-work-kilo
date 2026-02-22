@@ -1,4 +1,25 @@
-# Core Base Classes
+"""
+Core Base Classes for GAAP System
+
+Provides foundational base classes for all GAAP components:
+
+Classes:
+    - BaseComponent: Base class for all components
+    - BaseAgent: Base class for all agents
+    - BaseLayer: Base class for all layers
+    - BaseProvider: Base class for all providers
+
+Usage:
+    from gaap.core.base import BaseComponent, BaseAgent
+
+    class MyComponent(BaseComponent):
+        def initialize(self) -> None:
+            self._is_initialized = True
+
+        def shutdown(self) -> None:
+            pass
+"""
+
 import asyncio
 import logging
 import time
@@ -11,7 +32,9 @@ from typing import (
     Any,
     Generic,
     Optional,
+    ParamSpec,
     TypeVar,
+    cast,
 )
 
 from .exceptions import (
@@ -41,11 +64,20 @@ from .types import (
 )
 
 # =============================================================================
+# Constants
+# =============================================================================
+
+DEFAULT_LOG_LEVEL = "INFO"
+COMPONENT_ID_LENGTH = 8  # Length of truncated component ID in repr
+
+
+# =============================================================================
 # Type Variables
 # =============================================================================
 
 T = TypeVar("T")
 R = TypeVar("R")
+P = ParamSpec("P")
 
 
 # =============================================================================
@@ -53,14 +85,30 @@ R = TypeVar("R")
 # =============================================================================
 
 
-def setup_logger(name: str, level: str = "INFO") -> logging.Logger:
-    """إعداد المسجل"""
+def setup_logger(name: str, level: str = DEFAULT_LOG_LEVEL) -> logging.Logger:
+    """
+    Set up a logger with standard configuration.
+
+    Args:
+        name: Logger name (typically module or component name)
+        level: Logging level (default: INFO)
+
+    Returns:
+        Configured logger instance with stream handler
+
+    Example:
+        >>> logger = setup_logger("gaap.my_component")
+        >>> logger.info("Component initialized")
+    """
     logger = logging.getLogger(name)
     logger.setLevel(getattr(logging, level.upper()))
 
     if not logger.handlers:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
@@ -74,13 +122,33 @@ def setup_logger(name: str, level: str = "INFO") -> logging.Logger:
 
 class BaseComponent(ABC):
     """
-    الفئة الأساسية لجميع مكونات GAAP
+    Abstract base class for all GAAP components.
 
-    توفر:
-    - معرف فريد
-    - تسجيل موحد
-    - إدارة دورة الحياة
-    - مقاييس الأداء
+    Provides foundational functionality for all components including:
+    - Unique component ID
+    - Unified logging
+    - Lifecycle management (initialize/shutdown)
+    - Performance metrics tracking
+
+    Attributes:
+        id: Unique component identifier (UUID)
+        name: Component name
+        layer: Component layer in the architecture
+        created_at: Component creation timestamp
+        _logger: Logger instance for the component
+        _metrics: Dictionary of recorded metrics
+        _is_initialized: Whether component is initialized
+        _is_running: Whether component is currently running
+
+    Usage:
+        >>> class MyComponent(BaseComponent):
+        ...     def initialize(self) -> None:
+        ...         self._is_initialized = True
+        ...
+        ...     def shutdown(self) -> None:
+        ...         pass
+        >>> component = MyComponent(name="my_component")
+        >>> component.initialize()
     """
 
     def __init__(
@@ -88,7 +156,15 @@ class BaseComponent(ABC):
         component_id: str | None = None,
         name: str | None = None,
         layer: LayerType = LayerType.EXECUTION,
-    ):
+    ) -> None:
+        """
+        Initialize base component.
+
+        Args:
+            component_id: Optional custom ID (auto-generated if not provided)
+            name: Optional custom name (class name if not provided)
+            layer: Architecture layer (default: EXECUTION)
+        """
         self.id = component_id or str(uuid.uuid4())
         self.name = name or self.__class__.__name__
         self.layer = layer
@@ -100,33 +176,93 @@ class BaseComponent(ABC):
 
     @abstractmethod
     def initialize(self) -> None:
-        """تهيئة المكون"""
+        """
+        Initialize the component.
+
+        Should be called before using the component.
+        Sets up resources, connections, and state.
+
+        Raises:
+            Exception: If initialization fails
+        """
         pass
 
     @abstractmethod
     def shutdown(self) -> None:
-        """إيقاف المكون"""
+        """
+        Shutdown the component.
+
+        Should be called when component is no longer needed.
+        Cleans up resources and closes connections.
+
+        Raises:
+            Exception: If shutdown fails
+        """
         pass
 
     def record_metric(self, key: str, value: Any) -> None:
-        """تسجيل مقياس"""
+        """
+        Record a metric with timestamp.
+
+        Args:
+            key: Metric name (e.g., "latency_ms", "tokens_used")
+            value: Metric value (any JSON-serializable type)
+
+        Example:
+            >>> component.record_metric("latency_ms", 250.5)
+            >>> component.record_metric("tokens_used", 100)
+        """
         if key not in self._metrics:
             self._metrics[key] = []
-        self._metrics[key].append({"value": value, "timestamp": datetime.now().isoformat()})
+        self._metrics[key].append(
+            {
+                "value": value,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
     def get_metrics(self) -> dict[str, Any]:
-        """الحصول على المقاييس"""
+        """
+        Get all recorded metrics.
+
+        Returns:
+            Dictionary of metric names to lists of (value, timestamp) pairs
+
+        Example:
+            >>> metrics = component.get_metrics()
+            >>> print(metrics["latency_ms"])
+            [{'value': 250.5, 'timestamp': '2026-02-17T10:30:00'}]
+        """
         return self._metrics.copy()
 
     def log(self, level: str, message: str, **kwargs: Any) -> None:
-        """تسجيل رسالة"""
+        """
+        Log a message with component ID prefix.
+
+        Args:
+            level: Log level (debug, info, warning, error, critical)
+            message: Log message string
+            **kwargs: Additional context data to include
+
+        Example:
+            >>> component.log("info", "Task started", task_id="123")
+            >>> component.log("error", "Task failed", error="timeout")
+        """
         log_method = getattr(self._logger, level.lower(), self._logger.info)
-        log_method(f"[{self.id}] {message}", **kwargs)
+        log_method(f"[{self.id}] {message}", extra=kwargs)
 
     def __repr__(self) -> str:
-        return f"<{self.name}(id={self.id[:8]}..., layer={self.layer.name})>"
+        """
+        Get string representation of component.
+
+        Returns:
+            String with component name, ID, and layer
+        """
+        return f"<{self.name}(id={self.id[:COMPONENT_ID_LENGTH]}..., layer={self.layer.name})>"
 
 
+# =============================================================================
+# Base Agent
 # =============================================================================
 # Base Agent
 # =============================================================================
@@ -134,17 +270,52 @@ class BaseComponent(ABC):
 
 class BaseAgent(BaseComponent, Generic[T, R]):
     """
-    الفئة الأساسية لجميع الوكلاء
+    Abstract base class for all GAAP agents.
 
-    توفر:
-    - واجهة موحدة للتنفيذ
-    - إدارة الذاكرة
-    - التعامل مع الأخطاء
-    - التعافي الذاتي
+    Provides unified interface for agent execution with:
+    - Memory management
+    - Context tracking
+    - Error handling
+    - Self-healing capabilities
+    - Checkpoint support
+
+    Attributes:
+        identity: Agent identity configuration
+        capabilities: Agent capabilities
+        _memory: Agent memory storage
+        _context: Current execution context
+        _current_task: Currently executing task
+        _execution_history: History of executed tasks
+
+    Type Parameters:
+        T: Input type for agent operations
+        R: Output type for agent operations
+
+    Usage:
+        >>> class MyAgent(BaseAgent):
+        ...     async def execute(self, task: Task) -> TaskResult:
+        ...         # Implementation here
+        ...         pass
+        >>> agent = MyAgent(identity, capabilities)
     """
 
-    def __init__(self, identity: AgentIdentity, capabilities: AgentCapabilities | None = None):
-        super().__init__(component_id=identity.id, name=identity.name, layer=identity.layer)
+    def __init__(
+        self,
+        identity: AgentIdentity,
+        capabilities: AgentCapabilities | None = None,
+    ) -> None:
+        """
+        Initialize base agent.
+
+        Args:
+            identity: Agent identity with name, ID, and layer
+            capabilities: Optional agent capabilities (uses identity capabilities if not provided)
+        """
+        super().__init__(
+            component_id=identity.id,
+            name=identity.name,
+            layer=identity.layer,
+        )
         self.identity = identity
         self.capabilities = capabilities or identity.capabilities
         self._memory: list[dict[str, Any]] = []
@@ -155,24 +326,40 @@ class BaseAgent(BaseComponent, Generic[T, R]):
     @abstractmethod
     async def execute(self, task: Task) -> TaskResult:
         """
-        تنفيذ مهمة
+        Execute a task asynchronously.
 
         Args:
-            task: المهمة المراد تنفيذها
+            task: Task to execute
 
         Returns:
-            نتيجة المهمة
+            TaskResult with execution outcome
+
+        Raises:
+            TaskError: If task execution fails
+            TaskTimeoutError: If execution times out
         """
         pass
 
     async def validate_task(self, task: Task) -> bool:
-        """التحقق من صلاحية المهمة"""
-        # التحقق من النوع
+        """
+        Validate if agent can handle the task.
+
+        Checks:
+        1. Task type is supported
+        2. Complexity level is manageable
+
+        Args:
+            task: Task to validate
+
+        Returns:
+            True if task can be handled, False otherwise
+        """
+        # Check type
         if task.type not in self._get_supported_task_types():
             self.log("warning", f"Unsupported task type: {task.type}")
             return False
 
-        # التحقق من التعقيد
+        # Check complexity
         if not self._can_handle_complexity(task.complexity):
             self.log("warning", f"Cannot handle complexity: {task.complexity}")
             return False
@@ -180,8 +367,13 @@ class BaseAgent(BaseComponent, Generic[T, R]):
         return True
 
     def _get_supported_task_types(self) -> list[TaskType]:
-        """أنواع المهام المدعومة"""
-        types = []
+        """
+        Get list of supported task types.
+
+        Returns:
+            List of TaskType values based on agent capabilities
+        """
+        types: list[TaskType] = []
         if self.capabilities.code_generation:
             types.append(TaskType.CODE_GENERATION)
         if self.capabilities.code_review:
@@ -199,40 +391,111 @@ class BaseAgent(BaseComponent, Generic[T, R]):
         return types
 
     def _can_handle_complexity(self, complexity: Any) -> bool:
-        """التحقق من القدرة على التعامل مع التعقيد"""
-        return True  # يمكن تجاوزه في الفئات الفرعية
+        """
+        Check if agent can handle given complexity level.
+
+        Args:
+            complexity: Task complexity level
+
+        Returns:
+            True if complexity can be handled (override in subclasses)
+        """
+        return True  # Can be overridden in subclasses
 
     def add_to_memory(self, item: dict[str, Any]) -> None:
-        """إضافة عنصر للذاكرة"""
+        """
+        Add item to agent memory.
+
+        Args:
+            item: Memory item to store (will be timestamped)
+
+        Example:
+            >>> agent.add_to_memory({"event": "task_completed", "task_id": "123"})
+        """
         item["timestamp"] = datetime.now().isoformat()
         item["agent_id"] = self.id
         self._memory.append(item)
 
     def get_memory(self, limit: int = 100) -> list[dict[str, Any]]:
-        """الحصول على الذاكرة"""
+        """
+        Get recent memory items.
+
+        Args:
+            limit: Maximum number of items to return (default: 100)
+
+        Returns:
+            List of most recent memory items
+        """
         return self._memory[-limit:]
 
     def clear_memory(self) -> None:
-        """مسح الذاكرة"""
+        """Clear all agent memory."""
         self._memory.clear()
 
     def set_context(self, key: str, value: Any) -> None:
-        """تعيين قيمة في السياق"""
+        """
+        Set context value.
+
+        Args:
+            key: Context key
+            value: Context value
+
+        Example:
+            >>> agent.set_context("user_id", "123")
+        """
         self._context[key] = value
 
     def get_context(self, key: str, default: Any = None) -> Any:
-        """الحصول على قيمة من السياق"""
+        """
+        Get context value.
+
+        Args:
+            key: Context key to retrieve
+            default: Default value if key not found
+
+        Returns:
+            Context value or default
+        """
         return self._context.get(key, default)
 
-    async def execute_with_timeout(self, task: Task, timeout_seconds: float = 300) -> TaskResult:
-        """تنفيذ مع مهلة زمنية"""
+    async def execute_with_timeout(
+        self,
+        task: Task,
+        timeout_seconds: float = 300,
+    ) -> TaskResult:
+        """
+        Execute task with timeout.
+
+        Args:
+            task: Task to execute
+            timeout_seconds: Maximum execution time in seconds (default: 300)
+
+        Returns:
+            TaskResult with execution outcome
+
+        Raises:
+            TaskTimeoutError: If execution exceeds timeout
+        """
         try:
             return await asyncio.wait_for(self.execute(task), timeout=timeout_seconds)
         except asyncio.TimeoutError:
-            raise TaskTimeoutError(task_id=task.id, timeout_seconds=timeout_seconds)
+            raise TaskTimeoutError(
+                task_id=task.id,
+                timeout_seconds=timeout_seconds,
+            )
 
     def create_checkpoint(self) -> dict[str, Any]:
-        """إنشاء نقطة حفظ"""
+        """
+        Create agent checkpoint for recovery.
+
+        Returns:
+            Dictionary with agent state for recovery
+
+        Example:
+            >>> checkpoint = agent.create_checkpoint()
+            >>> # Later...
+            >>> agent.restore_from_checkpoint(checkpoint)
+        """
         return {
             "agent_id": self.id,
             "timestamp": datetime.now().isoformat(),
@@ -243,10 +506,21 @@ class BaseAgent(BaseComponent, Generic[T, R]):
         }
 
     def restore_from_checkpoint(self, checkpoint: dict[str, Any]) -> None:
-        """استعادة من نقطة حفظ"""
+        """
+        Restore agent state from checkpoint.
+
+        Args:
+            checkpoint: Previously created checkpoint
+
+        Example:
+            >>> agent.restore_from_checkpoint(saved_checkpoint)
+        """
         self._memory = checkpoint.get("memory", []).copy()
         self._context = checkpoint.get("context", {}).copy()
-        self.log("info", f"Restored from checkpoint at {checkpoint.get('timestamp')}")
+        self.log(
+            "info",
+            f"Restored from checkpoint at {checkpoint.get('timestamp')}",
+        )
 
 
 # =============================================================================
@@ -553,7 +827,7 @@ class BaseMemory(BaseComponent):
     """
 
     def __init__(self, max_size: int = 10000):
-        super().__init__(name="Memory", layer=LayerType.META_LEARNING)
+        super().__init__(name="Memory", layer=LayerType.EXECUTION)
         self.max_size = max_size
         self._storage: dict[str, Any] = {}
         self._access_log: list[dict[str, Any]] = []
@@ -752,33 +1026,33 @@ class ExecutionResult(Generic[T]):
 # =============================================================================
 
 
-def measure_time(func: Callable[..., T]) -> Callable[..., T]:
+def measure_time(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
     """مُزخرف لقياس وقت التنفيذ"""
 
-    async def wrapper(*args: Any, **kwargs: Any) -> T:
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
         start = time.time()
         try:
-            result: T = await func(*args, **kwargs)  # type: ignore[misc]
+            result: T = await func(*args, **kwargs)
             return result
         finally:
             elapsed = time.time() - start
-            if hasattr(args[0], "record_metric"):
-                args[0].record_metric(f"{func.__name__}_time", elapsed)
+            if args and hasattr(args[0], "record_metric"):
+                args[0].record_metric(f"{func.__name__}_time", elapsed)  # type: ignore[union-attr]
 
-    return wrapper  # type: ignore[return-value]
+    return wrapper
 
 
 def with_retry(
     max_retries: int = 3, delay: float = 1.0
-) -> Callable[[Callable[..., T]], Callable[..., T]]:
+) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[T]]]:
     """مُزخرف لإعادة المحاولة"""
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
-        async def wrapper(*args: Any, **kwargs: Any) -> T:
+    def decorator(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
+        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             last_error: Exception | None = None
             for attempt in range(max_retries):
                 try:
-                    result: T = await func(*args, **kwargs)  # type: ignore[misc]
+                    result: T = await func(*args, **kwargs)
                     return result
                 except GAAPException as e:
                     last_error = e
@@ -788,24 +1062,24 @@ def with_retry(
                 task_id="unknown", max_retries=max_retries, last_error=str(last_error)
             )
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     return decorator
 
 
 def validate_input(
     validator: Callable[[Any], bool],
-) -> Callable[[Callable[..., T]], Callable[..., T]]:
+) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[T]]]:
     """مُزخرف للتحقق من المدخلات"""
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
-        async def wrapper(*args: Any, **kwargs: Any) -> T:
+    def decorator(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
+        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             if not validator(args[1] if len(args) > 1 else kwargs):
                 raise ValueError("Input validation failed")
-            result: T = await func(*args, **kwargs)  # type: ignore[misc]
+            result: T = await func(*args, **kwargs)
             return result
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     return decorator
 

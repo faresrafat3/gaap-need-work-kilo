@@ -28,15 +28,7 @@ from gaap.memory import VECTOR_MEMORY_AVAILABLE
 # =============================================================================
 
 
-def get_logger(name: str) -> logging.Logger:
-    logger = logging.getLogger(name)
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
-    return logger
+from gaap.core.logging import get_standard_logger as get_logger
 
 
 # =============================================================================
@@ -45,8 +37,9 @@ def get_logger(name: str) -> logging.Logger:
 
 
 class TaskCategory(Enum):
-    """تصنيفات المهام"""
+    """تصنيفات المهام المتعددة التخصصات"""
 
+    # Software Engineering (Existing)
     SETUP = auto()
     DATABASE = auto()
     API = auto()
@@ -56,6 +49,25 @@ class TaskCategory(Enum):
     INTEGRATION = auto()
     SECURITY = auto()
     INFRASTRUCTURE = auto()
+
+    # Research & Intelligence (New)
+    INFORMATION_GATHERING = auto()
+    SOURCE_VERIFICATION = auto()
+    DATA_SYNTHESIS = auto()
+    LITERATURE_REVIEW = auto()
+    COMPETITIVE_ANALYSIS = auto()
+
+    # Diagnostics & Troubleshooting (New)
+    REPRODUCTION = auto()
+    LOG_ANALYSIS = auto()
+    ROOT_CAUSE_ANALYSIS = auto()
+    DIAGNOSTIC_ACTION = auto()
+    MITIGATION = auto()
+
+    # General (New)
+    ANALYSIS = auto()
+    REASONING = auto()
+    PLANNING = auto()
 
 
 class DependencyType(Enum):
@@ -372,6 +384,7 @@ class TacticalDecomposer:
 
     # تعيين الفئات من نص إلى Enum
     CATEGORY_MAP = {
+        # Software Engineering
         "setup": TaskCategory.SETUP,
         "database": TaskCategory.DATABASE,
         "api": TaskCategory.API,
@@ -381,6 +394,19 @@ class TacticalDecomposer:
         "security": TaskCategory.SECURITY,
         "integration": TaskCategory.INTEGRATION,
         "infrastructure": TaskCategory.INFRASTRUCTURE,
+        # Research & Intelligence
+        "information_gathering": TaskCategory.INFORMATION_GATHERING,
+        "source_verification": TaskCategory.SOURCE_VERIFICATION,
+        "data_synthesis": TaskCategory.DATA_SYNTHESIS,
+        "literature_review": TaskCategory.LITERATURE_REVIEW,
+        "competitive_analysis": TaskCategory.COMPETITIVE_ANALYSIS,
+        "analysis": TaskCategory.ANALYSIS,
+        # Diagnostics
+        "reproduction": TaskCategory.REPRODUCTION,
+        "log_analysis": TaskCategory.LOG_ANALYSIS,
+        "root_cause_analysis": TaskCategory.ROOT_CAUSE_ANALYSIS,
+        "diagnostic_action": TaskCategory.DIAGNOSTIC_ACTION,
+        "mitigation": TaskCategory.MITIGATION,
     }
 
     PRIORITY_MAP = {
@@ -406,48 +432,93 @@ class TacticalDecomposer:
         "refactoring": TaskType.REFACTORING,
     }
 
-    # البرومبت الهيكلي لتفكيك المهام
-    DECOMPOSITION_PROMPT = """You are an expert task decomposition system. Your job is to break down a user's request into atomic, actionable subtasks.
+    # القالب المعماري للبرمجة (Software Engineering)
+    ARCH_DECOMP_PROMPT = """You are an expert software engineer. Break down this architecture specification into atomic, actionable coding subtasks.
 
-## Original User Request
+## User Request
 {original_text}
 
 ## Architecture Context
 - Paradigm: {paradigm}
-- Data Strategy: {data_strategy}
-- Communication: {communication}
-- Goals: {goals}
-- Intent Type: {intent_type}
+- Tech Stack: {tech_stack}
+- Components: {components}
 
 ## Instructions
-Break this request into {max_tasks} or fewer atomic subtasks. Each subtask should be:
-1. **Specific** to the actual request (NOT generic templates)
-2. **Actionable** — clear what needs to be done
-3. **Atomic** — can be executed independently or with clear dependencies
-4. Ordered logically with dependencies
+Break this into {max_tasks} or fewer atomic tasks. Focus on:
+1. Building the actual software logic, databases, and APIs.
+2. Clear dependencies between coding steps.
+3. SPECIFIC details about the implementation.
 
-## Output Format
-Return ONLY a valid JSON array. Each element must have these fields:
-```json
-[
-  {{
-    "name": "Short task name (max 60 chars)",
-    "description": "Detailed description of what to implement/do. Be specific about the actual code, logic, or content needed.",
-    "category": "one of: setup|database|api|frontend|testing|documentation|security|integration|infrastructure",
-    "type": "one of: code_generation|code_review|debugging|testing|documentation|analysis|refactoring",
-    "priority": "one of: critical|high|normal|low",
-    "complexity": "one of: simple|moderate|complex",
-    "depends_on": [0],
-    "estimated_minutes": 15
-  }}
-]
-```
+## Output JSON Schema
+Return a JSON array of objects with fields:
+- "name": task name
+- "description": coding details
+- "category": one of: setup|database|api|frontend|testing|security|integration|infrastructure
+- "type": one of: code_generation|refactoring|testing
+- "priority": critical|high|normal|low
+- "complexity": simple|moderate|complex
+- "depends_on": [0] (0-based index)
+- "estimated_minutes": integer
+"""
 
-The `depends_on` field contains 0-based indices of tasks that must complete first. An empty array means no dependencies.
+    # قالب البحث والاستخبارات (Research & Intelligence)
+    RESEARCH_DECOMP_PROMPT = """You are an expert Research Analyst. Break down this research plan into specific investigation steps.
 
-CRITICAL: Tasks must be SPECIFIC to "{original_text}". Do NOT generate generic tasks like "Initialize project" or "Setup linting". Generate tasks that directly address the user's actual request.
+## User Request
+{original_text}
 
-Return ONLY the JSON array, no markdown fences, no explanation."""
+## Research Strategy
+- Methodology: {paradigm} (research methodology)
+- Source Strategy: {data_strategy} (where to look)
+- Verification: {communication} (how to verify)
+
+## Instructions
+Break this into {max_tasks} or fewer atomic investigation tasks. Focus on:
+1. Information gathering from reliable sources.
+2. Synthesizing data and verifying facts.
+3. Analyzing patterns and generating insights.
+DO NOT generate coding tasks unless the research REQUIRES code (e.g., benchmarking).
+
+## Output JSON Schema
+Return a JSON array of objects with fields:
+- "name": task name
+- "description": research details
+- "category": one of: information_gathering|source_verification|data_synthesis|analysis
+- "type": analysis|documentation
+- "priority": critical|high|normal|low
+- "complexity": simple|moderate|complex
+- "depends_on": [0]
+- "estimated_minutes": integer
+"""
+
+    # قالب التشخيص وحل المشكلات (Diagnostics & Troubleshooting)
+    DEBUG_DECOMP_PROMPT = """You are an expert Systems Diagnostic Engineer. Break down this root cause analysis plan into diagnostic steps.
+
+## User Request
+{original_text}
+
+## Diagnostic Strategy
+- Approach: {paradigm}
+- Data Collection: {data_strategy}
+- Isolation Method: {communication}
+
+## Instructions
+Break this into {max_tasks} or fewer atomic diagnostic tasks. Focus on:
+1. Reproducing the issue and collecting logs/traces.
+2. Isolating suspect components and testing hypotheses.
+3. Proposing and verifying a mitigation or fix.
+
+## Output JSON Schema
+Return a JSON array of objects with fields:
+- "name": task name
+- "description": diagnostic details
+- "category": one of: reproduction|log_analysis|root_cause_analysis|diagnostic_action|mitigation
+- "type": debugging|analysis|testing
+- "priority": critical|high|normal|low
+- "complexity": simple|moderate|complex
+- "depends_on": [0]
+- "estimated_minutes": integer
+"""
 
     def __init__(self, max_subtasks: int = 50, provider: Any = None) -> None:
         self.max_subtasks = max_subtasks
@@ -507,7 +578,7 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
             action = Action(
                 name=task.name,
                 description=task.description,
-                task_type=task.task_type if hasattr(task, "task_type") else "general",
+                task_type=getattr(task, "task_type", "general"),
                 is_destructive=self._is_destructive_task(task),
             )
             try:
@@ -541,14 +612,35 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         self, spec: ArchitectureSpec, original_text: str, intent_type: str, goals: list[str]
     ) -> list[AtomicTask] | None:
         """تفكيك باستخدام الـ LLM"""
+        # Select prompt based on intent_type
+        if intent_type in ("RESEARCH", "ANALYSIS", "PLANNING"):
+            prompt_template = self.RESEARCH_DECOMP_PROMPT
+            system_role = "You are an expert Research Analyst. Decompose the research methodology into investigation tasks."
+        elif intent_type in ("DEBUGGING", "CODE_REVIEW", "TESTING"):
+            prompt_template = self.DEBUG_DECOMP_PROMPT
+            system_role = "You are an expert Diagnostic Engineer. Decompose the diagnostic strategy into troubleshooting tasks."
+        else:
+            prompt_template = self.ARCH_DECOMP_PROMPT
+            system_role = "You are an expert Software Engineer. Decompose the architecture spec into coding tasks."
+
         # بناء البرومبت
-        prompt = self.DECOMPOSITION_PROMPT.format(
+        prompt = prompt_template.format(
             original_text=original_text,
-            paradigm=spec.paradigm.value,
-            data_strategy=spec.data_strategy.value,
-            communication=spec.communication.value,
+            paradigm=spec.paradigm.value if hasattr(spec.paradigm, "value") else str(spec.paradigm),
+            data_strategy=spec.data_strategy.value
+            if hasattr(spec.data_strategy, "value")
+            else str(spec.data_strategy),
+            communication=spec.communication.value
+            if hasattr(spec.communication, "value")
+            else str(spec.communication),
+            tech_stack=json.dumps(spec.tech_stack),
+            components=json.dumps(
+                [
+                    {"name": c.get("name", ""), "responsibility": c.get("responsibility", "")}
+                    for c in spec.components
+                ]
+            ),
             goals=", ".join(goals) if goals else "Not specified",
-            intent_type=intent_type,
             max_tasks=self.max_subtasks,
         )
 
@@ -556,7 +648,7 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         messages = [
             Message(
                 role=MessageRole.SYSTEM,
-                content="You are a precise task decomposition engine. Output only valid JSON arrays.",
+                content=system_role,
             ),
             Message(role=MessageRole.USER, content=prompt),
         ]
@@ -614,48 +706,6 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
         except json.JSONDecodeError:
             pass
 
-        bracket_match = re.search(r"\[[\s\S]*\]", cleaned)
-        if bracket_match:
-            try:
-                data = json.loads(bracket_match.group())
-                if isinstance(data, list):
-                    return data
-            except json.JSONDecodeError:
-                pass
-
-        self._logger.error(f"Could not parse LLM response: {cleaned[:200]}...")
-        return None
-
-        # إزالة أي markdown fences
-        cleaned = raw.strip()
-
-        # إزالة thinking tags إذا موجودة
-        thinking_pattern = re.compile(r"<think>.*?</think>", re.DOTALL)
-        cleaned = thinking_pattern.sub("", cleaned).strip()
-
-        # إزالة markdown code fences
-        if cleaned.startswith("```"):
-            # إزالة أول سطر (```json أو ```)
-            lines = cleaned.split("\n")
-            start_idx = 1
-            end_idx = len(lines)
-            for i in range(len(lines) - 1, 0, -1):
-                if lines[i].strip() == "```":
-                    end_idx = i
-                    break
-            cleaned = "\n".join(lines[start_idx:end_idx])
-
-        # محاولة parse مباشرة
-        try:
-            data = json.loads(cleaned)
-            if isinstance(data, list):
-                return data
-            elif isinstance(data, dict) and "tasks" in data:
-                return data["tasks"]
-        except json.JSONDecodeError:
-            pass
-
-        # محاولة استخراج JSON array من النص
         bracket_match = re.search(r"\[[\s\S]*\]", cleaned)
         if bracket_match:
             try:

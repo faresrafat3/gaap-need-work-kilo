@@ -1,51 +1,69 @@
-# Requirements
-# GAAP System - Core Dependencies
-# ================================
+# GAAP - General-purpose AI Architecture Platform
+# Core dependencies (required)
 
-# Core
-typing-extensions>=4.0.0
-dataclasses-json>=0.6.0
+# =============================================================================
+# Core Runtime
+# =============================================================================
+aiohttp>=3.9.0,<4.0.0
+httpx>=0.25.0,<1.0.0
+pydantic>=2.5.0,<3.0.0
+python-dotenv>=1.0.0,<2.0.0
+typing-extensions>=4.0.0,<5.0.0
+dataclasses-json>=0.6.0,<1.0.0
+pyyaml>=6.0,<7.0
+orjson>=3.9.0,<4.0.0
+numpy>=1.24.0,<2.0.0
 
-# HTTP & Networking
-aiohttp>=3.9.0
-httpx>=0.25.0
+# =============================================================================
+# Logging & Observability
+# =============================================================================
+structlog>=23.0.0,<25.0.0
+python-json-logger>=2.0.0,<3.0.0
+opentelemetry-api>=1.20.0,<2.0.0
+opentelemetry-sdk>=1.20.0,<2.0.0
+prometheus-client>=0.19.0,<1.0.0
 
-# Data & Serialization
-pyyaml>=6.0
-orjson>=3.9.0
+# =============================================================================
+# LLM Providers
+# =============================================================================
+openai>=1.10.0,<2.0.0
+google-generativeai>=0.3.0,<1.0.0
+groq>=0.4.0,<1.0.0
+anthropic>=0.8.0,<1.0.0
+curl_cffi>=0.6.0,<1.0.0
+g4f>=0.2.0,<1.0.0
 
-# Logging & Monitoring
-structlog>=23.0.0
-python-json-logger>=2.0.0
+# =============================================================================
+# Vector Memory & Knowledge Graph
+# =============================================================================
+chromadb>=0.4.22,<1.0.0
+sentence-transformers>=2.3.0,<3.0.0
+networkx>=3.2.1,<4.0.0
 
-# Observability (OpenTelemetry & Prometheus)
-opentelemetry-api>=1.20.0
-opentelemetry-sdk>=1.20.0
-opentelemetry-instrumentation-aiohttp-client>=0.41b0
-opentelemetry-exporter-otlp>=1.20.0
-prometheus-client>=0.19.0
+# =============================================================================
+# Security & Sandboxing
+# =============================================================================
+docker>=6.0.0,<8.0.0
+cryptography>=42.0.0,<45.0.0
+z3-solver>=4.12.0,<5.0.0
+icontract>=2.6.0,<3.0.0
 
-# Optional: LLM Providers
-# Uncomment based on your needs
-# openai>=1.0.0
-# anthropic>=0.8.0
-# groq>=0.4.0
+# =============================================================================
+# Formal Verification (Optional)
+# =============================================================================
+# daikon>=3.0.0  # Uncomment if using Daikon integration
 
-# Optional: Free/Chat-based providers
-# g4f>=0.2.0
+# =============================================================================
+# CLI & UX
+# =============================================================================
+rich>=13.7.0,<14.0.0
+typer>=0.9.0,<1.0.0
+streamlit>=1.30.0,<2.0.0
 
-# Optional: Web Framework
-# fastapi>=0.104.0
-# uvicorn>=0.24.0
-
-# Optional: Local Models
-# llama-cpp-python>=0.2.0
-
-# Development
-pytest>=7.0.0
-pytest-asyncio>=0.21.0
-pytest-cov>=4.0.0
-black>=23.0.0
-mypy>=1.0.0
-isort>=5.0.0
-ruff>=0.1.0
+# =============================================================================
+# Web Framework (Optional)
+# =============================================================================
+fastapi>=0.104.0,<1.0.0
+uvicorn>=0.24.0,<1.0.0
+pandas>=2.0.0,<3.0.0
+plotly>=5.18.0,<6.0.0

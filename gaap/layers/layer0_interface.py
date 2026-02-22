@@ -1,3 +1,30 @@
+"""
+Layer 0: Interface Layer
+
+The entry point for all GAAP requests. Provides:
+- Security scanning (7-layer firewall)
+- Intent classification (11 types)
+- Complexity estimation
+- Smart routing decisions
+
+Classes:
+    - IntentType: Intent classification types
+    - RoutingTarget: Routing decision targets
+    - ImplicitRequirements: Extracted implicit requirements
+    - StructuredIntent: Fully classified intent
+    - IntentClassifier: Classifies user intents
+    - RequestParser: Parses and validates requests
+    - Layer0Interface: Main Layer 0 interface
+
+Usage:
+    from gaap.layers import Layer0Interface
+
+    layer0 = Layer0Interface()
+    intent = await layer0.process("Write a binary search function")
+    print(f"Intent: {intent.intent_type}")
+    print(f"Route to: {intent.routing_target}")
+"""
+
 # Layer 0: Interface Layer
 import logging
 import re
@@ -10,21 +37,15 @@ from typing import Any
 from gaap.core.base import BaseLayer
 from gaap.core.types import LayerType, TaskComplexity
 from gaap.security.firewall import PromptFirewall
+from gaap.core.base import BaseProvider
+import json
 
 # =============================================================================
 # Logger Setup
 # =============================================================================
 
 
-def get_logger(name: str) -> logging.Logger:
-    logger = logging.getLogger(name)
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
-    return logger
+from gaap.core.logging import get_standard_logger as get_logger
 
 
 # =============================================================================
@@ -123,335 +144,153 @@ class StructuredIntent:
 
 
 # =============================================================================
-# Intent Classifier
-# =============================================================================
-
-
-class IntentClassifier:
-    """مصنف النوايا"""
-
-    # أنماط التصنيف
-    INTENT_PATTERNS = {
-        IntentType.CODE_GENERATION: [
-            r"write\s+.{0,40}(function|class|module|script|code|program|algorithm|implementation)",
-            r"create\s+.{0,40}(function|class|module|script|code|program|algorithm|implementation|server|app|api)",
-            r"implement\s+.{0,40}(function|class|module|algorithm|search|sort|pattern|handler|endpoint)",
-            r"implement\s+\w+",
-            r"build\s+(a|an|the)\s+\w+",
-            r"develop\s+\w+",
-            r"(write|code|make)\s+(me\s+)?(a|an)\s+\w+",
-            r"(binary|linear|merge|quick|bubble)\s*search|sort",
-            r"اكتب\s+(كود|دالة|برنامج)",
-            r"أنشئ\s+\w+",
-        ],
-        IntentType.CODE_REVIEW: [
-            r"review\s+(this|the)\s+(code|implementation)",
-            r"check\s+(this|the)\s+code",
-            r"analyze\s+(this|the)\s+code",
-            r"راجع\s+(الكود|البرنامج)",
-        ],
-        IntentType.DEBUGGING: [
-            r"debug\s+(this|the)\s+\w+",
-            r"fix\s+(this|the|a)\s+(error|bug|issue)",
-            r"why\s+(is|does|doesn\'t)\s+\w+",
-            r"what\'?s?\s+wrong\s+with",
-            r"صلح\s+(الخطأ|المشكلة)",
-            r"حل\s+(الخطأ|المشكلة)",
-        ],
-        IntentType.REFACTORING: [
-            r"refactor\s+(this|the)\s+\w+",
-            r"improve\s+(this|the)\s+(code|performance)",
-            r"optimize\s+\w+",
-            r"restructure\s+\w+",
-            r"أعد\s+هيكلة",
-            r"حسّن\s+(الكود|الأداء)",
-        ],
-        IntentType.DOCUMENTATION: [
-            r"write\s+(documentation|docs|comments)",
-            r"document\s+(this|the)\s+\w+",
-            r"add\s+comments\s+to",
-            r"generate\s+(docs|documentation)",
-            r"اكتب\s+(توثيق|وثائق)",
-        ],
-        IntentType.TESTING: [
-            r"write\s+(tests?|test\s+cases?)",
-            r"create\s+(tests?|test\s+suite)",
-            r"generate\s+tests?",
-            r"اكتب\s+(اختبارات|اختبار)",
-        ],
-        IntentType.RESEARCH: [
-            r"research\s+\w+",
-            r"find\s+(information|out)\s+about",
-            r"what\s+is\s+\w+",
-            r"how\s+does\s+\w+\s+work",
-            r"ابحث\s+عن",
-            r"ما\s+هو",
-        ],
-        IntentType.PLANNING: [
-            r"plan\s+(a|an|the)\s+\w+",
-            r"design\s+(a|an|the)\s+(architecture|system)",
-            r"create\s+(a|an)?\s*(architecture|design|plan)",
-            r"خطط\s+لـ",
-            r"صمم\s+(نظام|بنية)",
-        ],
-        IntentType.QUESTION: [
-            r"^(what|how|why|when|where|who|which)",
-            r"^(هل|كيف|لماذا|متى|أين|من)",
-            r"\?$",
-        ],
-        IntentType.ANALYSIS: [
-            r"analyze\s+\w+",
-            r"examine\s+\w+",
-            r"evaluate\s+\w+",
-            r"assess\s+\w+",
-            r"حلل\s+\w+",
-        ],
-    }
-
-    # مؤشرات التعقيد
-    COMPLEXITY_INDICATORS = {
-        "high": [
-            "architecture",
-            "system",
-            "microservices",
-            "distributed",
-            "scale",
-            "بنية",
-            "نظام موزع",
-        ],
-        "medium": ["module", "component", "service", "api", "وحدة", "مكون"],
-        "low": ["function", "method", "variable", "helper", "دالة", "متغير"],
-    }
-
-    def __init__(self) -> None:
-        self._logger = get_logger("gaap.layer0.classifier")
-
-    def classify(self, text: str) -> tuple[IntentType, float]:
-        """تصنيف النص"""
-        text_lower = text.lower()
-        scores: dict[IntentType, float] = {}
-
-        for intent_type, patterns in self.INTENT_PATTERNS.items():
-            score = 0.0
-            for pattern in patterns:
-                matches = re.findall(pattern, text_lower, re.IGNORECASE)
-                if matches:
-                    score += len(matches) * 1.0
-
-            if score > 0:
-                scores[intent_type] = score
-
-        if not scores:
-            return IntentType.UNKNOWN, 0.0
-
-        # أفضل تطابق
-        best_intent = max(scores.items(), key=lambda x: x[1])
-
-        # حساب الثقة
-        total_score = sum(scores.values())
-        confidence = best_intent[1] / total_score if total_score > 0 else 0.0
-
-        return best_intent[0], min(confidence, 1.0)
-
-    def estimate_complexity(self, text: str) -> TaskComplexity:
-        """تقدير التعقيد"""
-        text_lower = text.lower()
-
-        high_count = sum(1 for kw in self.COMPLEXITY_INDICATORS["high"] if kw in text_lower)
-        medium_count = sum(1 for kw in self.COMPLEXITY_INDICATORS["medium"] if kw in text_lower)
-        low_count = sum(1 for kw in self.COMPLEXITY_INDICATORS["low"] if kw in text_lower)
-
-        # طول النص كعامل إضافي
-        length_factor = len(text.split()) / 100
-
-        if high_count > 0 or length_factor > 2:
-            return TaskComplexity.ARCHITECTURAL
-        elif medium_count > 1 or length_factor > 1:
-            return TaskComplexity.COMPLEX
-        elif medium_count > 0 or length_factor > 0.5:
-            return TaskComplexity.MODERATE
-        elif low_count > 0:
-            return TaskComplexity.SIMPLE
-        else:
-            return TaskComplexity.TRIVIAL
-
-
-# =============================================================================
-# Request Parser
-# =============================================================================
-
-
-class RequestParser:
-    """محلل الطلبات"""
-
-    # أنماط استخراج المتطلبات الضمنية
-    REQUIREMENT_PATTERNS = {
-        "performance": [
-            (r"(fast|quick|speedy|high\s+performance)", "high_throughput"),
-            (r"(real-?time|instant|immediate)", "real_time"),
-            (r"(slow|latency|response\s+time)", "latency_optimization"),
-        ],
-        "security": [
-            (r"(secure|security|encrypted|auth)", "security_required"),
-            (r"(gdpr|compliance|privacy)", "compliance_required"),
-            (r"(pci|hipaa|sox)", "regulatory_compliance"),
-        ],
-        "scalability": [
-            (r"(scalable|scale|distributed)", "horizontal_scaling"),
-            (r"(million|billion|large\s+scale)", "high_scale"),
-        ],
-        "budget": [
-            (r"(budget|cheap|cost-?effective|affordable)", "budget_conscious"),
-            (r"(enterprise|production)", "production_grade"),
-        ],
-        "timeline": [
-            (r"(\d+)\s*(days?|weeks?|months?)", "timeline_constraint"),
-            (r"(asap|urgent|quickly|soon)", "urgent"),
-        ],
-    }
-
-    def __init__(self) -> None:
-        self._logger = get_logger("gaap.layer0.parser")
-
-    def parse(self, text: str) -> tuple[list[str], ImplicitRequirements, dict[str, Any]]:
-        """تحليل الطلب"""
-        # استخراج الأهداف الصريحة
-        goals = self._extract_goals(text)
-
-        # استخراج المتطلبات الضمنية
-        implicit = self._extract_implicit_requirements(text)
-
-        # استخراج القيود
-        constraints = self._extract_constraints(text)
-
-        return goals, implicit, constraints
-
-    def _extract_goals(self, text: str) -> list[str]:
-        """استخراج الأهداف"""
-        goals = []
-
-        # أنماط الأهداف
-        goal_patterns = [
-            r"(?:build|create|develop|implement|write)\s+(?:a|an|the)?\s*(.+?)(?:\s+that|\s+with|\s+for|\s*$)",
-            r"(?:need|want|require)\s+(?:to\s+)?(.+?)(?:\s+that|\s+with|\s+for|\s*$)",
-        ]
-
-        for pattern in goal_patterns:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            goals.extend(matches)
-
-        # تنظيف
-        goals = [g.strip() for g in goals if len(g.strip()) > 5]
-
-        return goals[:5]  # حد أقصى 5 أهداف
-
-    def _extract_implicit_requirements(self, text: str) -> ImplicitRequirements:
-        """استخراج المتطلبات الضمنية"""
-        text_lower = text.lower()
-
-        implicit = ImplicitRequirements()
-
-        # الأداء
-        for pattern, value in self.REQUIREMENT_PATTERNS["performance"]:
-            if re.search(pattern, text_lower):
-                implicit.performance = value
-                break
-
-        # الأمان
-        for pattern, value in self.REQUIREMENT_PATTERNS["security"]:
-            if re.search(pattern, text_lower):
-                implicit.security = value
-                break
-
-        # القابلية للتوسع
-        for pattern, value in self.REQUIREMENT_PATTERNS["scalability"]:
-            if re.search(pattern, text_lower):
-                implicit.scalability = value
-                break
-
-        # الامتثال
-        compliance_keywords = ["gdpr", "hipaa", "pci", "sox", "iso"]
-        for kw in compliance_keywords:
-            if kw in text_lower:
-                implicit.compliance.append(kw.upper())
-
-        # الميزانية
-        for pattern, value in self.REQUIREMENT_PATTERNS["budget"]:
-            if re.search(pattern, text_lower):
-                implicit.budget = value
-                break
-
-        # الجدول الزمني
-        for pattern, value in self.REQUIREMENT_PATTERNS["timeline"]:
-            if re.search(pattern, text_lower):
-                implicit.timeline = value
-                break
-
-        return implicit
-
-    def _extract_constraints(self, text: str) -> dict[str, Any]:
-        """استخراج القيود"""
-        constraints = {}
-
-        # قيود اللغة
-        lang_pattern = r"(?:using|in|with)\s+(python|javascript|typescript|java|go|rust)"
-        lang_match = re.search(lang_pattern, text, re.IGNORECASE)
-        if lang_match:
-            constraints["language"] = lang_match.group(1).lower()
-
-        # قيود الإطار
-        framework_pattern = r"(?:using|with)\s+(react|vue|angular|django|flask|fastapi|express)"
-        framework_match = re.search(framework_pattern, text, re.IGNORECASE)
-        if framework_match:
-            constraints["framework"] = framework_match.group(1).lower()
-
-        # قيود النظام الأساسي
-        platform_pattern = r"(?:on|for)\s+(aws|azure|gcp|docker|kubernetes)"
-        platform_match = re.search(platform_pattern, text, re.IGNORECASE)
-        if platform_match:
-            constraints["platform"] = platform_match.group(1).lower()
-
-        return constraints
-
-
-# =============================================================================
 # Layer 0 Interface
 # =============================================================================
 
 
 class Layer0Interface(BaseLayer):
     """
-    طبقة الواجهة - المدخل الرئيسي لنظام GAAP
+    Layer 0: Interface Layer - Main entry point for GAAP system.
 
-    المسؤوليات:
-    - فحص أمني للمدخلات (Prompt Firewall)
-    - تصنيف نية المستخدم
-    - استخراج المتطلبات الضمنية
-    - توجيه الطلب للطبقة المناسبة
-    - تهيئة السياق الأولي
+    Responsibilities:
+    - Security scanning (7-layer firewall)
+    - Intent classification (11 types)
+    - Implicit requirement extraction
+    - Routing decisions (Strategic/Tactical/Direct)
+    - Context initialization
+
+    Attributes:
+        firewall: Prompt firewall for security scanning
+        classifier: Intent classifier
+        parser: Request parser
+        _enable_behavioral: Enable behavioral analysis
+        _logger: Logger instance
+        _requests_processed: Request counter
+        _requests_blocked: Blocked request counter
+        _intent_distribution: Intent type distribution
+
+    Usage:
+        >>> layer0 = Layer0Interface(firewall_strictness="high")
+        >>> intent = await layer0.process("Write a function")
+        >>> print(f"Intent: {intent.intent_type.name}")
+        >>> print(f"Route: {intent.routing_target.value}")
     """
 
-    def __init__(self, firewall_strictness: str = "high", enable_behavioral_analysis: bool = True):
+    def __init__(
+        self,
+        firewall_strictness: str = "high",
+        enable_behavioral_analysis: bool = True,
+        provider: BaseProvider | None = None,
+    ) -> None:
+        """
+        Initialize Layer 0 interface.
+
+        Args:
+            firewall_strictness: Security strictness level (low/medium/high)
+            enable_behavioral_analysis: Enable behavioral analysis flag
+            provider: LLM Provider for intent analysis
+        """
         super().__init__(LayerType.INTERFACE)
 
-        # المكونات
+        # Components
         self.firewall = PromptFirewall(strictness=firewall_strictness)
-        self.classifier = IntentClassifier()
-        self.parser = RequestParser()
+        self.provider = provider
 
         self._enable_behavioral = enable_behavioral_analysis
         self._logger = get_logger("gaap.layer0")
 
-        # الإحصائيات
+        # Statistics
         self._requests_processed = 0
         self._requests_blocked = 0
         self._intent_distribution: dict[str, int] = {}
 
+    async def _analyze_intent_llm(self, text: str) -> dict[str, Any]:
+        """Analyze intent using LLM provider."""
+        default_res = {
+            "intent_type": "UNKNOWN",
+            "confidence": 0.5,
+            "complexity": "MODERATE",
+            "explicit_goals": [],
+            "implicit_requirements": {},
+            "constraints": {},
+        }
+        if not self.provider:
+            self._logger.warning("No LLM provider tied to Layer0. Falling back to default intent.")
+            return default_res
+
+        system_prompt = """
+You are the Layer 0 Intent Analyzer for the GAAP General-purpose AI Architecture Platform.
+Analyze the user's input and return a pure JSON object mapping strictly to this schema:
+{
+  "intent_type": "CODE_GENERATION" | "CODE_REVIEW" | "DEBUGGING" | "REFACTORING" | "DOCUMENTATION" | "TESTING" | "RESEARCH" | "ANALYSIS" | "PLANNING" | "QUESTION" | "CONVERSATION" | "UNKNOWN",
+  "confidence": float (0.0 to 1.0),
+  "complexity": "TRIVIAL" | "SIMPLE" | "MODERATE" | "COMPLEX" | "ARCHITECTURAL",
+  "explicit_goals": ["goal 1", "goal 2"],
+  "implicit_requirements": {
+    "performance": "real_time" | "high_throughput" | null,
+    "security": "security_required" | "compliance_required" | null,
+    "scalability": "horizontal_scaling" | "high_scale" | null,
+    "compliance": ["GDPR", "HIPAA", ...],
+    "budget": "budget_conscious" | "production_grade" | null,
+    "timeline": "urgent" | "timeline_constraint" | null
+  },
+  "constraints": {
+    "language": "python" | "javascript" | ...,
+    "framework": "react" | "django" | ...,
+    "platform": "aws" | "docker" | ...
+  }
+}
+Return ONLY valid JSON.
+"""
+        try:
+            from gaap.core.types import Message, MessageRole, ChatCompletionRequest
+
+            messages = [
+                Message(role=MessageRole.SYSTEM, content=system_prompt.strip()),
+                Message(role=MessageRole.USER, content=text),
+            ]
+            raw = await self.provider.generate_response(messages=messages)
+            # extract json block
+            matches = re.findall(r"```(?:json)?\s*({.*})\s*```", raw, re.DOTALL)
+            if matches:
+                return json.loads(matches[0])
+            else:
+                return json.loads(raw)
+        except Exception as e:
+            self._logger.error(f"Failed to analyze intent via LLM: {e}")
+            return default_res
+
     async def process(self, input_data: Any) -> StructuredIntent:
-        """معالجة المدخل"""
+        """
+        Process user input and return structured intent.
+
+        Args:
+            input_data: User input (string or dict with text/context)
+
+        Returns:
+            StructuredIntent with classification and routing
+
+        Raises:
+            ValueError: If input format is invalid
+
+        Process Flow:
+            1. Extract text from input
+            2. Generate request ID
+            3. Security scan (firewall)
+            4. Intent classification
+            5. Parse requirements
+            6. Estimate complexity
+            7. Determine routing
+
+        Example:
+            >>> layer0 = Layer0Interface()
+            >>> intent = await layer0.process("Write a binary search")
+            >>> print(f"Intent: {intent.intent_type.name}")
+            'CODE_GENERATION'
+        """
         start_time = time.time()
 
-        # استخراج النص
+        # Extract text
         if isinstance(input_data, str):
             text = input_data
             context = {}
@@ -461,12 +300,12 @@ class Layer0Interface(BaseLayer):
         else:
             raise ValueError("Invalid input format")
 
-        # إنشاء معرف الطلب
+        # Generate request ID
         request_id = self._generate_request_id()
 
         self._logger.info(f"Processing request {request_id}")
 
-        # 1. الفحص الأمني
+        # 1. Security scan
         security_result = self.firewall.scan(text, context)
 
         structured = StructuredIntent(
@@ -480,7 +319,7 @@ class Layer0Interface(BaseLayer):
             },
         )
 
-        # إذا لم يكن آمناً
+        # If not safe
         if not security_result.is_safe:
             self._requests_blocked += 1
             structured.routing_target = RoutingTarget.DIRECT
@@ -488,42 +327,59 @@ class Layer0Interface(BaseLayer):
             structured.metadata["blocked"] = True
             return structured
 
-        # 1.5. حفظ النص الأصلي للاستخدام في الطبقات اللاحقة
+        # Save original text
         structured.metadata["original_text"] = text
 
-        # 2. تصنيف النية
-        intent_type, confidence = self.classifier.classify(text)
-        structured.intent_type = intent_type
-        structured.confidence = confidence
+        # 2-4. Intent classification, parsing, and complexity estimation via LLM
+        analysis = await self._analyze_intent_llm(text)
 
-        # تحديث توزيع النوايا
-        intent_name = intent_type.name
+        try:
+            structured.intent_type = IntentType[analysis.get("intent_type", "UNKNOWN")]
+        except KeyError:
+            structured.intent_type = IntentType.UNKNOWN
+
+        structured.confidence = float(analysis.get("confidence", 0.5))
+
+        # Update distribution
+        intent_name = structured.intent_type.name
         self._intent_distribution[intent_name] = self._intent_distribution.get(intent_name, 0) + 1
 
-        # 3. تحليل الطلب
-        goals, implicit, constraints = self.parser.parse(text)
-        structured.explicit_goals = goals
-        structured.implicit_requirements = implicit
-        structured.constraints = constraints
+        structured.explicit_goals = analysis.get("explicit_goals", [])
 
-        # 4. تقدير التعقيد
-        complexity = self.classifier.estimate_complexity(text)
+        imp_reqs = analysis.get("implicit_requirements", {})
+        structured.implicit_requirements = ImplicitRequirements(
+            performance=imp_reqs.get("performance"),
+            security=imp_reqs.get("security"),
+            scalability=imp_reqs.get("scalability"),
+            compliance=imp_reqs.get("compliance", []),
+            budget=imp_reqs.get("budget"),
+            timeline=imp_reqs.get("timeline"),
+        )
+        structured.constraints = analysis.get("constraints", {})
+
+        try:
+            complexity = TaskComplexity[analysis.get("complexity", "MODERATE")]
+        except KeyError:
+            complexity = TaskComplexity.MODERATE
+
         structured.metadata["complexity"] = complexity.name
 
-        # 5. تحديد التوجيه
+        # 5. Determine routing
         routing_target, routing_reason = self._determine_routing(
-            intent_type, complexity, confidence, text
+            structured.intent_type, complexity, structured.confidence, text
         )
         structured.routing_target = routing_target
         structured.routing_reason = routing_reason
 
-        # 6. تحديد النقاد الموصى بهم
-        structured.recommended_critics = self._recommend_critics(intent_type, implicit, constraints)
+        # 6. Recommend critics
+        structured.recommended_critics = self._recommend_critics(
+            structured.intent_type, structured.implicit_requirements, structured.constraints
+        )
 
-        # 7. تحديد الأدوات الموصى بها
-        structured.recommended_tools = self._recommend_tools(intent_type, complexity)
+        # 7. Recommend tools
+        structured.recommended_tools = self._recommend_tools(structured.intent_type, complexity)
 
-        # 8. حفظ السياق
+        # 8. Save context snapshot
         structured.context_snapshot = {
             "text_length": len(text),
             "word_count": len(text.split()),
@@ -536,37 +392,64 @@ class Layer0Interface(BaseLayer):
         elapsed = (time.time() - start_time) * 1000
         self._logger.info(
             f"Request {request_id} processed in {elapsed:.1f}ms: "
-            f"intent={intent_type.name}, routing={routing_target.value}"
+            f"intent={structured.intent_type.name}, routing={routing_target.value}"
         )
 
         return structured
 
     def _determine_routing(
-        self, intent_type: IntentType, complexity: TaskComplexity, confidence: float, text: str
+        self,
+        intent_type: IntentType,
+        complexity: TaskComplexity,
+        confidence: float,
+        text: str,
     ) -> tuple[RoutingTarget, str]:
-        """تحديد التوجيه"""
+        """
+        Determine routing target based on intent and complexity.
 
-        # الأنواع التي تحتاج تخطيط استراتيجي
+        Args:
+            intent_type: Classified intent type
+            complexity: Estimated task complexity
+            confidence: Classification confidence (0.0-1.0)
+            text: Original input text
+
+        Returns:
+            Tuple of (routing_target, routing_reason)
+
+        Routing Logic:
+            - STRATEGIC: Planning, Analysis, or ARCHITECTURAL complexity
+            - TACTICAL: Code generation, Refactoring, Testing, or COMPLEX
+            - DIRECT: Questions, Conversation, Documentation, or SIMPLE
+
+        Example:
+            >>> layer0 = Layer0Interface()
+            >>> target, reason = layer0._determine_routing(
+            ...     IntentType.CODE_GENERATION, TaskComplexity.MODERATE, 0.8, "text"
+            ... )
+            >>> print(target.value)
+            'layer2_tactical'
+        """
+        # Types requiring strategic planning
         strategic_intents = {
             IntentType.PLANNING,
             IntentType.ANALYSIS,
         }
 
-        # الأنواع التي تحتاج تفصيل تكتيكي
+        # Types requiring tactical decomposition
         tactical_intents = {
             IntentType.CODE_GENERATION,
             IntentType.REFACTORING,
             IntentType.TESTING,
         }
 
-        # الأنواع التي يمكن تنفيذها مباشرة
+        # Types for direct execution
         direct_intents = {
             IntentType.QUESTION,
             IntentType.CONVERSATION,
             IntentType.DOCUMENTATION,
         }
 
-        # قرار التوجيه
+        # Routing decision
         if intent_type in strategic_intents or complexity == TaskComplexity.ARCHITECTURAL:
             return RoutingTarget.STRATEGIC, "Complex task requiring strategic planning"
 
@@ -582,20 +465,44 @@ class Layer0Interface(BaseLayer):
         ):
             return RoutingTarget.DIRECT, "Simple task for direct execution"
 
-        # إذا كانت الثقة منخفضة، نذهب للاستراتيجي
+        # Low confidence → strategic
         if confidence < 0.5:
             return RoutingTarget.STRATEGIC, "Low confidence, requires analysis"
 
-        # الافتراضي
+        # Default
         return RoutingTarget.TACTICAL, "Default tactical routing"
 
     def _recommend_critics(
-        self, intent_type: IntentType, implicit: ImplicitRequirements, constraints: dict[str, Any]
+        self,
+        intent_type: IntentType,
+        implicit: ImplicitRequirements,
+        constraints: dict[str, Any],
     ) -> list[str]:
-        """توصية بالنقاد"""
-        critics = ["logic"]  # دائماً ناقد المنطق
+        """
+        Recommend MAD critics based on intent and requirements.
 
-        # بناءً على النية
+        Args:
+            intent_type: Classified intent type
+            implicit: Implicit requirements
+            constraints: Task constraints
+
+        Returns:
+            List of critic names (logic, security, performance, etc.)
+
+        Critic Selection Logic:
+            - Always include 'logic' critic
+            - Add intent-specific critics (performance, style, etc.)
+            - Add requirement-based critics (security, compliance)
+
+        Example:
+            >>> layer0 = Layer0Interface()
+            >>> critics = layer0._recommend_critics(IntentType.CODE_GENERATION, ...)
+            >>> print(critics)
+            ['logic', 'performance', 'style']
+        """
+        critics = ["logic"]  # Always include logic critic
+
+        # Intent-based critics
         intent_critics = {
             IntentType.CODE_GENERATION: ["performance", "style"],
             IntentType.CODE_REVIEW: ["security", "performance"],
@@ -607,7 +514,7 @@ class Layer0Interface(BaseLayer):
 
         critics.extend(intent_critics.get(intent_type, []))
 
-        # بناءً على المتطلبات الضمنية
+        # Requirement-based critics
         if implicit.security:
             critics.append("security")
         if implicit.performance:
@@ -618,7 +525,27 @@ class Layer0Interface(BaseLayer):
         return list(set(critics))
 
     def _recommend_tools(self, intent_type: IntentType, complexity: TaskComplexity) -> list[str]:
-        """توصية بالأدوات"""
+        """
+        Recommend tools based on intent and complexity.
+
+        Args:
+            intent_type: Classified intent type
+            complexity: Estimated task complexity
+
+        Returns:
+            List of recommended tool names
+
+        Tool Selection Logic:
+            - Research → perplexity, web_search
+            - Complex/Architectural → tot_strategic
+            - Debugging → self_healing
+
+        Example:
+            >>> layer0 = Layer0Interface()
+            >>> tools = layer0._recommend_tools(IntentType.RESEARCH, TaskComplexity.MODERATE)
+            >>> print(tools)
+            ['perplexity', 'web_search']
+        """
         tools = []
 
         if intent_type == IntentType.RESEARCH:
@@ -633,13 +560,38 @@ class Layer0Interface(BaseLayer):
         return tools
 
     def _generate_request_id(self) -> str:
-        """توليد معرف طلب"""
+        """
+        Generate unique request ID.
+
+        Returns:
+            Unique request ID string (format: req_{timestamp}_{uuid})
+
+        Example:
+            >>> layer0._generate_request_id()
+            'req_1708234567890_a1b2c3d4'
+        """
         import uuid
 
         return f"req_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}"
 
     def get_stats(self) -> dict[str, Any]:
-        """إحصائيات الطبقة"""
+        """
+        Get layer statistics.
+
+        Returns:
+            Dictionary with layer statistics including:
+            - layer: Layer name
+            - requests_processed: Total requests processed
+            - requests_blocked: Requests blocked by firewall
+            - block_rate: Ratio of blocked requests
+            - intent_distribution: Distribution of intent types
+            - firewall_stats: Firewall statistics
+
+        Example:
+            >>> layer0 = Layer0Interface()
+            >>> stats = layer0.get_stats()
+            >>> print(f"Processed: {stats['requests_processed']}")
+        """
         return {
             "layer": "L0_Interface",
             "requests_processed": self._requests_processed,
@@ -656,9 +608,26 @@ class Layer0Interface(BaseLayer):
 
 
 def create_interface(
-    firewall_strictness: str = "high", enable_behavioral: bool = True
+    firewall_strictness: str = "high",
+    enable_behavioral: bool = True,
 ) -> Layer0Interface:
-    """إنشاء طبقة الواجهة"""
+    """
+    Create Layer0Interface instance.
+
+    Factory function for creating Layer 0 interface.
+
+    Args:
+        firewall_strictness: Security strictness (low/medium/high)
+        enable_behavioral: Enable behavioral analysis
+
+    Returns:
+        Configured Layer0Interface instance
+
+    Example:
+        >>> layer0 = create_interface(firewall_strictness="high")
+        >>> intent = await layer0.process("Write a function")
+    """
     return Layer0Interface(
-        firewall_strictness=firewall_strictness, enable_behavioral_analysis=enable_behavioral
+        firewall_strictness=firewall_strictness,
+        enable_behavioral_analysis=enable_behavioral,
     )
