@@ -18,6 +18,7 @@ from gaap.core.exceptions import (
 from gaap.core.types import (
     HealingLevel,
     Task,
+    TaskComplexity,
 )
 
 # =============================================================================
@@ -25,15 +26,7 @@ from gaap.core.types import (
 # =============================================================================
 
 
-def get_logger(name: str) -> logging.Logger:
-    logger = logging.getLogger(name)
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
-    return logger
+from gaap.core.logging import get_standard_logger as get_logger
 
 
 # =============================================================================
@@ -173,15 +166,8 @@ class ErrorClassifier:
     def classify(cls, error: Exception) -> ErrorCategory:
         """تصنيف الخطأ"""
         error_message = str(error).lower()
-        error_type = type(error).__name__.lower()
 
-        # فحص الأنماط
-        for category, patterns in cls.PATTERNS.items():
-            for pattern in patterns:
-                if re.search(pattern, error_message, re.IGNORECASE):
-                    return category
-
-        # تصنيف حسب نوع الاستثناء
+        # تصنيف حسب نوع الاستثناء أولاً (أكثر دقة من regex)
         if isinstance(error, ProviderRateLimitError):
             return ErrorCategory.TRANSIENT
 
@@ -191,11 +177,17 @@ class ErrorClassifier:
         if isinstance(error, ProviderError):
             return ErrorCategory.MODEL_LIMIT
 
-        if "timeout" in error_type:
-            return ErrorCategory.TRANSIENT
+        if isinstance(error, TimeoutError):
+            return ErrorCategory.TRANSIENT  # Generic timeout = retryable
 
-        if "auth" in error_type:
+        if "auth" in type(error).__name__.lower():
             return ErrorCategory.CRITICAL
+
+        # فحص الأنماط (fallback for untyped errors)
+        for category, patterns in cls.PATTERNS.items():
+            for pattern in patterns:
+                if re.search(pattern, error_message, re.IGNORECASE):
+                    return category
 
         return ErrorCategory.UNKNOWN
 
@@ -208,50 +200,51 @@ class ErrorClassifier:
 class PromptRefiner:
     """محسن الـ Prompts"""
 
-    # قوالب التحسين
+    # قوالب التحسين السيادي (Reflexion-based)
     REFINEMENT_TEMPLATES = {
         "syntax_error": """
-The previous attempt resulted in a syntax error. Please fix it.
+CRITICAL: The previous attempt resulted in a SYNTAX ERROR. 
 
-Error: {error_message}
+Error Message: {error_message}
+Original Request: {original_prompt}
 
-Original request: {original_prompt}
-
-Please provide the corrected output, ensuring:
-1. Valid syntax
-2. Proper formatting
-3. No missing brackets or quotes
+[INSTRUCTIONS]
+1. Analyze WHY the syntax error occurred (e.g., missing imports, unclosed brackets).
+2. Think Step-by-Step about the fix.
+3. Provide the corrected implementation ensuring full syntax validity.
+4. Do NOT repeat the same error.
 """,
         "timeout": """
-The previous attempt timed out. Please provide a simpler, faster solution.
+CRITICAL: The previous attempt TIMED OUT (Transient/Performance Issue).
 
-Original request: {original_prompt}
+Original Request: {original_prompt}
 
-Focus on:
-1. Simpler implementation
-2. Fewer steps
-3. Essential functionality only
+[INSTRUCTIONS]
+1. Identify potential performance bottlenecks in your previous logic.
+2. Provide a more EFFICIENT and STREAMLINED solution.
+3. Remove unnecessary complexity that might be causing latency.
 """,
         "validation_failed": """
-The previous output did not meet the requirements.
+CRITICAL: The previous output FAILED logic/quality validation.
 
-Validation errors: {error_message}
+Validation Issues: {error_message}
+Original Request: {original_prompt}
 
-Original request: {original_prompt}
-
-Please revise to address all validation errors.
+[INSTRUCTIONS]
+1. Explain why your previous solution failed to meet the criteria.
+2. Redesign the approach to specifically address all validation errors listed above.
+3. Ensure high-fidelity logic and alignment with requirements.
 """,
         "general": """
-The previous attempt failed. Please try again with improvements.
+CRITICAL: The previous attempt failed for unknown or multiple reasons.
 
-Error: {error_message}
+Error Context: {error_message}
+Original Request: {original_prompt}
 
-Original request: {original_prompt}
-
-Consider:
-1. Alternative approaches
-2. Edge cases
-3. Error handling
+[INSTRUCTIONS]
+1. Perform a Root Cause Analysis (RCA) on the failure.
+2. Pivot your strategy if necessary.
+3. Provide a robust, improved implementation that handles edge cases and errors.
 """,
     }
 
@@ -311,12 +304,13 @@ class SelfHealingSystem:
         self,
         max_level: HealingLevel = HealingLevel.L4_STRATEGY_SHIFT,
         on_escalate: Callable[[ErrorContext], Awaitable[None]] | None = None,
+        memory: Any = None,
     ):
         self.max_level = max_level
         self.on_escalate = on_escalate
         self._logger = get_logger("gaap.healing")
+        self._memory = memory
 
-        # السجلات
         self._records: list[HealingRecord] = []
         self._error_history: dict[str, list[ErrorContext]] = {}
 
@@ -351,7 +345,12 @@ class SelfHealingSystem:
         start_time = time.time()
         self._total_healing_attempts += 1
 
-        # تصنيف الخطأ
+        if context is None:
+            context = {}
+
+        if self._memory and task.description:
+            self._inject_few_shot_examples(task, context)
+
         error_category = ErrorClassifier.classify(error)
 
         # إنشاء سياق الخطأ
@@ -398,6 +397,13 @@ class SelfHealingSystem:
                     success=True,
                     error_category=error_category,
                 )
+                # v2: Observability
+                try:
+                    from gaap.core.observability import observability as _obs
+
+                    _obs.record_healing(level=current_level.name, success=True)
+                except Exception as e:
+                    pass  # observability is never allowed to crash healing
                 return result
 
             # الانتقال للمستوى التالي
@@ -430,6 +436,13 @@ class SelfHealingSystem:
             error_category=error_category,
             details=str(error),
         )
+        # v2: Observability
+        try:
+            from gaap.core.observability import observability as _obs
+
+            _obs.record_healing(level=current_level.name, success=False)
+        except Exception as e:
+            pass  # observability is never allowed to crash healing
 
         return result
 
@@ -647,6 +660,33 @@ This is a simplified version due to previous failures with the full implementati
         self._records.append(record)
 
     # =========================================================================
+    # Dynamic Few-Shot Injection
+    # =========================================================================
+
+    def _inject_few_shot_examples(self, task: Task, context: dict[str, Any]) -> None:
+        """Inject relevant examples from memory into context"""
+        try:
+            if hasattr(self._memory, "retrieve"):
+                results = self._memory.retrieve(query=task.description, k=3)
+                if results:
+                    examples = []
+                    for r in results[:3]:
+                        if hasattr(r, "content"):
+                            examples.append(r.content[:200])
+                        elif isinstance(r, dict) and "content" in r:
+                            examples.append(r["content"][:200])
+                    if examples:
+                        context["few_shot_examples"] = examples
+                        self._logger.debug(f"Injected {len(examples)} few-shot examples")
+            elif hasattr(self._memory, "search"):
+                results = self._memory.search(task.description, n_results=3)
+                if results:
+                    context["few_shot_examples"] = [r[:200] for r in results[:3]]
+                    self._logger.debug(f"Injected {len(results)} few-shot examples from search")
+        except Exception as e:
+            self._logger.debug(f"Failed to inject few-shot examples: {e}")
+
+    # =========================================================================
     # Statistics
     # =========================================================================
 
@@ -693,11 +733,3 @@ This is a simplified version due to previous failures with the full implementati
     def get_error_history(self, task_id: str) -> list[ErrorContext]:
         """تاريخ أخطاء مهمة"""
         return self._error_history.get(task_id, [])
-
-
-# =============================================================================
-# Type Imports
-# =============================================================================
-
-
-from gaap.core.types import TaskComplexity

@@ -1,8 +1,32 @@
+"""
+GAAP 4-Layer Architecture Module
+
+Provides the core 4-layer cognitive architecture:
+
+Layers:
+    - Layer 0 (Interface): Security, intent classification, routing
+    - Layer 1 (Strategic): Tree of Thoughts, MAD Architecture Panel
+    - Layer 2 (Tactical): Task decomposition, DAG construction
+    - Layer 3 (Execution): Parallel execution, quality assurance
+
+Usage:
+    from gaap.layers import (
+        Layer0Interface,
+        Layer1Strategic,
+        Layer2Tactical,
+        Layer3Execution
+    )
+
+    # Create layers
+    l0 = Layer0Interface()
+    l1 = Layer1Strategic()
+    l2 = Layer2Tactical()
+    l3 = Layer3Execution()
+"""
+
 from .layer0_interface import (
-    IntentClassifier,
     IntentType,
     Layer0Interface,
-    RequestParser,
     StructuredIntent,
 )
 from .layer1_strategic import (
@@ -27,12 +51,19 @@ from .layer3_execution import (
     MADQualityPanel,
     QualityPipeline,
 )
+from .mcts_logic import (
+    MCTSConfig,
+    MCTSNode,
+    MCTSPhase,
+    MCTSStrategic,
+    NodeType,
+    ValueOracle,
+    create_mcts,
+    create_mcts_for_priority,
+)
 
 __all__ = [
-    # Layer 0
     "Layer0Interface",
-    "RequestParser",
-    "IntentClassifier",
     "IntentType",
     "StructuredIntent",
     # Layer 1
@@ -41,6 +72,15 @@ __all__ = [
     "ToTStrategic",
     "ArchitectureParadigm",
     "ArchitectureSpec",
+    # MCTS
+    "MCTSStrategic",
+    "MCTSConfig",
+    "MCTSNode",
+    "MCTSPhase",
+    "NodeType",
+    "ValueOracle",
+    "create_mcts",
+    "create_mcts_for_priority",
     # Layer 2
     "Layer2Tactical",
     "TacticalDecomposer",

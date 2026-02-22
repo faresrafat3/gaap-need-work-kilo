@@ -90,6 +90,24 @@ class TacticalDecomposerConfig:
 
 
 @dataclass
+class SovereignConfig:
+    """تكوين السيادة والذكاء المتقدم (v2.1)"""
+
+    # Cognitive Features
+    enable_deep_research: bool = True  # تفعيل البحث العميق
+    enable_tool_synthesis: bool = True  # تفعيل تصنيع الأدوات
+    enable_ghost_fs: bool = True  # تفعيل محاكاة نظام الملفات
+
+    # Security Features
+    enable_dlp_shield: bool = True  # تفعيل درع منع التسريب
+    enable_semantic_firewall: bool = True  # تفعيل الجدار الدلالي
+
+    # Thresholds
+    dlp_strictness: str = "high"  # low, medium, high
+    research_depth: int = 3  # عمق البحث (عدد الخطوات)
+
+
+@dataclass
 class ExecutionConfig:
     """تكوين التنفيذ (Layer 3)"""
 
@@ -130,31 +148,6 @@ class QualityPanelConfig:
     min_approval_score: float = 70.0
     unanimous_required_for_critical: bool = True
     max_debate_rounds: int = 5
-
-
-@dataclass
-class MetaLearningConfig:
-    """تكوين التعلم الفوقي (Layer 4)"""
-
-    pattern_extraction_enabled: bool = True
-    pattern_min_occurrences: int = 3
-    fine_tuning_trigger_threshold: int = 50
-    cross_project_learning: bool = True
-    knowledge_distillation_interval: str = "24h"
-    ab_test_percentage: float = 0.1
-
-
-@dataclass
-class ExternalConnectorsConfig:
-    """تكوين الموصلات الخارجية (Layer 5)"""
-
-    perplexity_enabled: bool = True
-    perplexity_model: str = "sonar-reasoning-pro"
-    notebooklm_enabled: bool = True
-    wandb_enabled: bool = True
-    verdant_enabled: bool = False
-    cache_external_results: bool = True
-    cache_ttl_seconds: int = 3600
 
 
 @dataclass
@@ -227,6 +220,20 @@ class ProviderSettings:
 
 
 @dataclass
+class ExternalConnectorsConfig:
+    """تكوين الموصلات الخارجية"""
+
+    enable_web_search: bool = False
+    enable_perplexity: bool = False
+    enable_github: bool = False
+    perplexity_api_key: str | None = None
+    github_token: str | None = None
+    web_search_provider: str = "duckduckgo"
+    timeout_seconds: int = 30
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class SystemConfig:
     """التكوين الأساسي للنظام"""
 
@@ -253,14 +260,13 @@ class GAAPConfig:
     tactical_decomposer: TacticalDecomposerConfig = field(default_factory=TacticalDecomposerConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     quality_panel: QualityPanelConfig = field(default_factory=QualityPanelConfig)
-    meta_learning: MetaLearningConfig = field(default_factory=MetaLearningConfig)
     external_connectors: ExternalConnectorsConfig = field(default_factory=ExternalConnectorsConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
     budget: BudgetConfig = field(default_factory=BudgetConfig)
     context_management: ContextManagementConfig = field(default_factory=ContextManagementConfig)
+    sovereign: SovereignConfig = field(default_factory=SovereignConfig)
     providers: list[ProviderSettings] = field(default_factory=list)
 
-    # تكوين مخصص
     custom: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -458,7 +464,6 @@ class ConfigManager:
                 "unanimous_required_for_critical"
             ]
 
-        meta_learning = MetaLearningConfig(**config_dict.get("meta_learning", {}))
         external_connectors = ExternalConnectorsConfig(**config_dict.get("external_connectors", {}))
         security = SecurityConfig(**config_dict.get("security", {}))
         budget = BudgetConfig(**config_dict.get("budget", {}))
@@ -478,7 +483,6 @@ class ConfigManager:
             tactical_decomposer=tactical_decomposer,
             execution=execution,
             quality_panel=quality_panel,
-            meta_learning=meta_learning,
             external_connectors=external_connectors,
             security=security,
             budget=budget,

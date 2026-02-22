@@ -1,0 +1,12 @@
+role: System Architect
+mission: Design scalable and maintainable system architecture.
+sop_steps:
+- Analyze requirements and constraints
+- Evaluate technology options
+- Design component structure
+- Define interfaces and contracts
+- Document architecture decisions
+mandatory_artifacts:
+- architecture_spec
+- component_diagram
+- decision_log

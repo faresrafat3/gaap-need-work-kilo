@@ -1,23 +1,37 @@
-# GAAP System GLM5
-# 350+ lines
-__version__ = "1.0.0"
-__author__ = "GAAP Team"
+"""
+GAAP Sovereign AGI v2.1.0
+=========================
+
+General-purpose AI Agent Platform with 4-layer OODA architecture.
+
+Architecture:
+    - Layer 0: Interface (Intent parsing, security firewall)
+    - Layer 1: Strategic (ToT planning, MCTS, MAD consensus)
+    - Layer 2: Tactical (Task decomposition, dependency analysis)
+    - Layer 3: Execution (Tool calling, quality validation)
+
+Features:
+    - Multi-provider support (Groq, Gemini, Kilo, G4F)
+    - Self-healing with 5 recovery levels
+    - Hierarchical memory (Working, Episodic, Semantic, Procedural)
+    - Constitutional AI with axiom enforcement
+    - Real-time reflection and lesson learning
+
+Usage:
+    from gaap import GAAPEngine, create_engine
+
+    engine = create_engine(budget=10.0)
+    response = await engine.chat("Hello, world!")
+"""
+
+__version__ = "2.1.0-SOVEREIGN"
+__author__ = "Sovereign Strategic Architect"
 __email__ = "team@gaap.io"
 
 # =============================================================================
 # Engine Imports
 # =============================================================================
 
-# =============================================================================
-# Context Imports
-# =============================================================================
-from .context import (
-    ContextOrchestrator,
-    ExternalBrain,
-    HierarchicalContextLoader,
-    PKGAgent,
-    SmartChunker,
-)
 
 # =============================================================================
 # Core Imports
@@ -113,8 +127,6 @@ from .memory import (
 # =============================================================================
 from .providers import (
     G4FProvider,
-    GeminiProvider,
-    GroqProvider,
     UnifiedGAAPProvider,
 )
 
@@ -185,19 +197,11 @@ __all__ = [
     # Providers
     "BaseProvider",
     "G4FProvider",
-    "GroqProvider",
-    "GeminiProvider",
     "UnifiedGAAPProvider",
     # Routing
     "SmartRouter",
     "RoutingStrategy",
     "FallbackManager",
-    # Context
-    "ContextOrchestrator",
-    "PKGAgent",
-    "HierarchicalContextLoader",
-    "SmartChunker",
-    "ExternalBrain",
     # Healing
     "SelfHealingSystem",
     "ErrorClassifier",

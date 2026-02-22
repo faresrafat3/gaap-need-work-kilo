@@ -25,21 +25,7 @@ from gaap.routing.router import SmartRouter
 # =============================================================================
 
 
-def get_logger(name: str) -> logging.Logger:
-    """إنشاء مسجل"""
-    logger = logging.getLogger(name)
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
-    return logger
-
-
-# =============================================================================
-# Fallback Configuration
-# =============================================================================
+from gaap.core.logging import get_standard_logger as get_logger
 
 
 @dataclass
@@ -164,6 +150,11 @@ class FallbackManager:
         self._fallback_events: list[dict[str, Any]] = []
         self._total_fallbacks = 0
         self._successful_recoveries = 0
+
+    def __repr__(self) -> str:
+        return (
+            f"FallbackManager(chains={len(self._chains)}, total_fallbacks={self._total_fallbacks})"
+        )
 
     # =========================================================================
     # Fallback Chain Management

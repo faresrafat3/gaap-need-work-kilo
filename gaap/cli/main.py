@@ -14,7 +14,7 @@ from gaap.cli.commands import (
     cmd_providers,
     cmd_status,
     cmd_version,
-    cmd_web,
+
 )
 
 
@@ -109,9 +109,21 @@ def create_parser() -> argparse.ArgumentParser:
     # Doctor command
     subparsers.add_parser("doctor", help="Run diagnostics")
 
-    # Web command
-    web_p = subparsers.add_parser("web", help="Launch web UI")
-    web_p.add_argument("--port", type=int, default=8501, help="Port number")
+    # --- New Sovereign Commands (v2.1) ---
+    
+    # Research command
+    research_p = subparsers.add_parser("research", help="Run Deep Research (STORM Augmented)")
+    research_p.add_argument("query", help="Research query or topic")
+    research_p.add_argument("--depth", type=int, default=3, help="Research depth (steps)")
+
+    # Debug command
+    debug_p = subparsers.add_parser("debug", help="Diagnostic & Root Cause Analysis")
+    debug_p.add_argument("issue", help="Description of the error or issue")
+
+    # Maintenance commands
+    subparsers.add_parser("dream", help="Trigger Memory Consolidation (REM Sleep)")
+    subparsers.add_parser("audit", help="Run Constitutional Integrity Audit")
+
 
     return parser
 
@@ -144,8 +156,20 @@ def main() -> None:
         cmd_version(args)
     elif args.command == "doctor":
         cmd_doctor(args)
-    elif args.command == "web":
-        cmd_web(args)
+    elif args.command == "research":
+        # Dynamic execution using the sovereign engine
+        from gaap.cli.commands import cmd_research
+        asyncio.run(cmd_research(args))
+    elif args.command == "debug":
+        from gaap.cli.commands import cmd_debug
+        asyncio.run(cmd_debug(args))
+    elif args.command == "dream":
+        from gaap.cli.commands import cmd_dream
+        cmd_dream(args)
+    elif args.command == "audit":
+        from gaap.cli.commands import cmd_audit
+        cmd_audit(args)
+
     else:
         parser.print_help()
 

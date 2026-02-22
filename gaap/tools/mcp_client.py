@@ -20,6 +20,7 @@ Usage:
 import asyncio
 import json
 import logging
+import os
 import shutil
 import time
 from dataclasses import dataclass, field
@@ -141,7 +142,7 @@ class MCPClient:
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env={**dict(__import__("os").environ), **config.env},
+                env={**dict(os.environ), **config.env},
             )
 
             connection.process = process
@@ -189,7 +190,8 @@ class MCPClient:
             try:
                 connection.process.terminate()
                 await asyncio.wait_for(connection.process.wait(), timeout=5)
-            except Exception:
+            except Exception as e:
+                self._logger.debug(f"Force killing MCP process: {e}")
                 connection.process.kill()
 
             connection.state = MCPConnectionState.DISCONNECTED

@@ -175,8 +175,8 @@ def _parse_value(value: str) -> Any:
     if value.startswith("{") or value.startswith("["):
         try:
             return json.loads(value)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Config error: {e}")
 
     # String
     return value

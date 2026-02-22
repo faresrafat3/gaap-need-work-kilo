@@ -8,7 +8,8 @@ from .history import cmd_history
 from .models import cmd_models
 from .providers import cmd_providers
 from .system import cmd_doctor, cmd_status, cmd_version
-from .web import cmd_web
+
+from .sovereign import cmd_research, cmd_debug, cmd_dream, cmd_audit
 
 __all__ = [
     "cmd_chat",
@@ -20,5 +21,9 @@ __all__ = [
     "cmd_status",
     "cmd_version",
     "cmd_doctor",
-    "cmd_web",
+
+    "cmd_research",
+    "cmd_debug",
+    "cmd_dream",
+    "cmd_audit",
 ]

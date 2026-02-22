@@ -1,9 +1,18 @@
 """
 Shared pytest fixtures for GAAP tests
+
+Includes:
+    - Basic fixtures (messages, tasks, providers)
+    - VCR cassette fixtures for deterministic API testing
+    - LLM-as-a-Judge for semantic assertions
+    - Chaos testing fixtures for fault injection
 """
 
 import asyncio
-from typing import Any
+import os
+import random
+from functools import wraps
+from typing import Any, Callable
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -438,3 +447,338 @@ def task_factory():
 def message_factory():
     """Provide message factory"""
     return MessageFactory
+
+
+# =============================================================================
+# VCR Cassette Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def vcr_config():
+    """Default VCR configuration for recording API interactions."""
+    return {
+        "record_mode": "once",
+        "match_on": ["method", "scheme", "host", "port", "path", "query"],
+        "filter_headers": ["authorization", "api-key", "x-api-key"],
+        "filter_query_parameters": ["key", "api_key", "token"],
+        "decode_compressed_response": True,
+        "cassette_library_dir": "tests/cassettes",
+    }
+
+
+@pytest.fixture
+def cassette_path(tmp_path):
+    """Get path for a VCR cassette."""
+    return str(tmp_path / "cassettes")
+
+
+# =============================================================================
+# LLM-as-a-Judge Fixtures
+# =============================================================================
+
+
+class SemanticJudge:
+    """
+    LLM-as-a-Judge for semantic assertions.
+
+    Evaluates whether two texts are semantically similar using
+    simple heuristics or embedding-based similarity.
+    """
+
+    def __init__(self, threshold: float = 0.8) -> None:
+        self.threshold = threshold
+
+    def _tokenize(self, text: str) -> set[str]:
+        """Simple tokenization."""
+        return set(text.lower().split())
+
+    def _jaccard_similarity(self, text1: str, text2: str) -> float:
+        """Calculate Jaccard similarity between two texts."""
+        tokens1 = self._tokenize(text1)
+        tokens2 = self._tokenize(text2)
+
+        if not tokens1 and not tokens2:
+            return 1.0
+        if not tokens1 or not tokens2:
+            return 0.0
+
+        intersection = len(tokens1 & tokens2)
+        union = len(tokens1 | tokens2)
+        return intersection / union if union > 0 else 0.0
+
+    def assert_similar(self, actual: str, expected: str, threshold: float | None = None) -> bool:
+        """
+        Assert that two texts are semantically similar.
+
+        Args:
+            actual: Actual text
+            expected: Expected text
+            threshold: Similarity threshold (default: self.threshold)
+
+        Returns:
+            True if similar enough
+
+        Raises:
+            AssertionError if similarity is below threshold
+        """
+        threshold = threshold if threshold is not None else self.threshold
+        similarity = self._jaccard_similarity(actual, expected)
+
+        if similarity < threshold:
+            raise AssertionError(
+                f"Semantic similarity {similarity:.2f} < {threshold}\n"
+                f"Actual: {actual[:200]}...\n"
+                f"Expected: {expected[:200]}..."
+            )
+        return True
+
+    def assert_contains_concepts(self, text: str, concepts: list[str]) -> bool:
+        """
+        Assert that text contains all specified concepts.
+
+        Args:
+            text: Text to check
+            concepts: List of concept keywords
+
+        Returns:
+            True if all concepts are present
+        """
+        text_lower = text.lower()
+        missing = [c for c in concepts if c.lower() not in text_lower]
+
+        if missing:
+            raise AssertionError(f"Missing concepts: {missing}\nText: {text[:200]}...")
+        return True
+
+    def evaluate_response_quality(self, response: str, criteria: list[str]) -> float:
+        """
+        Evaluate response quality against criteria.
+
+        Args:
+            response: Response text
+            criteria: List of quality criteria
+
+        Returns:
+            Quality score (0.0 to 1.0)
+        """
+        if not criteria:
+            return 0.5
+
+        response_lower = response.lower()
+        matches = sum(1 for c in criteria if c.lower() in response_lower)
+        return matches / len(criteria)
+
+
+@pytest.fixture
+def semantic_judge():
+    """Provide LLM-as-a-Judge fixture."""
+    return SemanticJudge()
+
+
+@pytest.fixture
+def assert_semantically_similar():
+    """Convenience fixture for semantic assertions."""
+
+    def _assert(actual: str, expected: str, threshold: float = 0.8) -> None:
+        judge = SemanticJudge(threshold=threshold)
+        judge.assert_similar(actual, expected, threshold)
+
+    return _assert
+
+
+# =============================================================================
+# Chaos Testing Fixtures
+# =============================================================================
+
+
+class ChaosMonkey:
+    """
+    Chaos testing fixture for fault injection.
+
+    Randomly injects failures to test system resilience.
+    """
+
+    def __init__(
+        self,
+        failure_rate: float = 0.1,
+        seed: int | None = None,
+    ) -> None:
+        self.failure_rate = failure_rate
+        self._original_random_state = None
+        if seed is not None:
+            random.seed(seed)
+        self._injected_failures = 0
+        self._total_calls = 0
+
+    def inject_network_failure(self) -> bool:
+        """
+        Decide whether to inject a network failure.
+
+        Returns:
+            True if failure should be injected
+        """
+        self._total_calls += 1
+        if random.random() < self.failure_rate:
+            self._injected_failures += 1
+            return True
+        return False
+
+    def inject_timeout(self, base_timeout: float) -> float:
+        """
+        Potentially inflate a timeout value.
+
+        Args:
+            base_timeout: Original timeout value
+
+        Returns:
+            Modified timeout (possibly inflated)
+        """
+        if random.random() < self.failure_rate:
+            self._injected_failures += 1
+            return base_timeout * 10
+        return base_timeout
+
+    def corrupt_data(self, data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Potentially corrupt data.
+
+        Args:
+            data: Original data
+
+        Returns:
+            Possibly corrupted data
+        """
+        if random.random() < self.failure_rate:
+            self._injected_failures += 1
+            corrupted = data.copy()
+            if corrupted:
+                key = random.choice(list(corrupted.keys()))
+                corrupted[key] = None
+            return corrupted
+        return data
+
+    def get_stats(self) -> dict[str, Any]:
+        """Get chaos statistics."""
+        return {
+            "injected_failures": self._injected_failures,
+            "total_calls": self._total_calls,
+            "failure_rate_actual": (
+                self._injected_failures / self._total_calls if self._total_calls > 0 else 0.0
+            ),
+        }
+
+
+@pytest.fixture
+def chaos_monkey():
+    """Provide chaos testing fixture."""
+    return ChaosMonkey(failure_rate=0.1, seed=42)
+
+
+@pytest.fixture
+def resilient_provider(mock_provider, chaos_monkey):
+    """
+    Create a provider that randomly fails for chaos testing.
+
+    Combines mock_provider with chaos_monkey for fault injection.
+    """
+
+    class ChaoticProvider:
+        def __init__(self, base_provider, monkey: ChaosMonkey) -> None:
+            self._base = base_provider
+            self._monkey = monkey
+            self.name = base_provider.name
+            self.models = base_provider.models
+            self.default_model = base_provider.default_model
+            self.provider_type = base_provider.provider_type
+
+        async def chat_completion(self, messages, model=None, **kwargs):
+            if self._monkey.inject_network_failure():
+                raise ConnectionError("Chaos monkey injected network failure")
+            return await self._base.chat_completion(messages, model, **kwargs)
+
+        def is_model_available(self, model):
+            return self._base.is_model_available(model)
+
+        def get_available_models(self):
+            return self._base.get_available_models()
+
+        def get_stats(self):
+            stats = self._base.get_stats()
+            stats["chaos_stats"] = self._monkey.get_stats()
+            return stats
+
+    return ChaoticProvider(mock_provider, chaos_monkey)
+
+
+# =============================================================================
+# Gauntlet Test Helpers
+# =============================================================================
+
+
+class GauntletRunner:
+    """
+    Runner for E2E Gauntlet scenarios.
+
+    Executes full-system tests with assertions.
+    """
+
+    def __init__(self, tmp_path: str) -> None:
+        self.tmp_path = tmp_path
+        self._results: list[dict[str, Any]] = []
+
+    def check_file_exists(self, filepath: str) -> bool:
+        """Check if a file exists in the temp directory."""
+        full_path = os.path.join(self.tmp_path, filepath)
+        exists = os.path.exists(full_path)
+        self._results.append({"check": "file_exists", "path": filepath, "passed": exists})
+        return exists
+
+    def check_file_contains(self, filepath: str, content: str) -> bool:
+        """Check if a file contains specific content."""
+        full_path = os.path.join(self.tmp_path, filepath)
+        if not os.path.exists(full_path):
+            self._results.append(
+                {
+                    "check": "file_contains",
+                    "path": filepath,
+                    "passed": False,
+                    "error": "File not found",
+                }
+            )
+            return False
+
+        with open(full_path) as f:
+            file_content = f.read()
+
+        passed = content in file_content
+        self._results.append({"check": "file_contains", "path": filepath, "passed": passed})
+        return passed
+
+    def check_files_exist(self, files: list[str]) -> dict[str, bool]:
+        """Check if multiple files exist."""
+        results = {}
+        for f in files:
+            results[f] = self.check_file_exists(f)
+        return results
+
+    def get_results(self) -> list[dict[str, Any]]:
+        """Get all check results."""
+        return self._results
+
+    def get_summary(self) -> dict[str, Any]:
+        """Get summary of all checks."""
+        total = len(self._results)
+        passed = sum(1 for r in self._results if r["passed"])
+        return {
+            "total_checks": total,
+            "passed": passed,
+            "failed": total - passed,
+            "success_rate": passed / total if total > 0 else 0.0,
+        }
+
+
+@pytest.fixture
+def gauntlet_runner(tmp_path):
+    """Provide Gauntlet runner for E2E tests."""
+    return GauntletRunner(str(tmp_path))

@@ -1,0 +1,11 @@
+role: Security Analyst
+mission: Identify vulnerabilities and ensure code quality.
+sop_steps:
+- Scan for hardcoded credentials
+- Check for unsafe library imports
+- Analyze data flow for injection risks
+- Review error handling
+- Generate Security Risk Table
+mandatory_artifacts:
+- security_report.md
+- cvss_score

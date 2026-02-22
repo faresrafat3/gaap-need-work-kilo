@@ -1,3 +1,39 @@
+"""
+GAAP Core Module
+================
+
+Foundation components for the GAAP system:
+
+Base Classes:
+    - BaseComponent: Base for all components
+    - BaseAgent: Base for all agents
+    - BaseLayer: Base for OODA layers
+    - BaseProvider: Base for LLM providers
+    - BaseMemory: Base for memory systems
+    - BaseHealer: Base for self-healing
+    - BaseCritic: Base for MAD critics
+
+Types:
+    - Task, TaskPriority, TaskType
+    - Message, MessageRole
+    - OODAPhase, OODAState
+    - ProviderType, ModelTier
+
+Configuration:
+    - GAAPConfig: Main configuration
+    - ConfigManager: Configuration management
+    - ConfigBuilder: Fluent config builder
+
+Exceptions:
+    - GAAPException: Base exception
+    - ProviderError, TaskError, SecurityError
+    - HealingError, MADError
+
+Utilities:
+    - Logging, observability, rate limiting
+    - Axiom validation, governance
+"""
+
 from .base import (  # Base Classes; Context; Result; Decorators; Utilities
     BaseAgent,
     BaseComponent,
@@ -28,7 +64,6 @@ from .config import (  # Manager; Dataclasses; Functions
     ExternalConnectorsConfig,
     FirewallConfig,
     GAAPConfig,
-    MetaLearningConfig,
     ParserConfig,
     ProviderSettings,
     QualityPanelConfig,
@@ -44,6 +79,8 @@ from .config import (  # Manager; Dataclasses; Functions
     load_config,
 )
 from .exceptions import (  # Configuration; Context; Base; Healing; MAD; Plugin; Provider; Routing; Security; Task; Utilities
+    AxiomError,
+    AxiomViolationError,
     BudgetExceededError,
     CapabilityError,
     CircularDependencyError,
@@ -54,10 +91,12 @@ from .exceptions import (  # Configuration; Context; Base; Healing; MAD; Plugin;
     ContextLoadError,
     ContextOverflowError,
     CriticError,
+    DependencyAxiomError,
     GAAPException,
     HealingError,
     HealingFailedError,
     HumanEscalationError,
+    InterfaceAxiomError,
     InvalidConfigValueError,
     MADError,
     MaxRetriesExceededError,
@@ -81,6 +120,7 @@ from .exceptions import (  # Configuration; Context; Base; Healing; MAD; Plugin;
     SandboxEscapeError,
     SecurityError,
     SecurityScanError,
+    SyntaxAxiomError,
     TaskDependencyError,
     TaskError,
     TaskExecutionError,
@@ -124,8 +164,11 @@ from .types import (  # Constants; Data Classes; TypedDicts; Enums
     MessageRole,
     ModelInfo,
     ModelTier,
+    OODAPhase,
+    OODAState,
     ProviderConfig,
     ProviderType,
+    ReplanTrigger,
     RoutingContext,
     RoutingDecision,
     SecurityRiskLevel,
@@ -156,6 +199,8 @@ __all__ = [
     "SecurityRiskLevel",
     "ContextLevel",
     "MemoryType",
+    "OODAPhase",
+    "ReplanTrigger",
     # Data Classes
     "Message",
     "ChatCompletionRequest",
@@ -183,6 +228,7 @@ __all__ = [
     "IACPMessage",
     "ExecutionMetrics",
     "SystemMetrics",
+    "OODAState",
     # Config Classes
     "FirewallConfig",
     "ParserConfig",
@@ -192,7 +238,6 @@ __all__ = [
     "ExecutionConfig",
     "CriticConfig",
     "QualityPanelConfig",
-    "MetaLearningConfig",
     "ExternalConnectorsConfig",
     "SecurityConfig",
     "BudgetConfig",
@@ -260,6 +305,12 @@ __all__ = [
     "PluginError",
     "PluginLoadError",
     "PluginExecutionError",
+    # Axiom Exceptions
+    "AxiomError",
+    "AxiomViolationError",
+    "SyntaxAxiomError",
+    "DependencyAxiomError",
+    "InterfaceAxiomError",
     # Functions
     "get_default_config",
     "load_config",
@@ -287,6 +338,7 @@ __all__ = [
 
 # Logging
 from .logging import (
+    get_standard_logger,
     GAAPLogger,
     configure_logging,
     get_logger,
@@ -300,8 +352,14 @@ __all__.extend(
         "set_log_level",
         "configure_logging",
         "GAAPLogger",
+        "get_standard_logger",
     ]
 )
+
+# External Connectors Config
+from .config import ExternalConnectorsConfig
+
+__all__.append("ExternalConnectorsConfig")
 
 # Observability
 from .observability import (
@@ -353,5 +411,72 @@ __all__.extend(
         "AdaptiveRateLimiter",
         "CompositeRateLimiter",
         "create_rate_limiter",
+    ]
+)
+
+# World Model
+from gaap.core.world_model import (
+    Action,
+    Prediction,
+    RiskLevel,
+    WorldModel,
+)
+
+__all__.extend(
+    [
+        "WorldModel",
+        "Action",
+        "Prediction",
+        "RiskLevel",
+    ]
+)
+
+# Real-Time Reflection
+from gaap.core.reflection import (
+    ExecutionSummary,
+    RealTimeReflector,
+    Reflection,
+    ReflectionType,
+    get_reflector,
+)
+
+__all__.extend(
+    [
+        # Reflection
+        "RealTimeReflector",
+        "Reflection",
+        "ReflectionType",
+        "ExecutionSummary",
+        "get_reflector",
+    ]
+)
+
+# SOP Governance
+from gaap.core.governance import (
+    Artifact,
+    ArtifactStatus,
+    RoleDefinition,
+    SOPExecution,
+    SOPGatekeeper,
+    SOPStep,
+    SOPStepStatus,
+    SOPStore,
+    create_sop_gatekeeper,
+    create_sop_store,
+)
+
+__all__.extend(
+    [
+        # Governance
+        "Artifact",
+        "ArtifactStatus",
+        "RoleDefinition",
+        "SOPExecution",
+        "SOPGatekeeper",
+        "SOPStep",
+        "SOPStepStatus",
+        "SOPStore",
+        "create_sop_gatekeeper",
+        "create_sop_store",
     ]
 )

@@ -14,7 +14,16 @@ from gaap.core.types import (
     ModelTier,
     ProviderType,
 )
-from gaap.providers.base_provider import BaseProvider, get_logger
+from gaap.core.logging import get_standard_logger as get_logger
+from gaap.providers.base_provider import BaseProvider
+
+# =============================================================================
+# Constants
+# =============================================================================
+
+RETRY_WAIT_SHORT = 5  # seconds - shorter wait when switching accounts
+RETRY_WAIT_BASE = 30  # seconds - base wait for exponential backoff
+MAX_RETRIES_DEFAULT = 3
 
 # =============================================================================
 # WebChat Models
@@ -85,8 +94,8 @@ class WebChatBridgeProvider(BaseProvider):
             auto_discover_accounts()
             self._pool = mgr.pool(webchat_provider)
             self._pool_initialized = True
-        except Exception:
-            pass
+        except Exception as e:
+            self._logger.debug(f"Pool initialization skipped: {e}")
 
         # الحصول على تكوين المزود
         config = WEBCHAT_MODELS.get(webchat_provider, WEBCHAT_MODELS["kimi"])
@@ -191,8 +200,8 @@ class WebChatBridgeProvider(BaseProvider):
                             f"({cooldown_sec // 3600}h {(cooldown_sec % 3600) // 60}m cooldown, "
                             f"expires at {expires.strftime('%H:%M:%S')})"
                         )
-            except Exception:
-                pass
+            except Exception as e:
+                self._logger.debug(f"Rate limit check skipped: {e}")
 
     def get_account_status(self) -> str:
         """Get a human-readable status of all accounts."""
@@ -324,8 +333,8 @@ class WebChatBridgeProvider(BaseProvider):
 
                     if detect_hard_cooldown(full_err):
                         is_hard_limit = True
-                except Exception:
-                    pass
+                except Exception as e:
+                    self._logger.debug(f"Hard cooldown detection skipped: {e}")
 
                 # If hard limit, try switching to another account immediately
                 if is_hard_limit and self._pool:
@@ -367,9 +376,9 @@ class WebChatBridgeProvider(BaseProvider):
                                 f"switching to '{next_acct.label}'"
                             )
                             current_account = next_acct.label
-                            wait = 5  # shorter wait since we're switching accounts
+                            wait = RETRY_WAIT_SHORT
                         else:
-                            wait = 30 * attempt  # 30s, 60s
+                            wait = RETRY_WAIT_BASE * attempt
                     else:
                         wait = self._cooldown_sec * attempt * 2
 

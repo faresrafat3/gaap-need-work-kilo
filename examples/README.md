@@ -11,6 +11,8 @@ This directory contains example scripts demonstrating various GAAP features.
 | `03_rate_limiting.py` | Rate limiting strategies |
 | `04_custom_provider.py` | Creating custom providers |
 | `05_error_handling.py` | Error handling and self-healing |
+| `06_complete_workflow.py` | **Complete real-world workflow examples** |
+| `07_testing_guide.py` | **Testing infrastructure and advanced patterns** |
 
 ## Running Examples
 
@@ -24,6 +26,8 @@ python examples/02_observability.py
 python examples/03_rate_limiting.py
 python examples/04_custom_provider.py
 python examples/05_error_handling.py
+python examples/06_complete_workflow.py
+python examples/07_testing_guide.py
 ```
 
 ## Prerequisites
@@ -67,3 +71,20 @@ python examples/05_error_handling.py
 - Healing levels
 - Retry logic patterns
 - Error serialization
+
+### 06_complete_workflow.py (NEW 🎉)
+- **Example 1**: Simple code generation (Binary Search)
+- **Example 2**: Multi-step project creation (REST API)
+- **Example 3**: Code review and refactoring
+- **Example 4**: Debugging with self-healing
+- **Example 5**: Memory and learning from experience
+- **Example 6**: Provider comparison (Groq vs Gemini)
+
+### 07_testing_guide.py (NEW 🎉)
+- **Test 1**: Basic engine with mock provider
+- **Test 2**: Security firewall testing
+- **Test 3**: Error handling and self-healing
+- **Test 4**: Hierarchical memory system
+- **Test 5**: Multi-step workflow
+- **Pattern 1**: Retry with exponential backoff
+- **Pattern 2**: Circuit breaker

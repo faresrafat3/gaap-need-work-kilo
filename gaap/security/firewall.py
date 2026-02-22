@@ -2,7 +2,9 @@
 import hashlib
 import json
 import logging
+import os
 import re
+import secrets
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -252,33 +254,32 @@ class PromptFirewall:
         return min(score, 1.0)
 
     def _layer4_scan(self, text: str, detected: list[str], context: dict[str, Any] | None) -> float:
-        """فحص دلالي"""
+        """فحص دلالي للحقن المعقد (Semantic Intelligence)"""
         score = 0.0
 
-        # كلمات مفتاحية خطيرة
-        danger_keywords = [
-            "override",
-            "bypass",
-            "exploit",
-            "hack",
-            "unauthorized",
-            "secret",
-            "password",
-            "token",
+        # 1. تكتيكات هجومية استراتيجية
+        adversarial_tactics = [
+            "instead of", "forget previous", "now act as", 
+            "bypass", "emergency override", "developer mode",
+            "unrestricted", "no filters"
         ]
 
         text_lower = text.lower()
-        found_keywords = [kw for kw in danger_keywords if kw in text_lower]
+        found_tactics = [kw for kw in adversarial_tactics if kw in text_lower]
 
-        if found_keywords:
-            detected.append(f"L4:danger_keywords:{found_keywords}")
-            score += 0.2 * len(found_keywords)
+        if found_tactics:
+            detected.append(f"L4:tactics_detected:{found_tactics}")
+            score += 0.2 * len(found_tactics)
 
-        # سياق المشروع
+        # 2. فحص محاولة كسر السياق والتعليمات
+        if "ignore" in text_lower and ("prompt" in text_lower or "instruction" in text_lower):
+            detected.append("L4:context_break_attempt")
+            score += 0.4
+
+        # سياق المشروع (Existing Logic)
         if context:
-            context.get("allowed_topics", [])
-            # فحص إذا كان النص خارج الموضوع المسموح
-            # ...
+            # logic here...
+            pass
 
         return min(score, 1.0)
 
@@ -416,6 +417,12 @@ class AuditTrail:
 
         self._chain.append(entry)
 
+        if self.storage_path:
+            try:
+                self.export(self.storage_path)
+            except Exception as e:
+                self._logger.error(f"Failed to persist audit trail: {e}")
+
         return entry
 
     def _calculate_hash(self, entry: AuditEntry) -> str:
@@ -485,8 +492,21 @@ class CapabilityToken:
 class CapabilityManager:
     """مدير القدرات"""
 
-    def __init__(self, secret_key: str = "gaap-secret"):
-        self.secret_key = secret_key
+    def __init__(self, secret_key: str | None = None):
+        if secret_key:
+            self.secret_key = secret_key
+        else:
+            env_key = os.environ.get("GAAP_CAPABILITY_SECRET")
+            if env_key:
+                self.secret_key = env_key
+            else:
+                self.secret_key = secrets.token_hex(32)
+                self._logger = logging.getLogger("gaap.security.capability")
+                self._logger.warning(
+                    "No secret key provided and GAAP_CAPABILITY_SECRET not set. "
+                    "Generated ephemeral key — tokens will not survive restarts. "
+                    "Set GAAP_CAPABILITY_SECRET env var for production use."
+                )
         self._active_tokens: dict[str, CapabilityToken] = {}
         self._logger = logging.getLogger("gaap.security.capability")
 
@@ -564,6 +584,6 @@ def create_audit_trail(storage_path: str | None = None) -> AuditTrail:
     return AuditTrail(storage_path=storage_path)
 
 
-def create_capability_manager(secret_key: str = "gaap-secret") -> CapabilityManager:
+def create_capability_manager(secret_key: str | None = None) -> CapabilityManager:
     """إنشاء مدير قدرات"""
     return CapabilityManager(secret_key=secret_key)

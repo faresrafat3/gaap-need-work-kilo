@@ -34,12 +34,15 @@ Usage:
 """
 
 import json
+import logging
 import threading
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
+
+logger = logging.getLogger("gaap.providers.account_manager")
 
 # =============================================================================
 # Storage
@@ -539,8 +542,8 @@ class AccountSlot:
                 return AccountStatus.NEEDS_LOGIN
             if auth.is_expired:
                 return AccountStatus.EXPIRED
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Account operation failed: {e}")
         return AccountStatus.ACTIVE
 
     @property
@@ -597,8 +600,8 @@ class AccountSlot:
                     warnings.append(f"🔐 Auth expires in {auth.remaining_sec // 60}m!")
                 elif remaining_hours < 12:
                     warnings.append(f"🔐 Auth expires in {remaining_hours:.1f}h")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Account operation failed: {e}")
 
         return warnings
 
@@ -1123,7 +1126,9 @@ class PoolManager:
         if not should:
             raise RuntimeError(f"[{provider}] Cannot call: {reason}")
 
-        assert acct_label is not None
+        if acct_label is None:
+            raise RuntimeError(f"[{provider}] No account label returned from should_call")
+
         acct = pool.get_account(acct_label)
         if not acct:
             raise RuntimeError(f"[{provider}] Account '{acct_label}' not found")

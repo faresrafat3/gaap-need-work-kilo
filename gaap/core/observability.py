@@ -12,36 +12,92 @@ import time
 from collections.abc import Callable
 from contextlib import contextmanager
 from functools import wraps
-from typing import Any, ContextManager, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, ContextManager, Optional, Protocol, TypeVar, cast
 
 F = TypeVar("F", bound=Callable[..., Any])
 
+# =============================================================================
+# Type Stubs for Optional Dependencies
+# =============================================================================
+
+if TYPE_CHECKING:
+    from opentelemetry import trace
+    from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+    from opentelemetry.trace import Span, Status, StatusCode
+    from prometheus_client import Counter, Gauge, Histogram, Info
+else:
+
+    class Span(Protocol):
+        def set_attribute(self, key: str, value: Any) -> None: ...
+        def record_exception(self, exception: Exception) -> None: ...
+        def set_status(self, status: Any) -> None: ...
+        def add_event(self, name: str, attributes: dict | None = None) -> None: ...
+
+    class Status(Protocol):
+        def __init__(self, status_code: Any, description: str = ""): ...
+
+    class StatusCode(Protocol):
+        ERROR: Any
+        OK: Any
+
+    class Resource(Protocol):
+        @staticmethod
+        def create(attrs: dict) -> "Resource": ...
+
+    class TracerProvider(Protocol):
+        def add_span_processor(self, processor: Any) -> None: ...
+
+    class BatchSpanProcessor(Protocol):
+        def __init__(self, exporter: Any): ...
+
+    class ConsoleSpanExporter(Protocol):
+        pass
+
+    SERVICE_NAME: str = ""
+
+    class Counter(Protocol):
+        def labels(self, **kwargs: str) -> "Counter": ...
+        def inc(self, value: float = 1) -> None: ...
+
+    class Histogram(Protocol):
+        def labels(self, **kwargs: str) -> "Histogram": ...
+        def observe(self, value: float) -> None: ...
+
+    class Gauge(Protocol):
+        def labels(self, **kwargs: str) -> "Gauge": ...
+        def set(self, value: float) -> None: ...
+        def inc(self, value: float = 1) -> None: ...
+        def dec(self, value: float = 1) -> None: ...
+
+    class Info(Protocol):
+        def labels(self, **kwargs: str) -> "Info": ...
+        def set(self, value: dict) -> None: ...
+
+# =============================================================================
+# Optional Imports
+# =============================================================================
 
 try:
-    from opentelemetry import trace
-    from opentelemetry.context import Context
+    from opentelemetry import trace as _trace
     from opentelemetry.sdk.resources import SERVICE_NAME, Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
     from opentelemetry.trace import Span, Status, StatusCode
 
     OTEL_AVAILABLE = True
+    trace = _trace
 except ImportError:
     OTEL_AVAILABLE = False
-    trace = None  # type: ignore[assignment]
-    Span = object  # type: ignore[misc,assignment]
+    trace = None
 
 try:
-    from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, Info
-    from prometheus_client.context_managers import ExceptionCounter
+    from prometheus_client import Counter, Gauge, Histogram, Info
 
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
-    Counter = None  # type: ignore[misc,assignment]
-    Histogram = None  # type: ignore[misc,assignment]
-    Gauge = None  # type: ignore[misc,assignment]
-    Info = None  # type: ignore[misc,assignment]
 
 
 class TracingConfig:
@@ -49,9 +105,9 @@ class TracingConfig:
 
     def __init__(
         self,
-        service_name: str = "gaap-system",
-        service_version: str = "1.0.0",
-        environment: str = "development",
+        service_name: str = "gaap-sovereign",
+        service_version: str = "2.1.0-SOVEREIGN",
+        environment: str = "production",
         enable_console_export: bool = False,
         enable_otlp_export: bool = False,
         otlp_endpoint: str | None = None,
@@ -144,8 +200,9 @@ class Tracer:
             except ImportError:
                 pass
 
-        trace.set_tracer_provider(self._provider)
-        self._tracer = trace.get_tracer(self.config.service_name, self.config.service_version)
+        if trace is not None:
+            trace.set_tracer_provider(self._provider)
+            self._tracer = trace.get_tracer(self.config.service_name, self.config.service_version)
 
     @property
     def tracer(self) -> Any:
@@ -167,7 +224,7 @@ class Tracer:
 
             return noop_span()
 
-        return self._tracer.start_as_current_span(name, attributes=attributes, kind=kind)  # type: ignore[no-any-return]
+        return self._tracer.start_as_current_span(name, attributes=attributes, kind=kind)
 
     def record_exception(self, span: Any, exception: Exception) -> None:
         """Record an exception in a span"""
@@ -452,8 +509,8 @@ class Observability:
                     return func(*args, **kwargs)
 
             if asyncio.iscoroutinefunction(func):
-                return async_wrapper  # type: ignore[return-value]
-            return sync_wrapper  # type: ignore[return-value]
+                return cast(F, async_wrapper)
+            return cast(F, sync_wrapper)
 
         return decorator
 

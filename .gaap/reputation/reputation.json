@@ -1,0 +1,47 @@
+{
+  "profiles": {
+    "default_coder": {
+      "name": "Coder",
+      "specialization": "PYTHON",
+      "guild": null,
+      "total_tasks": 0,
+      "reputation_scores": {}
+    },
+    "default_critic": {
+      "name": "Critic",
+      "specialization": "SECURITY",
+      "guild": null,
+      "total_tasks": 0,
+      "reputation_scores": {}
+    },
+    "default_researcher": {
+      "name": "Researcher",
+      "specialization": "RESEARCH",
+      "guild": null,
+      "total_tasks": 0,
+      "reputation_scores": {}
+    },
+    "custom_coder_001": {
+      "name": "Coder",
+      "specialization": "PYTHON",
+      "guild": null,
+      "total_tasks": 0,
+      "reputation_scores": {}
+    },
+    "agent_1": {
+      "name": "Coder",
+      "specialization": "PYTHON",
+      "guild": null,
+      "total_tasks": 0,
+      "reputation_scores": {}
+    },
+    "agent_2": {
+      "name": "Critic",
+      "specialization": "SECURITY",
+      "guild": null,
+      "total_tasks": 0,
+      "reputation_scores": {}
+    }
+  },
+  "guilds": {}
+}

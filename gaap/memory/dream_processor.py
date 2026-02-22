@@ -183,8 +183,8 @@ class DreamProcessor:
                             entries.append(json.loads(line))
                         except json.JSONDecodeError:
                             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Dream processing error: {e}")
         return entries
 
     def _extract_error_lesson(self, entry: dict[str, Any]) -> str | None:

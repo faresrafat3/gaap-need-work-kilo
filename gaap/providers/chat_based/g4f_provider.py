@@ -23,26 +23,23 @@ G4F_MODELS = {
     # OpenAI Models
     "gpt-4o": "gpt-4o",
     "gpt-4o-mini": "gpt-4o-mini",
-    "gpt-4": "gpt-4",
     "gpt-4-turbo": "gpt-4-turbo",
-    "gpt-3.5-turbo": "gpt-3.5-turbo",
     # Claude Models
     "claude-3-5-sonnet": "claude-3.5-sonnet",
     "claude-3-5-opus": "claude-3.5-opus",
-    "claude-3-opus": "claude-3-opus",
-    "claude-3-sonnet": "claude-3-sonnet",
-    "claude-3-haiku": "claude-3-haiku",
     # Gemini Models
-    "gemini-pro": "gemini-pro",
     "gemini-1.5-pro": "gemini-1.5-pro",
     "gemini-1.5-flash": "gemini-1.5-flash",
-    # Llama Models
+    # Llama Models (v3.1)
+    "llama-3-1-70b": "llama-3.1-70b",
+    "llama-3-1-405b": "llama-3.1-405b",
     "llama-3-70b": "llama-3-70b",
-    "llama-3-8b": "llama-3-8b",
-    "llama-2-70b": "llama-2-70b",
-    # Mistral Models
-    "mixtral-8x7b": "mixtral-8x7b",
-    "mistral-7b": "mistral-7b",
+    # DeepSeek Models (Highly recommended for research/code)
+    "deepseek-v3": "deepseek-v3",
+    "deepseek-coder": "deepseek-coder",
+    # Qwen Models
+    "qwen-2-5-72b": "qwen-2.5-72b",
+    "qwen-2-5-coder": "qwen-2.5-coder-32b",
 }
 
 # تكاليف تقريبية (g4f مجاني لكن للتتبع)
@@ -277,7 +274,8 @@ class G4FProvider(BaseProvider):
                 if not name.startswith("_"):
                     providers.append(name)
             return providers
-        except Exception:
+        except Exception as e:
+            self._logger.debug(f"Failed to list G4F providers: {e}")
             return []
 
 

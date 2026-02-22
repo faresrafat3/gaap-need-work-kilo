@@ -754,6 +754,96 @@ class PluginExecutionError(PluginError):
 
 
 # =============================================================================
+# Axiom Exceptions
+# =============================================================================
+
+
+class AxiomError(GAAPException):
+    """خطأ في البديهيات"""
+
+    error_code = "GAAP_AXM_001"
+    error_category = "axiom"
+    severity = "error"
+
+
+class AxiomViolationError(AxiomError):
+    """انتهاك بديهية"""
+
+    error_code = "GAAP_AXM_002"
+
+    def __init__(
+        self,
+        axiom_name: str,
+        violation_details: str,
+        task_id: str | None = None,
+        severity_level: str = "medium",
+        **kwargs: Any,
+    ) -> None:
+        severity = "warning" if severity_level == "low" else "error"
+        super().__init__(
+            message=f"Axiom '{axiom_name}' violated: {violation_details}",
+            details={
+                "axiom": axiom_name,
+                "task_id": task_id,
+                "severity_level": severity_level,
+            },
+            suggestions=[
+                f"Fix the violation of axiom '{axiom_name}'",
+                "Review the code against project constraints",
+            ],
+            **kwargs,
+        )
+        self.severity = severity
+
+
+class SyntaxAxiomError(AxiomViolationError):
+    """خطأ في بديهية الصيغة"""
+
+    error_code = "GAAP_AXM_003"
+
+    def __init__(self, syntax_error: str, code_snippet: str, **kwargs: Any) -> None:
+        super().__init__(
+            axiom_name="syntax",
+            violation_details=f"Code does not parse: {syntax_error}",
+            severity_level="low",
+            **kwargs,
+        )
+        self.details["code_snippet"] = code_snippet[:200]
+
+
+class DependencyAxiomError(AxiomViolationError):
+    """خطأ في بديهية التبعيات"""
+
+    error_code = "GAAP_AXM_004"
+
+    def __init__(self, package_name: str, **kwargs: Any) -> None:
+        super().__init__(
+            axiom_name="dependency",
+            violation_details=f"New package '{package_name}' added without L1 approval",
+            severity_level="medium",
+            **kwargs,
+        )
+        self.details["package"] = package_name
+
+
+class InterfaceAxiomError(AxiomViolationError):
+    """خطأ في بديهية الواجهة"""
+
+    error_code = "GAAP_AXM_005"
+    severity = "critical"
+
+    def __init__(self, file_path: str, change_type: str, **kwargs: Any) -> None:
+        super().__init__(
+            axiom_name="interface",
+            violation_details=f"Sensitive file '{file_path}' modified: {change_type}",
+            severity_level="high",
+            **kwargs,
+        )
+        self.details["file_path"] = file_path
+        self.details["change_type"] = change_type
+
+
+# =============================================================================
 # Utility Functions
 # =============================================================================
 

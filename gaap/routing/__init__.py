@@ -1,3 +1,34 @@
+"""
+GAAP Routing Module
+===================
+
+Intelligent provider selection and failover:
+
+Smart Router:
+    - RoutingStrategy: COST, SPEED, QUALITY, BALANCED, SMART
+    - SmartRouter: AI-powered provider selection
+    - ProviderScore: Provider quality metrics
+
+Fallback System:
+    - FallbackManager: Automatic failover on errors
+    - FallbackChain: Ordered fallback providers
+    - ProviderHealth: Health tracking per provider
+    - CircuitBreaker: Prevent cascading failures
+
+Features:
+    - Task complexity analysis
+    - Budget-aware routing
+    - Multi-key rotation
+    - Rate limit handling
+    - Quality-based selection
+
+Usage:
+    from gaap.routing import SmartRouter, RoutingStrategy
+
+    router = SmartRouter(providers, strategy=RoutingStrategy.SMART)
+    decision = await router.route(messages, task)
+"""
+
 from .fallback import (
     CircuitBreaker,
     FallbackChain,

@@ -306,6 +306,7 @@ class LeakyBucketRateLimiter(BaseRateLimiter):
             except asyncio.CancelledError:
                 break
             except Exception:
+                self._logger.debug("Leaky bucket background task error, retrying...")
                 await asyncio.sleep(0.1)
 
     async def acquire(self, tokens: int = 1) -> RateLimitResult:

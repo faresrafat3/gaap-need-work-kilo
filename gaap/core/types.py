@@ -1,4 +1,44 @@
-# Core Types
+"""
+Core Types for GAAP System
+
+Provides fundamental type definitions used throughout GAAP:
+
+Classes:
+    - TaskPriority: Task priority levels
+    - TaskComplexity: Task complexity levels
+    - TaskType: Task type enumeration
+    - LayerType: GAAP layer types
+    - ModelTier: LLM model tiers
+    - ProviderType: Provider types
+    - MessageRole: Message roles in conversations
+    - CriticType: MAD panel critic types
+    - HealingLevel: Self-healing levels
+    - ExecutionStatus: Task execution status
+    - SecurityRiskLevel: Security risk levels
+    - ContextLevel: Context loading levels
+    - MemoryType: Memory system types
+    - Message: Message data class
+    - Task: Task data class
+    - TaskResult: Task execution result
+    - And many more...
+
+Usage:
+    from gaap.core.types import (
+        Task, TaskPriority, TaskType, TaskComplexity,
+        Message, MessageRole,
+        GAAPRequest, GAAPResponse
+    )
+
+    # Create a task
+    task = Task(
+        id="task-123",
+        description="Write a function",
+        type=TaskType.CODE_GENERATION,
+        priority=TaskPriority.NORMAL,
+        complexity=TaskComplexity.SIMPLE
+    )
+"""
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -25,7 +65,23 @@ T_contra = TypeVar("T_contra", contravariant=True)
 
 
 class TaskPriority(Enum):
-    """أولوية المهمة"""
+    """
+    Task priority levels.
+
+    Determines task scheduling and resource allocation.
+
+    Members:
+        CRITICAL: Critical - requires maximum resources
+        HIGH: High priority
+        NORMAL: Normal priority (default)
+        LOW: Low priority
+        BACKGROUND: Background - does not affect user experience
+
+    Usage:
+        >>> priority = TaskPriority.HIGH
+        >>> print(priority.name)
+        'HIGH'
+    """
 
     CRITICAL = auto()  # حرجة - تتطلب موارد قصوى
     HIGH = auto()  # عالية
@@ -35,7 +91,22 @@ class TaskPriority(Enum):
 
 
 class TaskComplexity(Enum):
-    """تعقيد المهمة"""
+    """
+    Task complexity levels.
+
+    Estimates task difficulty and resource requirements.
+
+    Members:
+        TRIVIAL: Trivial - single line
+        SIMPLE: Simple - single function
+        MODERATE: Moderate - single component
+        COMPLEX: Complex - multiple components
+        ARCHITECTURAL: Architectural - full system
+
+    Usage:
+        >>> complexity = TaskComplexity.MODERATE
+        >>> estimated_tokens = get_token_estimate(complexity)
+    """
 
     TRIVIAL = auto()  # بسيط جداً - سطر واحد
     SIMPLE = auto()  # بسيط - دالة واحدة
@@ -45,7 +116,28 @@ class TaskComplexity(Enum):
 
 
 class TaskType(Enum):
-    """نوع المهمة"""
+    """
+    Task type enumeration.
+
+    Defines the nature of work to be performed.
+
+    Members:
+        CODE_GENERATION: Generate new code
+        CODE_REVIEW: Review existing code
+        DEBUGGING: Fix bugs
+        REFACTORING: Improve code structure
+        DOCUMENTATION: Write documentation
+        TESTING: Write/run tests
+        RESEARCH: Research solutions
+        ANALYSIS: Analyze requirements
+        PLANNING: Plan architecture
+        ORCHESTRATION: Orchestrate multiple tasks
+
+    Usage:
+        >>> task_type = TaskType.CODE_GENERATION
+        >>> if task_type == TaskType.CODE_GENERATION:
+        ...     generate_code()
+    """
 
     CODE_GENERATION = auto()
     CODE_REVIEW = auto()
@@ -60,18 +152,47 @@ class TaskType(Enum):
 
 
 class LayerType(Enum):
-    """طبقات GAAP الست"""
+    """
+    GAAP layer types.
+
+    Represents the active layer architecture.
+
+    Members:
+        INTERFACE: Layer 0 - Interface and security
+        STRATEGIC: Layer 1 - Strategic planning
+        TACTICAL: Layer 2 - Tactical organization
+        EXECUTION: Layer 3 - Execution and quality
+        EXTERNAL: Layer 5 - External intelligence
+
+    Usage:
+        >>> layer = LayerType.STRATEGIC
+        >>> print(layer.value)
+        1
+    """
 
     INTERFACE = 0  # Layer 0: الواجهة والحماية
     STRATEGIC = 1  # Layer 1: التخطيط الاستراتيجي
     TACTICAL = 2  # Layer 2: التنظيم التكتيكي
     EXECUTION = 3  # Layer 3: التنفيذ والجودة
-    META_LEARNING = 4  # Layer 4: التعلم الفوقي
     EXTERNAL = 5  # Layer 5: الذكاء الخارجي
 
 
 class ModelTier(Enum):
-    """مستويات النماذج"""
+    """
+    LLM model tiers.
+
+    Categorizes models by capability and cost.
+
+    Members:
+        TIER_1_STRATEGIC: Smartest models - for strategic planning
+        TIER_2_TACTICAL: Balanced intelligence/speed - for execution
+        TIER_3_EFFICIENT: Fast and cheap - for simple tasks
+        TIER_4_PRIVATE: Local - for sensitive data
+
+    Usage:
+        >>> tier = ModelTier.TIER_1_STRATEGIC
+        >>> model = get_model_for_tier(tier)
+    """
 
     TIER_1_STRATEGIC = auto()  # أذكى النماذج - للتخطيط الاستراتيجي
     TIER_2_TACTICAL = auto()  # توازن ذكاء/سرعة - للتنفيذ
@@ -80,7 +201,22 @@ class ModelTier(Enum):
 
 
 class ProviderType(Enum):
-    """نوع المزود"""
+    """
+    Provider type enumeration.
+
+    Categorizes LLM providers by service model.
+
+    Members:
+        CHAT_BASED: Chat-based provider (g4f, etc.)
+        FREE_TIER: Free tier (Groq, Gemini)
+        PAID: Paid provider (OpenAI, Anthropic)
+        LOCAL: Local provider (Ollama, vLLM)
+
+    Usage:
+        >>> provider_type = ProviderType.FREE_TIER
+        >>> if provider_type == ProviderType.FREE_TIER:
+        ...     use_free_tier()
+    """
 
     CHAT_BASED = auto()  # مزود قائم على Chat (g4f, etc.)
     FREE_TIER = auto()  # طبقة مجانية (Groq, Gemini)
@@ -89,7 +225,22 @@ class ProviderType(Enum):
 
 
 class MessageRole(Enum):
-    """أدوار الرسائل"""
+    """
+    Message roles in conversations.
+
+    Defines the sender of a message.
+
+    Members:
+        SYSTEM: System message
+        USER: User message
+        ASSISTANT: Assistant response
+        FUNCTION: Function call result
+        TOOL: Tool call result
+
+    Usage:
+        >>> role = MessageRole.USER
+        >>> message = Message(role=role, content="Hello")
+    """
 
     SYSTEM = "system"
     USER = "user"
@@ -99,18 +250,53 @@ class MessageRole(Enum):
 
 
 class CriticType(Enum):
-    """أنواع النقاد في MAD Panel"""
+    """
+    أنواع النقاد في لجنة MAD
+    
+    تحدد مجالات الخبرة لكل ناقد.
+    """
 
+    # Software & Logic (Existing)
     LOGIC = auto()  # ناقد المنطق
     SECURITY = auto()  # ناقد الأمان
     PERFORMANCE = auto()  # ناقد الأداء
     STYLE = auto()  # ناقد الأسلوب
     COMPLIANCE = auto()  # ناقد الامتثال
     ETHICS = auto()  # ناقد الأخلاق
+    
+    # Research & Intelligence (New)
+    ACCURACY = auto()  # ناقد الدقة العلمية
+    SOURCE_CREDIBILITY = auto()  # ناقد موثوقية المصادر
+    COMPLETENESS = auto()  # ناقد كمال البحث
+    
+    # Diagnostics (New)
+    ROOT_CAUSE = auto()  # ناقد السبب الجذري
+    RELIABILITY = auto()  # ناقد الموثوقية التشخيصية
+    
+    # Analysis
+    CRITICAL_THINKING = auto()  # ناقد التفكير النقدي
+    BIAS_DETECTION = auto()  # ناقد كشف التحيز
+
 
 
 class HealingLevel(Enum):
-    """مستويات التعافي الذاتي"""
+    """
+    Self-healing levels.
+
+    Escalating levels of recovery attempts.
+
+    Members:
+        L1_RETRY: Retry (transient errors)
+        L2_REFINE: Refine prompt (syntax/logic errors)
+        L3_PIVOT: Change model (capability limits)
+        L4_STRATEGY_SHIFT: Change strategy (complexity)
+        L5_HUMAN_ESCALATION: Human escalation (unrecoverable)
+
+    Usage:
+        >>> level = HealingLevel.L1_RETRY
+        >>> if should_retry(level):
+        ...     retry_operation()
+    """
 
     L1_RETRY = auto()  # إعادة المحاولة
     L2_REFINE = auto()  # تحسين الصيغة
@@ -120,7 +306,26 @@ class HealingLevel(Enum):
 
 
 class ExecutionStatus(Enum):
-    """حالة التنفيذ"""
+    """
+    Task execution status.
+
+    Tracks task lifecycle.
+
+    Members:
+        PENDING: Task created, not started
+        QUEUED: Task in queue
+        RUNNING: Task executing
+        COMPLETED: Task completed successfully
+        FAILED: Task failed
+        RETRYING: Task being retried
+        ESCALATED: Task escalated to human
+        CANCELLED: Task cancelled
+
+    Usage:
+        >>> status = ExecutionStatus.RUNNING
+        >>> if status == ExecutionStatus.COMPLETED:
+        ...     handle_success()
+    """
 
     PENDING = auto()
     QUEUED = auto()
@@ -133,7 +338,24 @@ class ExecutionStatus(Enum):
 
 
 class SecurityRiskLevel(Enum):
-    """مستويات الخطر الأمني"""
+    """
+    Security risk levels.
+
+    Assesses security threat severity.
+
+    Members:
+        SAFE: Safe - no threat
+        LOW: Low risk
+        MEDIUM: Medium risk
+        HIGH: High risk
+        CRITICAL: Critical risk
+        BLOCKED: Blocked - immediate threat
+
+    Usage:
+        >>> risk = SecurityRiskLevel.HIGH
+        >>> if risk >= SecurityRiskLevel.HIGH:
+        ...     block_request()
+    """
 
     SAFE = auto()  # آمن
     LOW = auto()  # خطر منخفض
@@ -144,7 +366,22 @@ class SecurityRiskLevel(Enum):
 
 
 class ContextLevel(Enum):
-    """مستويات تحميل السياق"""
+    """
+    Context loading levels.
+
+    Determines how much context to load.
+
+    Members:
+        LEVEL_0_OVERVIEW: Overview (~100 tokens)
+        LEVEL_1_MODULE: Module view (~500 tokens)
+        LEVEL_2_FILE: File view (~2k tokens)
+        LEVEL_3_FULL: Full content (~20k+ tokens)
+        LEVEL_4_DEPENDENCIES: With dependencies
+
+    Usage:
+        >>> level = ContextLevel.LEVEL_2_FILE
+        >>> context = load_context(level)
+    """
 
     LEVEL_0_OVERVIEW = auto()  # نظرة عامة (~100 tokens)
     LEVEL_1_MODULE = auto()  # نظرة وحدة (~500 tokens)
@@ -160,6 +397,16 @@ class MemoryType(Enum):
     EPISODIC = auto()  # ذاكرة الحلقات (L2)
     SEMANTIC = auto()  # ذاكرة دلالية (L3)
     PROCEDURAL = auto()  # ذاكرة إجرائية (L4)
+
+
+# =============================================================================
+# Constants
+# =============================================================================
+
+# Default values for task properties
+DEFAULT_TASK_PRIORITY = TaskPriority.NORMAL
+DEFAULT_TASK_COMPLEXITY = TaskComplexity.SIMPLE
+DEFAULT_TASK_TYPE = TaskType.CODE_GENERATION
 
 
 # =============================================================================
@@ -738,3 +985,86 @@ MAX_RETRIES_PER_LEVEL: Final[dict[HealingLevel, int]] = {
     HealingLevel.L4_STRATEGY_SHIFT: 1,
     HealingLevel.L5_HUMAN_ESCALATION: 0,
 }
+
+
+# =============================================================================
+# OODA Loop Types
+# =============================================================================
+
+
+class OODAPhase(Enum):
+    """مراحل دورة OODA"""
+
+    OBSERVE = auto()
+    ORIENT = auto()
+    DECIDE = auto()
+    ACT = auto()
+    LEARN = auto()
+
+
+class ReplanTrigger(Enum):
+    """محفزات إعادة التخطيط"""
+
+    NONE = auto()
+    L3_CRITICAL_FAILURE = auto()
+    AXIOM_VIOLATION = auto()
+    RESOURCE_EXHAUSTED = auto()
+    GOAL_DRIFT = auto()
+    USER_INTERRUPT = auto()
+
+
+@dataclass
+class OODAState:
+    """حالة دورة OODA"""
+
+    request_id: str
+    current_phase: OODAPhase = OODAPhase.OBSERVE
+    iteration: int = 0
+    max_iterations: int = 10
+
+    goal_achieved: bool = False
+    needs_replanning: bool = False
+    replan_trigger: ReplanTrigger = ReplanTrigger.NONE
+    replan_count: int = 0
+
+    completed_tasks: set[str] = field(default_factory=set)
+    failed_tasks: set[str] = field(default_factory=set)
+    in_progress_tasks: set[str] = field(default_factory=set)
+
+    axiom_violations: list[dict[str, Any]] = field(default_factory=list)
+    lessons_learned: list[str] = field(default_factory=list)
+
+    current_rss_mb: float = 0.0
+    peak_rss_mb: float = 0.0
+
+    last_observation: dict[str, Any] = field(default_factory=dict)
+    last_decision: dict[str, Any] = field(default_factory=dict)
+
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def advance_phase(self) -> OODAPhase:
+        """الانتقال للمرحلة التالية"""
+        phases = list(OODAPhase)
+        current_idx = phases.index(self.current_phase)
+        next_idx = (current_idx + 1) % len(phases)
+        self.current_phase = phases[next_idx]
+        if self.current_phase == OODAPhase.OBSERVE:
+            self.iteration += 1
+        return self.current_phase
+
+    def trigger_replan(self, trigger: ReplanTrigger) -> None:
+        """تفعيل إعادة التخطيط"""
+        self.needs_replanning = True
+        self.replan_trigger = trigger
+        self.replan_count += 1
+
+    def record_axiom_violation(self, violation: dict[str, Any]) -> None:
+        """تسجيل انتهاك بديهية"""
+        self.axiom_violations.append(violation)
+
+    def get_stupidity_rate(self) -> float:
+        """حساب معدل الأخطاء المنخفضة المستوى"""
+        if not self.axiom_violations:
+            return 0.0
+        low_level = [v for v in self.axiom_violations if v.get("level") == "low"]
+        return len(low_level) / max(len(self.axiom_violations), 1)

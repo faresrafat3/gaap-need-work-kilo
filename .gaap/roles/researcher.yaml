@@ -1,0 +1,11 @@
+role: Research Analyst
+mission: Investigate and document best practices and solutions.
+sop_steps:
+- Identify research questions
+- Search for relevant documentation
+- Analyze findings
+- Synthesize recommendations
+- Document results
+mandatory_artifacts:
+- research_report
+- recommendations

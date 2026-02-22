@@ -13,28 +13,38 @@ Usage:
     result = await sandbox.execute("print('hello')", language="python")
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
 import tempfile
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 logger = logging.getLogger("gaap.sandbox")
 
 DOCKER_AVAILABLE = False
+
+if TYPE_CHECKING:
+    from docker import DockerClient
+    from docker.errors import APIError, DockerException, ImageNotFound
+    from docker.models.containers import Container
+
 try:
-    import docker
-    from docker.errors import DockerException, ImageNotFound, APIError
+    import docker as _docker
+    from docker.errors import APIError, DockerException, ImageNotFound
 
     DOCKER_AVAILABLE = True
+    docker = _docker
 except ImportError:
-    docker = None  # type: ignore
-    DockerException = Exception  # type: ignore
-    ImageNotFound = Exception  # type: ignore
-    APIError = Exception  # type: ignore
+    DOCKER_AVAILABLE = False
+    docker = None
+    DockerException = Exception
+    ImageNotFound = Exception
+    APIError = Exception
 
 
 @dataclass
@@ -77,11 +87,11 @@ class DockerSandbox:
     """
 
     def __init__(self, config: SandboxConfig | None = None):
-        if not DOCKER_AVAILABLE:
+        if not DOCKER_AVAILABLE or docker is None:
             raise ImportError("Docker SDK not installed. Run: pip install docker")
 
         self.config = config or SandboxConfig()
-        self._client = docker.from_env()
+        self._client: DockerClient = docker.from_env()
         self._logger = logger
         self._ensure_image()
 
@@ -113,7 +123,7 @@ class DockerSandbox:
             SandboxResult with output and status
         """
         start_time = time.time()
-        container = None
+        container: Any = None
 
         try:
             command = self._build_command(code, language)
@@ -168,7 +178,7 @@ class DockerSandbox:
             if stats:
                 memory_used = stats.get("memory_stats", {}).get("usage", 0) / (1024 * 1024)
 
-            success = exit_code == 0 and "error" not in logs.lower()[:100]
+            success = exit_code == 0
 
             execution_time = (time.time() - start_time) * 1000
 
@@ -277,49 +287,85 @@ class DockerSandbox:
         }
 
 
+import shutil
+
+
+FIREJAIL_AVAILABLE = shutil.which("firejail") is not None
+
+
 class LocalSandbox:
     """
-    Fallback sandbox using local subprocess.
-    Less secure but works without Docker.
+    Fallback sandbox using local subprocess with lightweight isolation.
+
+    Security layers (best-effort when Docker is unavailable):
+    - Uses firejail for filesystem/network isolation when available
+    - Falls back to bare subprocess with timeout only (logs loud warning)
+    - Timeout enforcement via asyncio.wait_for
     """
 
     def __init__(self, timeout: int = 30):
         self.timeout = timeout
         self._logger = logger
+        self._use_firejail = FIREJAIL_AVAILABLE
+
+        if not self._use_firejail:
+            self._logger.warning(
+                "⚠️  SECURITY WARNING: firejail is not installed. "
+                "LocalSandbox will execute code WITHOUT isolation. "
+                "Install firejail for lightweight sandboxing: sudo apt install firejail"
+            )
+
+    def _build_command(self, code: str, language: str) -> list[str]:
+        """Build execution command, optionally wrapped in firejail."""
+        if language == "python":
+            base_cmd = ["python3", "-c", code]
+        elif language == "bash":
+            base_cmd = ["bash", "-c", code]
+        elif language == "javascript":
+            base_cmd = ["node", "-e", code]
+        else:
+            base_cmd = ["python3", "-c", code]
+
+        if self._use_firejail:
+            return [
+                "firejail",
+                "--quiet",
+                "--noprofile",
+                "--net=none",  # No network access
+                "--nosound",  # No sound
+                "--no3d",  # No 3D acceleration
+                "--nodvd",  # No DVD access
+                "--nogroups",  # No supplementary groups
+                "--nonewprivs",  # No privilege escalation
+                "--noroot",  # No root access
+                "--seccomp",  # Enable seccomp filter
+                "--private-tmp",  # Private /tmp
+                "--read-only=/",  # Read-only root filesystem
+                "--",
+            ] + base_cmd
+
+        return base_cmd
 
     async def execute(
         self,
         code: str,
         language: str = "python",
     ) -> SandboxResult:
-        """Execute code locally (fallback)"""
+        """Execute code locally with best-effort isolation."""
         start_time = time.time()
 
+        if not self._use_firejail:
+            self._logger.warning(
+                "Executing code WITHOUT sandbox isolation (firejail not available)"
+            )
+
         try:
-            if language == "python":
-                proc = await asyncio.create_subprocess_exec(
-                    "python3",
-                    "-c",
-                    code,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-            elif language == "bash":
-                proc = await asyncio.create_subprocess_exec(
-                    "bash",
-                    "-c",
-                    code,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-            else:
-                proc = await asyncio.create_subprocess_exec(
-                    "python3",
-                    "-c",
-                    code,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
+            cmd = self._build_command(code, language)
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
 
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=self.timeout)
@@ -334,9 +380,9 @@ class LocalSandbox:
             error = stderr.decode("utf-8", errors="replace")
 
             return SandboxResult(
-                success=exit_code == 0 and not error,
+                success=exit_code == 0,
                 output=output,
-                error=error,
+                error=error if exit_code != 0 else "",
                 exit_code=exit_code,
                 execution_time_ms=(time.time() - start_time) * 1000,
             )
@@ -352,10 +398,15 @@ class LocalSandbox:
 
 
 def get_sandbox(use_docker: bool = True) -> DockerSandbox | LocalSandbox:
-    """Get appropriate sandbox based on availability"""
+    """Get appropriate sandbox based on availability."""
     if use_docker and DOCKER_AVAILABLE:
         try:
             return DockerSandbox()
         except Exception:
-            pass
+            logger.warning("Docker sandbox creation failed, falling back to LocalSandbox")
+    else:
+        logger.warning(
+            "Docker not available, using LocalSandbox "
+            f"(firejail isolation: {'enabled' if FIREJAIL_AVAILABLE else 'DISABLED'})"
+        )
     return LocalSandbox()

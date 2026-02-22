@@ -47,6 +47,8 @@ dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
+    "pytest-vcr>=1.0.0",
+    "vcrpy>=5.0.0",
     "black>=23.0.0",
     "isort>=5.0.0",
     "mypy>=1.0.0",
@@ -154,6 +156,9 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
+    "gauntlet: marks tests as E2E gauntlet scenarios",
+    "chaos: marks tests as chaos/fault injection tests",
+    "vcr: marks tests that use VCR cassettes",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",

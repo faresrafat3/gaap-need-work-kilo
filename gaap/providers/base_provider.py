@@ -1,3 +1,31 @@
+"""
+Base Provider Module for GAAP System
+
+Provides foundational base classes for all LLM providers:
+
+Classes:
+    - RateLimitState: Rate limit tracking
+    - RateLimiter: Async rate limiting
+    - RetryConfig: Retry configuration
+    - RetryManager: Exponential backoff retry logic
+    - BaseProvider: Abstract base class for all providers
+
+Usage:
+    from gaap.providers import BaseProvider, RateLimiter, RetryManager
+
+    class MyProvider(BaseProvider):
+        async def _make_request(self, messages, model, **kwargs):
+            # Implementation here
+            pass
+
+Features:
+    - Rate limiting with token bucket
+    - Exponential backoff retry
+    - Streaming support
+    - Cost calculation
+    - Model tier tracking
+"""
+
 import asyncio
 import logging
 import time
@@ -27,6 +55,16 @@ from gaap.core.types import (
     Usage,
 )
 
+# =============================================================================
+# Constants
+# =============================================================================
+
+DEFAULT_REQUESTS_PER_MINUTE = 60
+DEFAULT_TOKENS_PER_MINUTE = 100000
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_BASE_DELAY = 1.0
+DEFAULT_TIMEOUT = 30.0
+
 T = TypeVar("T")
 
 
@@ -35,37 +73,50 @@ T = TypeVar("T")
 # =============================================================================
 
 
-def get_logger(name: str) -> logging.Logger:
-    """إنشاء مسجل"""
-    logger = logging.getLogger(name)
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
-    return logger
-
-
-# =============================================================================
-# Rate Limiter
-# =============================================================================
+from gaap.core.logging import get_standard_logger as get_logger
 
 
 @dataclass
 class RateLimitState:
-    """حالة حد الطلبات"""
+    """
+    Rate limit state tracking.
 
-    requests_per_minute: int = 60
-    tokens_per_minute: int = 100000
+    Tracks request counts and token usage within a time window.
+
+    Attributes:
+        requests_per_minute: Maximum requests allowed per minute
+        tokens_per_minute: Maximum tokens allowed per minute
+        current_requests: Current request count in window
+        current_tokens: Current token count in window
+        window_start: Start time of current window
+
+    Usage:
+        >>> state = RateLimitState(requests_per_minute=60)
+        >>> if state.is_allowed(tokens=100):
+        ...     state.record_request(tokens=100)
+    """
+
+    requests_per_minute: int = DEFAULT_REQUESTS_PER_MINUTE
+    tokens_per_minute: int = DEFAULT_TOKENS_PER_MINUTE
     current_requests: int = 0
     current_tokens: int = 0
     window_start: datetime = field(default_factory=datetime.now)
 
     def is_allowed(self, tokens: int = 0) -> bool:
-        """التحقق من السماح بالطلب"""
+        """
+        Check if request is allowed under rate limits.
+
+        Args:
+            tokens: Number of tokens for this request
+
+        Returns:
+            True if request is allowed, False otherwise
+
+        Note:
+            Automatically resets counters if window has expired
+        """
         now = datetime.now()
-        # إعادة تعيين النافذة إذا مرت دقيقة
+        # Reset window if minute has passed
         if (now - self.window_start).total_seconds() >= 60:
             self.current_requests = 0
             self.current_tokens = 0
@@ -77,30 +128,94 @@ class RateLimitState:
         )
 
     def record_request(self, tokens: int) -> None:
-        """تسجيل طلب"""
+        """
+        Record a request against rate limit.
+
+        Args:
+            tokens: Number of tokens used in request
+
+        Note:
+            Call this after making a successful request
+        """
         self.current_requests += 1
         self.current_tokens += tokens
 
 
 class RateLimiter:
-    """محدد معدل الطلبات"""
+    """
+    Async rate limiter with token bucket algorithm.
 
-    def __init__(self, requests_per_minute: int = 60, tokens_per_minute: int = 100000):
+    Provides rate limiting for API calls with:
+    - Configurable requests per minute
+    - Configurable tokens per minute
+    - Async-safe with locking
+    - Wait for slot capability
+
+    Attributes:
+        state: Current rate limit state
+        _lock: Async lock for thread safety
+
+    Usage:
+        >>> limiter = RateLimiter(requests_per_minute=60)
+        >>> if await limiter.acquire():
+        ...     await make_api_call()
+    """
+
+    def __init__(
+        self,
+        requests_per_minute: int = DEFAULT_REQUESTS_PER_MINUTE,
+        tokens_per_minute: int = DEFAULT_TOKENS_PER_MINUTE,
+    ):
+        """
+        Initialize rate limiter.
+
+        Args:
+            requests_per_minute: Max requests per minute (default: 60)
+            tokens_per_minute: Max tokens per minute (default: 100000)
+        """
         self.state = RateLimitState(
-            requests_per_minute=requests_per_minute, tokens_per_minute=tokens_per_minute
+            requests_per_minute=requests_per_minute,
+            tokens_per_minute=tokens_per_minute,
         )
         self._lock = asyncio.Lock()
 
     async def acquire(self, tokens: int = 0) -> bool:
-        """محاولة الحصول على إذن"""
+        """
+        Try to acquire a rate limit slot.
+
+        Args:
+            tokens: Number of tokens for this request
+
+        Returns:
+            True if slot acquired, False if rate limited
+
+        Example:
+            >>> if await limiter.acquire(tokens=100):
+            ...     # Make API call
+            ...     pass
+        """
         async with self._lock:
             if self.state.is_allowed(tokens):
                 self.state.record_request(tokens)
                 return True
             return False
 
-    async def wait_for_slot(self, tokens: int = 0, timeout: float = 30) -> bool:
-        """الانتظار حتى يتوفر مكان"""
+    async def wait_for_slot(self, tokens: int = 0, timeout: float = DEFAULT_TIMEOUT) -> bool:
+        """
+        Wait until a rate limit slot is available.
+
+        Args:
+            tokens: Number of tokens for this request
+            timeout: Maximum time to wait in seconds (default: 30)
+
+        Returns:
+            True if slot acquired within timeout, False otherwise
+
+        Example:
+            >>> if await limiter.wait_for_slot(tokens=100, timeout=60):
+            ...     # Make API call
+            ...     pass
+        """
         start = time.time()
         while time.time() - start < timeout:
             if await self.acquire(tokens):
@@ -116,52 +231,140 @@ class RateLimiter:
 
 @dataclass
 class RetryConfig:
-    """تكوين إعادة المحاولة"""
+    """
+    Retry configuration for exponential backoff.
 
-    max_retries: int = 3
-    base_delay: float = 1.0
+    Attributes:
+        max_retries: Maximum number of retry attempts (default: 3)
+        base_delay: Base delay in seconds (default: 1.0)
+        max_delay: Maximum delay cap in seconds (default: 60.0)
+        exponential_base: Base for exponential backoff (default: 2.0)
+        retry_on_status_codes: HTTP status codes to retry on
+
+    Usage:
+        >>> config = RetryConfig(max_retries=5, base_delay=0.5)
+        >>> manager = RetryManager(config)
+    """
+
+    max_retries: int = DEFAULT_MAX_RETRIES
+    base_delay: float = DEFAULT_BASE_DELAY
     max_delay: float = 60.0
     exponential_base: float = 2.0
     retry_on_status_codes: list[int] = field(default_factory=lambda: [429, 500, 502, 503, 504])
 
 
 class RetryManager:
-    """مدير إعادة المحاولة"""
+    """
+    Exponential backoff retry manager.
 
-    def __init__(self, config: RetryConfig):
+    Provides intelligent retry logic with:
+    - Exponential backoff delays
+    - Configurable max retries
+    - Status code-based retry decisions
+    - Network error detection
+
+    Attributes:
+        config: Retry configuration
+        _attempt_counts: Per-key attempt counters
+
+    Usage:
+        >>> config = RetryConfig(max_retries=3)
+        >>> manager = RetryManager(config)
+        >>> result = await manager.execute_with_retry(my_async_func)
+    """
+
+    def __init__(self, config: RetryConfig) -> None:
+        """
+        Initialize retry manager.
+
+        Args:
+            config: Retry configuration settings
+        """
         self.config = config
         self._attempt_counts: dict[str, int] = {}
 
     def get_delay(self, attempt: int) -> float:
-        """حساب التأخير للمحاولة"""
+        """
+        Calculate delay for a given attempt using exponential backoff.
+
+        Args:
+            attempt: Attempt number (0-indexed)
+
+        Returns:
+            Delay in seconds, capped at max_delay
+
+        Example:
+            >>> manager.get_delay(0)  # First retry
+            1.0
+            >>> manager.get_delay(2)  # Third retry
+            4.0
+        """
         delay = self.config.base_delay * (self.config.exponential_base**attempt)
         return min(delay, self.config.max_delay)
 
     def should_retry(self, attempt: int, error: Exception) -> bool:
-        """هل يجب إعادة المحاولة؟"""
+        """
+        Determine if retry should be attempted based on error type.
+
+        Args:
+            attempt: Current attempt number
+            error: Exception that occurred
+
+        Returns:
+            True if retry should be attempted, False otherwise
+
+        Retry Conditions:
+            - attempt < max_retries
+            - Network errors (TimeoutError, ConnectionError)
+            - Rate limit errors (ProviderRateLimitError)
+            - Server errors (HTTP 500, 502, 503, 504)
+        """
         if attempt >= self.config.max_retries:
             return False
 
-        # إعادة المحاولة لأخطاء الشبكة
+        # Retry for network errors
         if isinstance(error, (asyncio.TimeoutError, ConnectionError)):
             return True
 
-        # إعادة المحاولة لأخطاء HTTP محددة
+        # Retry for specific HTTP status codes
         status_code = getattr(error, "status_code", None)
         if status_code is not None:
             return status_code in self.config.retry_on_status_codes
 
+        # Retry for rate limits
         return isinstance(error, ProviderRateLimitError)
 
-    async def execute_with_retry(self, func: Callable[[], Awaitable[T]], key: str = "default") -> T:
-        """تنفيذ مع إعادة المحاولة"""
+    async def execute_with_retry(
+        self,
+        func: Callable[[], Awaitable[T]],
+        key: str = "default",
+    ) -> T:
+        """
+        Execute async function with automatic retry on failure.
+
+        Args:
+            func: Async function to execute
+            key: Unique key for tracking attempts
+
+        Returns:
+            Result from successful function execution
+
+        Raises:
+            Exception: Last exception if all retries exhausted
+
+        Example:
+            >>> result = await manager.execute_with_retry(
+            ...     lambda: api_call(),
+            ...     key="groq_request"
+            ... )
+        """
         attempt = 0
         last_error: Exception | None = None
 
         while attempt < self.config.max_retries:
             try:
                 result = await func()
-                # إعادة تعيين العداد عند النجاح
+                # Reset counter on success
                 self._attempt_counts[key] = 0
                 return result
             except Exception as e:
@@ -175,7 +378,8 @@ class RetryManager:
                 delay = self.get_delay(attempt)
                 await asyncio.sleep(delay)
 
-        assert last_error is not None
+        if last_error is None:
+            raise RuntimeError("Retry logic failed: no error recorded")
         raise last_error
 
 
@@ -186,7 +390,33 @@ class RetryManager:
 
 @dataclass
 class UsageRecord:
-    """سجل استخدام"""
+    """
+    Usage record for tracking API calls.
+
+    Attributes:
+        timestamp: Time of the request
+        provider: Provider name (e.g., "groq", "gemini")
+        model: Model used (e.g., "llama-3.3-70b")
+        input_tokens: Number of input tokens
+        output_tokens: Number of output tokens
+        total_tokens: Total tokens (input + output)
+        cost_usd: Cost in USD
+        latency_ms: Request latency in milliseconds
+        success: Whether request succeeded
+        error: Error message if failed
+
+    Usage:
+        >>> record = UsageRecord(
+        ...     timestamp=datetime.now(),
+        ...     provider="groq",
+        ...     model="llama-3.3-70b",
+        ...     input_tokens=100,
+        ...     output_tokens=50,
+        ...     cost_usd=0.001,
+        ...     latency_ms=250.0,
+        ...     success=True
+        ... )
+    """
 
     timestamp: datetime
     provider: str
@@ -201,9 +431,40 @@ class UsageRecord:
 
 
 class UsageTracker:
-    """متتبع الاستخدام"""
+    """
+    Tracks API usage across all providers.
 
-    def __init__(self, max_records: int = 10000):
+    Features:
+    - Per-provider usage tracking
+    - Token and cost aggregation
+    - Recent record history
+    - Automatic trimming of old records
+
+    Attributes:
+        max_records: Maximum records to keep (default: 10000)
+        _records: List of usage records
+        _totals: Per-provider totals
+
+    Usage:
+        >>> tracker = UsageTracker(max_records=5000)
+        >>> tracker.record(
+        ...     provider="groq",
+        ...     model="llama-3.3-70b",
+        ...     input_tokens=100,
+        ...     output_tokens=50,
+        ...     cost_usd=0.001,
+        ...     latency_ms=250.0,
+        ...     success=True
+        ... )
+    """
+
+    def __init__(self, max_records: int = 10000) -> None:
+        """
+        Initialize usage tracker.
+
+        Args:
+            max_records: Maximum number of records to retain
+        """
         self.max_records = max_records
         self._records: list[UsageRecord] = []
         self._totals: dict[str, dict[str, float]] = {}
@@ -219,7 +480,25 @@ class UsageTracker:
         success: bool,
         error: str | None = None,
     ) -> UsageRecord:
-        """تسجيل استخدام"""
+        """
+        Record an API usage event.
+
+        Args:
+            provider: Provider name
+            model: Model used
+            input_tokens: Input token count
+            output_tokens: Output token count
+            cost_usd: Cost in USD
+            latency_ms: Latency in milliseconds
+            success: Success status
+            error: Error message if failed
+
+        Returns:
+            Created UsageRecord instance
+
+        Note:
+            Automatically trims old records if exceeding max_records
+        """
         record = UsageRecord(
             timestamp=datetime.now(),
             provider=provider,
@@ -235,11 +514,11 @@ class UsageTracker:
 
         self._records.append(record)
 
-        # تقليم السجلات القديمة
+        # Trim old records
         if len(self._records) > self.max_records:
             self._records = self._records[-self.max_records :]
 
-        # تحديث الإجماليات
+        # Update totals
         if provider not in self._totals:
             self._totals[provider] = {
                 "total_tokens": 0,
@@ -257,13 +536,39 @@ class UsageTracker:
         return record
 
     def get_totals(self, provider: str | None = None) -> dict[str, Any]:
-        """الحصول على الإجماليات"""
+        """
+        Get usage totals.
+
+        Args:
+            provider: Optional provider name (returns all if None)
+
+        Returns:
+            Dictionary with totals for specified provider or all
+
+        Example:
+            >>> totals = tracker.get_totals("groq")
+            >>> print(totals["total_cost"])
+            0.05
+        """
         if provider:
             return self._totals.get(provider, {})
         return self._totals.copy()
 
     def get_recent_records(self, limit: int = 100) -> list[UsageRecord]:
-        """الحصول على السجلات الأخيرة"""
+        """
+        Get most recent usage records.
+
+        Args:
+            limit: Maximum number of records to return
+
+        Returns:
+            List of recent UsageRecord objects
+
+        Example:
+            >>> records = tracker.get_recent_records(limit=10)
+            >>> for record in records:
+            ...     print(f"{record.provider}: {record.cost_usd}")
+        """
         return self._records[-limit:]
 
 
@@ -274,13 +579,32 @@ class UsageTracker:
 
 class BaseProvider(ABC):
     """
-    الفئة الأساسية لجميع مزودي النماذج
+    Abstract base class for all LLM providers.
 
-    توفر:
-    - واجهة موحدة للاتصال بالنماذج
-    - إدارة المهلات وإعادة المحاولة
-    - تتبع الاستخدام والتكلفة
-    - تحديد معدل الطلبات
+    Provides unified interface for LLM interactions with:
+    - Rate limiting
+    - Automatic retry with exponential backoff
+    - Usage tracking and cost calculation
+    - Timeout management
+    - Streaming support
+
+    Attributes:
+        name: Provider name
+        provider_type: Type of provider (FREE_TIER, PAID, etc.)
+        models: List of available models
+        api_key: API key for authentication
+        base_url: Base URL for API
+        timeout: Request timeout in seconds
+        default_model: Default model to use
+
+    Usage:
+        >>> class MyProvider(BaseProvider):
+        ...     async def _make_request(self, messages, model, **kwargs):
+        ...         # Implementation
+        ...         pass
+        ...
+        >>> provider = MyProvider(name="my_provider", ...)
+        >>> response = await provider.chat_completion(messages)
     """
 
     def __init__(
@@ -295,7 +619,22 @@ class BaseProvider(ABC):
         timeout: float = 120.0,
         max_retries: int = 3,
         default_model: str | None = None,
-    ):
+    ) -> None:
+        """
+        Initialize base provider.
+
+        Args:
+            name: Provider name
+            provider_type: Type of provider
+            models: List of available model names
+            api_key: Optional API key
+            base_url: Optional custom base URL
+            rate_limit_rpm: Requests per minute limit
+            rate_limit_tpm: Tokens per minute limit
+            timeout: Request timeout in seconds
+            max_retries: Maximum retry attempts
+            default_model: Default model (uses first if not specified)
+        """
         self.name = name
         self.provider_type = provider_type
         self.models = models
@@ -304,14 +643,14 @@ class BaseProvider(ABC):
         self.timeout = timeout
         self.default_model = default_model or (models[0] if models else "")
 
-        # المكونات الداخلية
+        # Internal components
         self._logger = get_logger(f"gaap.provider.{name}")
         self._rate_limiter = RateLimiter(rate_limit_rpm, rate_limit_tpm)
         self._retry_manager = RetryManager(RetryConfig(max_retries=max_retries))
         self._usage_tracker = UsageTracker()
         self._is_initialized = False
 
-        # إحصائيات
+        # Statistics
         self._total_requests = 0
         self._successful_requests = 0
         self._failed_requests = 0
@@ -327,9 +666,20 @@ class BaseProvider(ABC):
         self, messages: list[Message], model: str, **kwargs: Any
     ) -> dict[str, Any]:
         """
-        تنفيذ الطلب الفعلي للمزود
+        Make actual request to provider.
 
-        يجب تنفيذها في الفئات الفرعية
+        Must be implemented by subclasses.
+
+        Args:
+            messages: List of conversation messages
+            model: Model name to use
+            **kwargs: Additional provider-specific parameters
+
+        Returns:
+            Raw response data from provider
+
+        Example:
+            >>> response_data = await self._make_request(messages, model)
         """
         pass
 
@@ -338,15 +688,35 @@ class BaseProvider(ABC):
         self, messages: list[Message], model: str, **kwargs: Any
     ) -> AsyncGenerator[str, None]:
         """
-        تنفيذ الطلب المتدفق
+        Make streaming request to provider.
 
-        يجب تنفيذها في الفئات الفرعية
+        Must be implemented by subclasses.
+
+        Args:
+            messages: List of conversation messages
+            model: Model name to use
+            **kwargs: Additional provider-specific parameters
+
+        Yields:
+            Chunks of response content as they arrive
         """
         yield ""  # pragma: no cover
 
     @abstractmethod
     def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
-        """حساب تكلفة الطلب"""
+        """
+        Calculate cost for a request.
+
+        Must be implemented by subclasses.
+
+        Args:
+            model: Model name used
+            input_tokens: Number of input tokens
+            output_tokens: Number of output tokens
+
+        Returns:
+            Cost in USD
+        """
         pass
 
     # =========================================================================
@@ -431,6 +801,22 @@ class BaseProvider(ABC):
                 success=True,
             )
 
+            # v2: Observability — record per-call metrics
+            try:
+                from gaap.core.observability import observability as _obs
+
+                _obs.record_llm_call(
+                    provider=self.name,
+                    model=model,
+                    input_tokens=result.usage.prompt_tokens if result.usage else 0,
+                    output_tokens=result.usage.completion_tokens if result.usage else 0,
+                    cost=cost,
+                    latency=latency_ms / 1000,
+                    success=True,
+                )
+            except Exception as e:
+                pass  # observability is never allowed to crash the main flow is never allowed to crash the main flow
+
             result.provider = self.name
             result.latency_ms = latency_ms
             result.metadata["cost_usd"] = cost
@@ -450,6 +836,21 @@ class BaseProvider(ABC):
                 success=False,
                 error=str(e),
             )
+            # v2: Observability — record failure
+            try:
+                from gaap.core.observability import observability as _obs
+
+                _obs.record_llm_call(
+                    provider=self.name,
+                    model=model,
+                    input_tokens=0,
+                    output_tokens=0,
+                    cost=0.0,
+                    latency=latency_ms / 1000,
+                    success=False,
+                )
+            except Exception:
+                pass  # observability is never allowed to crash the main flow
             raise
 
     async def stream_chat_completion(

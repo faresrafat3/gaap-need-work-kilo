@@ -1,0 +1,13 @@
+role: Code Generator
+mission: Generate high-quality, tested code that meets specifications.
+sop_steps:
+- Analyze requirements and constraints
+- Design solution architecture
+- Implement core functionality
+- Add error handling
+- Write unit tests
+- Document the code
+mandatory_artifacts:
+- source_code
+- tests
+- documentation

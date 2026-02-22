@@ -1,91 +1,109 @@
 """
-Vector Memory Store - Semantic Search with ChromaDB
-====================================================
+Vector Store Implementation (Evolution 2026)
+Implements: docs/evolution_plan_2026/25_MEMORY_AUDIT_SPEC.md
 
-Provides vector-based memory storage for semantic search and retrieval.
-Replaces keyword-based lookups with embedding similarity.
-
-Usage:
-    store = VectorMemoryStore()
-    await store.add("Learned to use Docker for sandboxing", {"type": "lesson"})
-    results = await store.search("container security", n=5)
+Focus: Semantic retrieval using ChromaDB with fallback embedding.
 """
 
 import hashlib
 import logging
-import time
+import os
+import uuid
 from dataclasses import dataclass, field
-from pathlib import Path
+from datetime import datetime
 from typing import Any
+
+import chromadb
+from chromadb.config import Settings
 
 logger = logging.getLogger("gaap.memory.vector")
 
-try:
-    import chromadb
-    from chromadb.config import Settings
-
-    CHROMADB_AVAILABLE = True
-except ImportError:
-    CHROMADB_AVAILABLE = False
-    chromadb = None  # type: ignore
-
 
 @dataclass
-class MemoryEntry:
-    """Entry in vector memory"""
+class VectorEntry:
+    """A single unit of semantic memory."""
 
     id: str
     content: str
-    metadata: dict[str, Any] = field(default_factory=dict)
-    importance: float = 1.0
-    created_at: float = field(default_factory=time.time)
-    access_count: int = 0
-
-
-@dataclass
-class SearchResult:
-    """Result from vector search"""
-
-    id: str
-    content: str
-    score: float
     metadata: dict[str, Any]
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
 
-class VectorMemoryStore:
+class SimpleEmbeddingFunction:
     """
-    Vector-based memory store using ChromaDB.
+    Fallback embedding function using hash-based pseudo-embeddings.
+    Used when sentence_transformers is not available.
+    """
 
-    Features:
-    - Semantic search (find similar concepts, not just keywords)
-    - Persistent storage (survives restarts)
-    - Automatic embedding (no external model needed)
-    - Metadata filtering
+    name = "simple_hash_embedding"
+
+    def __call__(self, texts: list[str]) -> list[list[float]]:
+        """Generate pseudo-embeddings from text hashes."""
+        embeddings = []
+        for text in texts:
+            text_hash = hashlib.sha256(text.encode()).hexdigest()
+            embedding = [int(text_hash[i : i + 8], 16) / 0xFFFFFFFF for i in range(0, 64, 8)]
+            embedding = [e * 2 - 1 for e in embedding]
+            while len(embedding) < 384:
+                embedding.extend(embedding[: min(384 - len(embedding), len(embedding))])
+            embeddings.append(embedding[:384])
+        return embeddings
+
+
+class VectorStore:
+    """
+    Persistent Vector Database wrapper around ChromaDB.
+    Handles embedding generation and semantic search with fallback.
     """
 
     def __init__(
         self,
-        persist_dir: str | None = None,
         collection_name: str = "gaap_memory",
-    ):
-        if not CHROMADB_AVAILABLE:
-            raise ImportError("chromadb not installed. Run: pip install chromadb")
+        persist_dir: str = ".gaap/memory/vector_db",
+    ) -> None:
+        self.persist_dir = persist_dir
+        self.collection_name = collection_name
+        self._available = False
 
-        self.persist_dir = Path(persist_dir or Path.home() / ".gaap" / "vector_memory")
-        self.persist_dir.mkdir(parents=True, exist_ok=True)
+        os.makedirs(persist_dir, exist_ok=True)
 
-        self._client = chromadb.PersistentClient(
-            path=str(self.persist_dir),
-            settings=Settings(anonymized_telemetry=False),
-        )
+        try:
+            self.client = chromadb.PersistentClient(
+                path=persist_dir, settings=Settings(allow_reset=True)
+            )
 
-        self._collection = self._client.get_or_create_collection(
-            name=collection_name,
-            metadata={"description": "GAAP semantic memory"},
-        )
+            self.embedding_fn = self._get_embedding_function()
 
-        self._logger = logger
-        self._entry_count = self._collection.count()
+            self.collection = self.client.get_or_create_collection(
+                name=collection_name,
+                embedding_function=self.embedding_fn,
+                metadata={"hnsw:space": "cosine"},
+            )
+            self._available = True
+            logger.info(f"VectorStore initialized at {persist_dir}")
+
+        except Exception as e:
+            logger.warning(f"VectorStore unavailable: {e}. Using in-memory fallback.")
+            self._available = False
+            self._fallback_store: dict[str, tuple[str, dict[str, Any]]] = {}
+
+    def _get_embedding_function(self) -> Any:
+        """Get embedding function with fallback."""
+        try:
+            from chromadb.utils import embedding_functions
+
+            ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name="all-MiniLM-L6-v2"
+            )
+            logger.info("Using SentenceTransformer embeddings")
+            return ef
+        except Exception as e:
+            logger.warning(f"SentenceTransformer unavailable: {e}. Using hash-based fallback.")
+            return SimpleEmbeddingFunction()
+
+    @property
+    def available(self) -> bool:
+        return self._available
 
     def add(
         self,
@@ -93,212 +111,113 @@ class VectorMemoryStore:
         metadata: dict[str, Any] | None = None,
         entry_id: str | None = None,
     ) -> str:
-        """
-        Add content to vector memory.
-
-        Args:
-            content: Text content to store
-            metadata: Optional metadata (type, tags, source, etc.)
-            entry_id: Optional ID (auto-generated if not provided)
-
-        Returns:
-            Entry ID
-        """
+        """Add a text document to the vector store."""
         if not content.strip():
-            raise ValueError("Content cannot be empty")
+            return ""
 
-        entry_id = entry_id or self._generate_id(content)
-        metadata = metadata or {}
+        if not entry_id:
+            entry_id = str(uuid.uuid4())
 
-        metadata["created_at"] = time.time()
-        metadata["importance"] = metadata.get("importance", 1.0)
+        meta = metadata or {}
+        meta["timestamp"] = datetime.now().isoformat()
 
-        self._collection.upsert(
-            ids=[entry_id],
-            documents=[content],
-            metadatas=[metadata],
-        )
-
-        self._entry_count += 1
-        self._logger.debug(f"Added memory entry: {entry_id[:8]}...")
-
-        return entry_id
+        if self._available:
+            try:
+                self.collection.add(documents=[content], metadatas=[meta], ids=[entry_id])
+                return entry_id
+            except Exception as e:
+                logger.error(f"Error adding to VectorStore: {e}")
+                return ""
+        else:
+            self._fallback_store[entry_id] = (content, meta)
+            return entry_id
 
     def search(
         self,
         query: str,
-        n: int = 5,
-        where: dict[str, Any] | None = None,
-    ) -> list[SearchResult]:
-        """
-        Search for similar content.
-
-        Args:
-            query: Search query
-            n: Number of results
-            where: Optional metadata filter (e.g., {"type": "lesson"})
-
-        Returns:
-            List of search results with similarity scores
-        """
-        if not query.strip():
-            return []
-
-        results = self._collection.query(
-            query_texts=[query],
-            n_results=min(n, self._entry_count) if self._entry_count > 0 else 0,
-            where=where,
-            include=["documents", "metadatas", "distances"],
-        )
-
-        if not results["ids"] or not results["ids"][0]:
-            return []
-
-        search_results = []
-        for i, doc_id in enumerate(results["ids"][0]):
-            content = results["documents"][0][i] if results["documents"] else ""
-            metadata = results["metadatas"][0][i] if results["metadatas"] else {}
-            distance = results["distances"][0][i] if results["distances"] else 0.0
-
-            score = 1.0 - min(distance, 1.0)
-
-            search_results.append(
-                SearchResult(
-                    id=doc_id,
-                    content=content,
-                    score=score,
-                    metadata=dict(metadata) if metadata else {},
+        n_results: int = 5,
+        filter_meta: dict[str, Any] | None = None,
+    ) -> list[VectorEntry]:
+        """Semantic search for relevant documents."""
+        if self._available:
+            try:
+                results = self.collection.query(
+                    query_texts=[query],
+                    n_results=n_results,
+                    where=filter_meta,
                 )
-            )
 
-        self._logger.debug(f"Found {len(search_results)} results for: {query[:50]}...")
-        return search_results
+                entries = []
+                if results["ids"] and results["ids"][0]:
+                    ids = results["ids"][0]
+                    documents = results["documents"][0] if results["documents"] else []
+                    metadatas = results["metadatas"][0] if results["metadatas"] else []
 
-    def get(self, entry_id: str) -> MemoryEntry | None:
-        """Get a specific entry by ID"""
-        results = self._collection.get(
-            ids=[entry_id],
-            include=["documents", "metadatas"],
-        )
+                    for i, doc_id in enumerate(ids):
+                        entries.append(
+                            VectorEntry(
+                                id=doc_id,
+                                content=documents[i] if i < len(documents) else "",
+                                metadata=metadatas[i] if i < len(metadatas) else {},
+                            )
+                        )
+                return entries
 
-        if not results["ids"]:
-            return None
+            except Exception as e:
+                logger.error(f"Error searching VectorStore: {e}")
+                return []
+        else:
+            results = []
+            query_lower = query.lower()
+            for entry_id, (content, meta) in self._fallback_store.items():
+                if query_lower in content.lower():
+                    if filter_meta:
+                        if not all(meta.get(k) == v for k, v in filter_meta.items()):
+                            continue
+                    results.append(VectorEntry(id=entry_id, content=content, metadata=meta))
+                    if len(results) >= n_results:
+                        break
+            return results
 
-        content = results["documents"][0] if results["documents"] else ""
-        raw_metadata = results["metadatas"][0] if results["metadatas"] else {}
-        metadata = dict(raw_metadata) if raw_metadata else {}
-
-        return MemoryEntry(
-            id=entry_id,
-            content=content,
-            metadata=metadata,
-            importance=float(metadata.get("importance", 1.0)),
-            created_at=float(metadata.get("created_at", 0.0)),
-            access_count=int(metadata.get("access_count", 0)),
-        )
-
-    def delete(self, entry_id: str) -> None:
-        """Delete an entry by ID"""
-        self._collection.delete(ids=[entry_id])
-        self._entry_count = max(0, self._entry_count - 1)
-
-    def update(
-        self,
-        entry_id: str,
-        content: str | None = None,
-        metadata: dict[str, Any] | None = None,
-    ) -> None:
-        """Update an existing entry"""
-        existing = self.get(entry_id)
-        if not existing:
-            raise KeyError(f"Entry not found: {entry_id}")
-
-        new_content = content or existing.content
-        new_metadata = {**existing.metadata, **(metadata or {})}
-
-        self._collection.upsert(
-            ids=[entry_id],
-            documents=[new_content],
-            metadatas=[new_metadata],
-        )
-
-    def clear(self) -> None:
-        """Clear all entries"""
-        all_ids = self._collection.get()["ids"]
-        if all_ids:
-            self._collection.delete(ids=all_ids)
-        self._entry_count = 0
+    def delete(self, entry_id: str) -> bool:
+        """Delete an entry by ID."""
+        if self._available:
+            try:
+                self.collection.delete(ids=[entry_id])
+                return True
+            except Exception as e:
+                logger.error(f"Error deleting from VectorStore: {e}")
+                return False
+        else:
+            if entry_id in self._fallback_store:
+                del self._fallback_store[entry_id]
+                return True
+            return False
 
     def count(self) -> int:
-        """Get total number of entries"""
-        return self._collection.count()
+        """Return total count of embeddings."""
+        if self._available:
+            return self.collection.count()
+        return len(self._fallback_store)
 
-    def _generate_id(self, content: str) -> str:
-        """Generate unique ID from content"""
-        hash_input = f"{content}{time.time()}"
-        return hashlib.sha256(hash_input.encode()).hexdigest()[:16]
-
-    def get_stats(self) -> dict[str, Any]:
-        """Get memory statistics"""
-        return {
-            "total_entries": self._entry_count,
-            "persist_dir": str(self.persist_dir),
-            "collection_name": self._collection.name,
-        }
+    def reset(self) -> None:
+        """Wipe the entire database."""
+        if self._available:
+            try:
+                self.client.reset()
+                logger.warning("VectorStore has been reset.")
+            except Exception as e:
+                logger.error(f"Error resetting VectorStore: {e}")
+        else:
+            self._fallback_store.clear()
 
 
-class LessonStore(VectorMemoryStore):
-    """
-    Specialized store for learned lessons.
+_vector_store_instance: VectorStore | None = None
 
-    Stores lessons learned from task execution with automatic
-    categorization and retrieval.
-    """
 
-    def __init__(self, persist_dir: str | None = None):
-        super().__init__(persist_dir=persist_dir, collection_name="gaap_lessons")
-
-    def add_lesson(
-        self,
-        lesson: str,
-        category: str = "general",
-        task_type: str | None = None,
-        success: bool = True,
-    ) -> str:
-        """
-        Add a learned lesson.
-
-        Args:
-            lesson: The lesson learned
-            category: Category (security, performance, debugging, etc.)
-            task_type: Type of task this lesson applies to
-            success: Whether this was from a successful operation
-
-        Returns:
-            Lesson ID
-        """
-        metadata = {
-            "type": "lesson",
-            "category": category,
-            "success": success,
-        }
-        if task_type:
-            metadata["task_type"] = task_type
-
-        return self.add(lesson, metadata)
-
-    def get_lessons_for_task(self, task_type: str, n: int = 5) -> list[SearchResult]:
-        """Get relevant lessons for a task type"""
-        return self.search(
-            query=task_type,
-            n=n,
-            where={"type": "lesson"},
-        )
-
-    def get_security_lessons(self, n: int = 10) -> list[SearchResult]:
-        """Get all security-related lessons"""
-        return self.search(
-            query="security vulnerability exploit attack",
-            n=n,
-            where={"$and": [{"type": "lesson"}, {"category": "security"}]},
-        )
+def get_vector_store() -> VectorStore:
+    """Get singleton VectorStore instance."""
+    global _vector_store_instance
+    if _vector_store_instance is None:
+        _vector_store_instance = VectorStore()
+    return _vector_store_instance

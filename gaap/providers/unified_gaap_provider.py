@@ -1,35 +1,33 @@
 import asyncio
 import time
-from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from gaap.core.types import (
     Message,
-    MessageRole,
     ModelTier,
     ProviderType,
 )
 from gaap.providers.base_provider import BaseProvider, register_provider
-from gaap.providers.unified_provider import UnifiedProvider
+from gaap.providers.chat_based.g4f_provider import G4FProvider # Sovereign Replacement
 
 
 @register_provider("unified_gaap")
 class UnifiedGAAPProvider(BaseProvider):
     """
-    Bridge between GAAP BaseProvider and the smart UnifiedProvider.
-    This enables Kimi-first routing with the full GAAP engine features.
+    Sovereign Unified Provider
+    
+    Acts as a high-level facade for the best available free-tier models (G4F).
     """
 
     def __init__(
         self,
         api_key: str | None = None,
         base_url: str | None = None,
-        default_model: str = "kimi",
+        default_model: str = "gemini-1.5-flash",
         profile: str = "quality",
         **kwargs: Any,
     ) -> None:
-        # We don't call super().__init__ with all models yet because they are dynamic
-        models = ["kimi", "deepseek", "glm", "gemini-2.5-flash"]
+        models = ["gemini-1.5-flash", "claude-3-5-sonnet", "gpt-4o-mini"]
 
         super().__init__(
             name="unified_gaap",
@@ -39,72 +37,36 @@ class UnifiedGAAPProvider(BaseProvider):
             base_url=base_url,
             rate_limit_rpm=60,
             rate_limit_tpm=1000000,
-            timeout=180.0,  # WebChat needs longer timeouts
+            timeout=180.0,
             max_retries=2,
             default_model=default_model,
         )
 
-        self._unified = UnifiedProvider(profile=profile, verbose=True)
-        self._logger.info(f"UnifiedGAAPProvider initialized with profile: {profile}")
+        self._backend = G4FProvider()
+        self._logger.info(f"UnifiedGAAPProvider initialized (Backend: G4F)")
+
+    async def chat_completion(
+        self, messages: list[Message], model: str | None = None, **kwargs: Any
+    ) -> Any:
+        """Forward to backend"""
+        return await self._backend.chat_completion(messages, model, **kwargs)
 
     async def _make_request(
         self, messages: list[Message], model: str, **kwargs: Any
     ) -> dict[str, Any]:
-        """Execute request via UnifiedProvider fallback chain (Kimi -> DeepSeek -> etc.)"""
-
-        # Convert Message objects to simple dicts
-        prompt_parts = []
-        system_content = None
-
-        for msg in messages:
-            if msg.role == MessageRole.SYSTEM:
-                system_content = msg.content
-            else:
-                prompt_parts.append(msg.content)
-
-        full_prompt = "\n\n".join(prompt_parts)
-
-        def sync_call() -> tuple[str, str, float]:
-            return self._unified.call(
-                prompt=full_prompt, system=system_content or "", timeout=int(self.timeout)
-            )
-
-        try:
-            content, model_used, latency_ms = await asyncio.to_thread(sync_call)
-
-            return {
-                "id": f"unified-{int(time.time())}",
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {"role": "assistant", "content": content},
-                        "finish_reason": "stop",
-                    }
-                ],
-                "usage": {
-                    "prompt_tokens": len(full_prompt) // 4,
-                    "completion_tokens": len(content) // 4,
-                    "total_tokens": (len(full_prompt) + len(content)) // 4,
-                },
-                "model_used": model_used,
-                "latency_ms": latency_ms,
-            }
-        except Exception as e:
-            self._logger.error(f"Unified fallback chain failed: {e}")
-            raise
+        """Legacy internal method (not used if chat_completion overridden)"""
+        return {}
 
     async def _stream_request(
         self, messages: list[Message], model: str, **kwargs: Any
     ) -> AsyncGenerator[str, None]:
-        """Streaming is not natively supported by the unified bridge yet,
-        so we yield the full response as a single chunk."""
-        result = await self._make_request(messages, model, **kwargs)
-        content = result["choices"][0]["message"]["content"]
-        yield content
+        """Streaming proxy"""
+        async for chunk in self._backend.stream_chat_completion(messages, model, **kwargs):
+            yield chunk
 
     def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
         """Cost is 0 for free WebChat providers."""
         return 0.0
 
     def get_model_tier(self, model: str) -> ModelTier:
-        return ModelTier.TIER_1_STRATEGIC  # Kimi/DeepSeek/GLM are high-tier
+        return ModelTier.TIER_1_STRATEGIC

@@ -1,0 +1,14 @@
+{
+  "nodes": [
+    {"id": "FastAPI", "type": "Framework", "domain": "Backend"},
+    {"id": "Uvicorn", "type": "Server", "domain": "Backend"},
+    {"id": "PostgreSQL", "type": "Database", "domain": "Data"},
+    {"id": "Docker", "type": "Infrastructure", "domain": "DevOps"},
+    {"id": "Localhost", "type": "Network", "domain": "DevOps"}
+  ],
+  "edges": [
+    {"source": "FastAPI", "target": "Uvicorn", "relation": "REQUIRES", "weight": 1.0},
+    {"source": "PostgreSQL", "target": "Docker", "relation": "RECOMMENDS", "weight": 0.8},
+    {"source": "Docker", "target": "Localhost", "relation": "ISOLATES_FROM", "weight": 1.0, "warning": "Container cannot see host localhost without host.docker.internal"}
+  ]
+}

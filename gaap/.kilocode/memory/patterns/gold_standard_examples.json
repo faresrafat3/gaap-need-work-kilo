@@ -1,0 +1,51 @@
+[
+  {
+    "intent": "CODE_GENERATION",
+    "subtype": "FASTAPI_ENDPOINT",
+    "description": "Create a secure user login endpoint with rate limiting",
+    "gold_standard_code": "from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from core.rate_limiter import RateLimiter
+
+router = APIRouter()
+limiter = RateLimiter(times=5, seconds=60)
+
+@router.post('/token', dependencies=[Depends(limiter)])
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='Incorrect username or password',
+            headers={'WWW-Authenticate': 'Bearer'},
+        )
+    # ... token generation logic ...
+    return {'access_token': token, 'token_type': 'bearer'}",
+    "reasoning": "Uses dependency injection for rate limiting. Follows standard OAuth2 pattern. Returns correct HTTP 401 with headers. Type hinting is strict.",
+    "anti_patterns": [
+      "Hardcoding secrets",
+      "Returning plain text errors",
+      "Missing rate limiting on auth endpoints"
+    ]
+  },
+  {
+    "intent": "ARCHITECTURE",
+    "subtype": "EVENT_DRIVEN",
+    "description": "Design a scalable notification system",
+    "gold_standard_spec": {
+      "paradigm": "event_driven",
+      "components": [
+        {"name": "NotificationService", "role": "Consumer"},
+        {"name": "OrderService", "role": "Producer"},
+        {"name": "RabbitMQ", "role": "Broker"}
+      ],
+      "pattern": "Fan-out",
+      "reliability": "Dead Letter Queue (DLQ) for failed messages"
+    },
+    "reasoning": "Decouples producers from consumers. DLQ ensures no message is lost. RabbitMQ chosen for reliability over speed (vs Redis PubSub).",
+    "anti_patterns": [
+      "Synchronous HTTP calls for notifications",
+      "Database polling"
+    ]
+  }
+]
