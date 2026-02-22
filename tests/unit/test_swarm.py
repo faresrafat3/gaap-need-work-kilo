@@ -1,634 +1,527 @@
 """
-Unit Tests for GAAP Swarm Intelligence Module
-Tests: ReputationStore, TaskAuction, Fractals, GISP Protocol
+Unit Tests for GAAP Swarm Intelligence Module (v2.0)
+Tests: ReputationStore, TaskAuctioneer, FractalAgent, Guild, GISP Protocol
 """
 
 import asyncio
 import tempfile
 from pathlib import Path
+from unittest.mock import Mock, AsyncMock
 
 import pytest
 
 from gaap.core.types import Task, TaskType, TaskPriority, TaskComplexity
-from gaap.swarm import (
+from gaap.swarm.reputation import (
     ReputationStore,
+    ReputationEntry,
+    DomainExpertise,
     ReputationScore,
-    FractalProfile,
-    TaskBid,
-    TaskDomain,
-    TaskAuction,
-    TaskBroadcast,
-    AuctionResult,
-    ConsensusOracle,
-    Arbitrator,
-    GISPMessage,
-    GISPHeader,
-    MessageType,
-    create_reputation_store,
-    create_task_auction,
-    create_bid_message,
-    create_auction_message,
 )
-from gaap.swarm.fractals import (
-    BaseFractal,
-    CoderFractal,
-    CriticFractal,
-    ResearcherFractal,
-    FractalResult,
+from gaap.swarm.gisp_protocol import (
+    TaskAuction,
+    TaskBid,
+    TaskAward,
+    TaskDomain,
+    TaskPriority as GISPPriority,
+    MessageType,
+    ConsensusVote,
+    GuildForm,
+)
+from gaap.swarm.auction import (
+    TaskAuctioneer,
+    AuctionConfig,
+    AuctionState,
+    AuctionResult,
+)
+from gaap.swarm.fractal import (
+    FractalAgent,
+    FractalState,
+    FractalCapability,
+    TaskEstimate,
+)
+from gaap.swarm.guild import (
+    Guild,
+    GuildState,
+    GuildMembership,
+)
+from gaap.swarm.orchestrator import (
+    SwarmOrchestrator,
+    SwarmConfig,
+    SwarmMetrics,
+    OrchestratorState,
 )
 
 
 @pytest.fixture
 def temp_dir():
-    """Create a temporary directory for tests"""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield tmpdir
 
 
 @pytest.fixture
 def reputation_store(temp_dir):
-    """Create a fresh reputation store"""
-    return ReputationStore(persist_path=str(Path(temp_dir) / "reputation"))
+    return ReputationStore(storage_path=str(Path(temp_dir) / "reputation.json"))
 
 
 @pytest.fixture
-def task_auction(reputation_store):
-    """Create a task auction instance"""
-    return TaskAuction(reputation_store=reputation_store)
-
-
-@pytest.fixture
-def sample_task():
-    """Create a sample task"""
-    return Task(
-        id="test_task_001",
-        description="Write a Python function to calculate fibonacci",
-        type=TaskType.CODE_GENERATION,
-        priority=TaskPriority.NORMAL,
-        complexity=TaskComplexity.SIMPLE,
+def auctioneer(reputation_store):
+    return TaskAuctioneer(
+        reputation_store=reputation_store,
+        config=AuctionConfig(default_timeout_seconds=5.0),
     )
 
 
-class TestReputationScore:
-    """Tests for ReputationScore"""
-
-    def test_initial_score(self):
-        """Test initial reputation score"""
-        score = ReputationScore(domain=TaskDomain.PYTHON)
-        assert score.score == 50.0
-        assert score.total_tasks == 0
-        assert score.success_rate == 0.0
-
-    def test_update_success(self):
-        """Test updating with success"""
-        score = ReputationScore(domain=TaskDomain.PYTHON)
-        score.update(success=True)
-        assert score.total_tasks == 1
-        assert score.successful_tasks == 1
-        assert score.score == 51.0
-
-    def test_update_failure(self):
-        """Test updating with failure"""
-        score = ReputationScore(domain=TaskDomain.PYTHON)
-        score.update(success=False)
-        assert score.total_tasks == 1
-        assert score.failed_tasks == 1
-        assert score.score == 48.0
-
-    def test_self_predicted_failure_no_penalty(self):
-        """Test self-predicted failure saves reputation"""
-        score = ReputationScore(domain=TaskDomain.PYTHON)
-        score.update(success=False, self_predicted=True)
-        assert score.score == 50.0
-        assert score.self_predicted_failures == 1
-
-    def test_success_rate(self):
-        """Test success rate calculation"""
-        score = ReputationScore(domain=TaskDomain.PYTHON)
-        score.update(success=True)
-        score.update(success=True)
-        score.update(success=False)
-        assert score.success_rate == pytest.approx(2 / 3, rel=0.01)
+@pytest.fixture
+def mock_provider():
+    provider = Mock()
+    provider.default_model = "test-model"
+    response = Mock()
+    response.choices = [Mock()]
+    response.choices[0].message.content = "Test output"
+    provider.chat_completion = AsyncMock(return_value=response)
+    return provider
 
 
-class TestFractalProfile:
-    """Tests for FractalProfile"""
+@pytest.fixture
+def mock_memory():
+    memory = Mock()
+    memory.retrieve = Mock(return_value=[])
+    memory.record_episode = AsyncMock()
+    return memory
 
-    def test_profile_creation(self):
-        """Test creating a fractal profile"""
-        profile = FractalProfile(
-            fractal_id="coder_001",
-            name="TestCoder",
-            specialization=TaskDomain.PYTHON,
-        )
-        assert profile.fractal_id == "coder_001"
-        assert profile.specialization == TaskDomain.PYTHON
-        assert profile.guild is None
 
-    def test_get_reputation_creates_if_missing(self):
-        """Test getting reputation creates if missing"""
-        profile = FractalProfile(
-            fractal_id="coder_001",
-            name="TestCoder",
-            specialization=TaskDomain.PYTHON,
-        )
-        rep = profile.get_reputation(TaskDomain.JAVASCRIPT)
-        assert rep.domain == TaskDomain.JAVASCRIPT
-        assert TaskDomain.JAVASCRIPT in profile.reputation_scores
+@pytest.fixture
+def sample_fractal(reputation_store, mock_provider, mock_memory):
+    for _ in range(5):
+        reputation_store.record_success("coder_01", "python")
 
-    def test_utility_score_specialization_bonus(self):
-        """Test utility score bonus for specialization"""
-        profile = FractalProfile(
-            fractal_id="coder_001",
-            name="TestCoder",
-            specialization=TaskDomain.PYTHON,
-        )
-        utility_python = profile.get_utility_score(TaskDomain.PYTHON)
-        utility_js = profile.get_utility_score(TaskDomain.JAVASCRIPT)
-        assert utility_python > utility_js
+    return FractalAgent(
+        fractal_id="coder_01",
+        domains=["python", "testing"],
+        provider=mock_provider,
+        memory=mock_memory,
+        reputation_store=reputation_store,
+    )
 
 
 class TestReputationStore:
     """Tests for ReputationStore"""
 
-    def test_register_fractal(self, reputation_store):
-        """Test registering a fractal"""
-        profile = reputation_store.register_fractal(
-            fractal_id="coder_001",
-            name="TestCoder",
-            specialization=TaskDomain.PYTHON,
-        )
-        assert profile.fractal_id == "coder_001"
-        assert reputation_store.get_profile("coder_001") is not None
+    def test_record_success(self, reputation_store):
+        reputation_store.record_success("coder_01", "python")
 
-    def test_record_task_result_success(self, reputation_store):
-        """Test recording successful task"""
-        reputation_store.register_fractal(
-            fractal_id="coder_001",
-            name="TestCoder",
-            specialization=TaskDomain.PYTHON,
-        )
-        reputation_store.record_task_result(
-            fractal_id="coder_001",
-            domain=TaskDomain.PYTHON,
-            success=True,
-        )
-        profile = reputation_store.get_profile("coder_001")
-        assert profile.total_tasks == 1
-        rep = profile.get_reputation(TaskDomain.PYTHON)
-        assert rep.successful_tasks == 1
+        score = reputation_store.get_domain_reputation("coder_01", "python")
+        assert score > 0.5
 
-    def test_create_bid(self, reputation_store):
-        """Test creating a bid"""
-        reputation_store.register_fractal(
-            fractal_id="coder_001",
-            name="TestCoder",
-            specialization=TaskDomain.PYTHON,
-        )
-        bid = reputation_store.create_bid(
-            fractal_id="coder_001",
-            task_id="task_001",
-            domain=TaskDomain.PYTHON,
-        )
-        assert bid is not None
-        assert bid.task_id == "task_001"
-        assert bid.bidder_id == "coder_001"
+    def test_record_failure(self, reputation_store):
+        reputation_store.record_success("coder_01", "python")
+        score_before = reputation_store.get_domain_reputation("coder_01", "python")
 
-    def test_select_winner(self, reputation_store):
-        """Test selecting auction winner"""
-        reputation_store.register_fractal("f1", "Coder1", TaskDomain.PYTHON)
-        reputation_store.register_fractal("f2", "Coder2", TaskDomain.JAVASCRIPT)
-        reputation_store.register_fractal("f3", "Coder3", TaskDomain.PYTHON)
+        reputation_store.record_failure("coder_01", "python", predicted=False)
+        score_after = reputation_store.get_domain_reputation("coder_01", "python")
 
-        reputation_store.record_task_result("f1", TaskDomain.PYTHON, True)
-        reputation_store.record_task_result("f1", TaskDomain.PYTHON, True)
-        reputation_store.record_task_result("f3", TaskDomain.PYTHON, False)
+        assert score_after < score_before
 
-        bid1 = reputation_store.create_bid("f1", "task_001", TaskDomain.PYTHON)
-        bid2 = reputation_store.create_bid("f2", "task_001", TaskDomain.PYTHON)
-        bid3 = reputation_store.create_bid("f3", "task_001", TaskDomain.PYTHON)
+    def test_predicted_failure_reduced_penalty(self, reputation_store):
+        reputation_store.record_success("coder_01", "python")
+        reputation_store.record_success("coder_02", "python")
 
-        winner = reputation_store.select_winner([bid1, bid2, bid3])
-        assert winner is not None
-        assert winner.bidder_id == "f1"
+        reputation_store.record_failure("coder_01", "python", predicted=True)
+        reputation_store.record_failure("coder_02", "python", predicted=False)
 
-    def test_guild_formation(self, reputation_store):
-        """Test guild formation after sufficient tasks"""
-        reputation_store.register_fractal(
-            fractal_id="expert_coder",
-            name="ExpertCoder",
-            specialization=TaskDomain.PYTHON,
-        )
-        for _ in range(10):
-            reputation_store.record_task_result("expert_coder", TaskDomain.PYTHON, True)
+        score_01 = reputation_store.get_domain_reputation("coder_01", "python")
+        score_02 = reputation_store.get_domain_reputation("coder_02", "python")
 
-        profile = reputation_store.get_profile("expert_coder")
-        assert profile.guild == "PYTHON_Guild"
+        assert score_01 > score_02
 
-    def test_get_stats(self, reputation_store):
-        """Test getting statistics"""
-        reputation_store.register_fractal("f1", "Coder1", TaskDomain.PYTHON)
-        reputation_store.register_fractal("f2", "Coder2", TaskDomain.JAVASCRIPT)
+    def test_get_top_fractals(self, reputation_store):
+        for _ in range(5):
+            reputation_store.record_success("coder_01", "python")
+        for _ in range(2):
+            reputation_store.record_success("coder_02", "python")
 
-        stats = reputation_store.get_stats()
-        assert stats["total_fractals"] == 2
+        top = reputation_store.get_top_fractals("python", limit=2)
 
+        assert len(top) == 2
+        assert top[0][0] == "coder_01"
 
-class TestTaskAuction:
-    """Tests for TaskAuction"""
+    def test_persistence(self, reputation_store, temp_dir):
+        reputation_store.record_success("coder_01", "python")
+        reputation_store.save()
 
-    def test_register_fractal(self, task_auction):
-        """Test registering fractals"""
-        coder = CoderFractal(fractal_id="coder_001")
-        task_auction.register_fractal(coder)
-        stats = task_auction.get_fractal_stats()
-        assert stats["total_fractals"] == 1
+        new_store = ReputationStore(storage_path=str(Path(temp_dir) / "reputation.json"))
 
-    def test_broadcast_task(self, task_auction, sample_task):
-        """Test broadcasting a task"""
-        broadcast = asyncio.run(task_auction.broadcast_task(sample_task))
-        assert broadcast.task_id == sample_task.id
-        assert broadcast.domain == TaskDomain.PYTHON
-
-    def test_collect_bids_no_fractals(self, task_auction, sample_task):
-        """Test collecting bids with no registered fractals"""
-        bids = asyncio.run(task_auction.collect_bids(sample_task))
-        assert len(bids) == 0
-
-    def test_collect_bids_with_fractals(self, task_auction, sample_task):
-        """Test collecting bids with registered fractals"""
-        task_auction.register_fractal(CoderFractal(fractal_id="coder_001"))
-        task_auction.register_fractal(ResearcherFractal(fractal_id="researcher_001"))
-
-        bids = asyncio.run(task_auction.collect_bids(sample_task))
-
-        assert len(bids) >= 1
-        for bid in bids:
-            assert bid.utility > 0
-
-    def test_run_auction(self, task_auction, sample_task):
-        """Test running complete auction"""
-        task_auction.register_fractal(CoderFractal(fractal_id="coder_001"))
-        task_auction.register_fractal(CriticFractal(fractal_id="critic_001"))
-
-        result = asyncio.run(task_auction.run_auction(sample_task))
-
-        assert result.task_id == sample_task.id
-        assert result.winner_id is not None
-        assert len(result.all_bids) >= 1
-
-    def test_execute_with_winner(self, task_auction, sample_task):
-        """Test executing task with auction winner"""
-        task_auction.register_fractal(CoderFractal(fractal_id="coder_001"))
-
-        result = asyncio.run(task_auction.execute_with_winner(sample_task, {"test": True}))
-
-        assert result is not None
-        assert result.success is not None
-
-
-class TestFractals:
-    """Tests for Fractal agents"""
-
-    def test_coder_fractal_creation(self):
-        """Test creating coder fractal"""
-        coder = CoderFractal(fractal_id="test_coder")
-        assert coder.name == "Coder"
-        assert coder.specialization == TaskDomain.PYTHON
-
-    def test_coder_assess_capability(self):
-        """Test coder capability assessment"""
-        coder = CoderFractal()
-        task = Task(
-            description="Write a Python function",
-            type=TaskType.CODE_GENERATION,
-        )
-        confidence = coder.assess_capability(task)
-        assert 0.0 <= confidence <= 1.0
-
-    def test_coder_execute(self):
-        """Test coder execution"""
-        coder = CoderFractal()
-        task = Task(
-            id="test_001",
-            description="Write a simple hello world function in Python",
-            type=TaskType.CODE_GENERATION,
-        )
-        result = asyncio.run(coder.execute(task, {}))
-        assert result.success
-        assert result.output is not None
-
-    def test_critic_fractal_creation(self):
-        """Test creating critic fractal"""
-        critic = CriticFractal(fractal_id="test_critic")
-        assert critic.name == "Critic"
-        assert critic.specialization == TaskDomain.SECURITY
-
-    def test_critic_analyze_code(self):
-        """Test critic code analysis"""
-        critic = CriticFractal()
-        code = """
-password = "secret123"
-eval(user_input)
-"""
-        task = Task(
-            id="review_001",
-            description="Review this code",
-            type=TaskType.CODE_REVIEW,
-        )
-        result = asyncio.run(critic.execute(task, {"code": code}))
-        assert result.success
-        issues = result.output.get("issues", {})
-        assert len(issues.get("security", [])) >= 2
-
-    def test_researcher_fractal_creation(self):
-        """Test creating researcher fractal"""
-        researcher = ResearcherFractal(fractal_id="test_researcher")
-        assert researcher.name == "Researcher"
-        assert researcher.specialization == TaskDomain.RESEARCH
-
-    def test_researcher_execute(self):
-        """Test researcher execution"""
-        researcher = ResearcherFractal()
-        task = Task(
-            id="research_001",
-            description="Research best practices for Python async",
-            type=TaskType.RESEARCH,
-        )
-        result = asyncio.run(researcher.execute(task, {}))
-        assert result.success
-        assert "findings" in result.output
-
-    def test_fractal_memory(self):
-        """Test fractal local memory"""
-        coder = CoderFractal()
-        coder.remember({"task": "test", "success": True})
-        similar = coder.recall_similar("test")
-        assert len(similar) == 1
-
-    def test_epistemic_doubt(self):
-        """Test epistemic doubt mechanism"""
-        coder = CoderFractal()
-        assert coder.check_epistemic_doubt(0.3) is True
-        assert coder.check_epistemic_doubt(0.7) is False
+        score = new_store.get_domain_reputation("coder_01", "python")
+        assert score > 0.5
 
 
 class TestGISPProtocol:
-    """Tests for GISP Protocol v2.0"""
+    """Tests for GISP Protocol"""
 
-    def test_message_creation(self):
-        """Test creating GISP message"""
-        header = GISPHeader(
-            sender_id="test_sender",
-            recipient_id="test_recipient",
-            trace_id="trace_001",
+    def test_task_auction_creation(self):
+        auction = TaskAuction(
+            task_id="task_123",
+            task_description="Implement authentication",
+            domain=TaskDomain.SECURITY,
+            complexity=7,
+            priority=GISPPriority.HIGH,
         )
-        message = GISPMessage(
-            header=header,
-            msg_type=MessageType.TASK_BID,
-            payload={"test": "data"},
+
+        assert auction.task_id == "task_123"
+        assert auction.domain == TaskDomain.SECURITY
+
+    def test_task_bid_utility(self):
+        bid = TaskBid(
+            task_id="task_123",
+            bidder_id="coder_01",
+            estimated_success_rate=0.9,
+            estimated_cost_tokens=100,
+            estimated_time_seconds=60,
+            confidence_in_estimate=0.8,
+            current_load=0.2,
         )
-        assert message.msg_type == MessageType.TASK_BID
-        assert message.header.protocol_version == "GISP/2.0"
 
-    def test_create_bid_message(self):
-        """Test creating bid message"""
-        message = create_bid_message(
-            task_id="task_001",
-            bidder_id="coder_001",
-            utility=85.5,
-            success_rate=0.9,
-            cost=0.05,
-            reputation=75.0,
-            rationale="Python expert",
-            trace_id="trace_001",
+        utility = bid.compute_utility_score(reputation=0.85)
+
+        assert 0 < utility < 1
+        assert bid.utility_score == utility
+
+    def test_message_serialization(self):
+        auction = TaskAuction(
+            task_id="task_123",
+            task_description="Test task",
         )
-        assert message.msg_type == MessageType.TASK_BID
-        assert message.payload["utility"] == 85.5
 
-    def test_create_auction_message(self):
-        """Test creating auction message"""
-        message = create_auction_message(
-            task_id="task_001",
-            description="Write Python code",
-            domain="PYTHON",
-            requirements={"language": "python"},
-            trace_id="trace_001",
+        data = auction.to_dict()
+
+        assert data["task_id"] == "task_123"
+        assert data["message_type"] == "TASK_AUCTION"
+
+    def test_consensus_vote(self):
+        vote = ConsensusVote(
+            proposal_id="prop_001",
+            proposal_type="SOP",
+            voter_id="coder_01",
+            vote="APPROVE",
+            confidence=0.9,
         )
-        assert message.msg_type == MessageType.TASK_AUCTION
-        assert message.payload["domain"] == "PYTHON"
+
+        assert vote.vote == "APPROVE"
+        assert vote.confidence == 0.9
 
 
-class TestConsensusOracle:
-    """Tests for ConsensusOracle"""
+class TestTaskAuctioneer:
+    """Tests for TaskAuctioneer"""
 
-    def test_cast_vote(self):
-        """Test casting votes"""
-        oracle = ConsensusOracle()
-        message = GISPMessage(
-            header=GISPHeader(
-                sender_id="voter_001",
-                recipient_id="oracle",
-                trace_id="debate_001",
-            ),
-            msg_type=MessageType.CONSENSUS_VOTE,
-            payload={"decision": "APPROVE", "rationale": "Looks good"},
+    @pytest.mark.asyncio
+    async def test_start_auction(self, auctioneer):
+        auction = TaskAuction(
+            task_id="task_123",
+            task_description="Test task",
+            domain=TaskDomain.PYTHON,
+            timeout_seconds=5,
         )
-        oracle.cast_vote(message)
-        assert "debate_001" in oracle.active_debates
 
-    def test_evaluate_consensus_approved(self):
-        """Test evaluating consensus - approved"""
-        oracle = ConsensusOracle(quorum_threshold=0.66)
+        auction_id = await auctioneer.start_auction(auction, auto_close=False)
 
-        for i in range(3):
-            message = GISPMessage(
-                header=GISPHeader(
-                    sender_id=f"voter_{i}",
-                    recipient_id="oracle",
-                    trace_id="debate_001",
-                ),
-                msg_type=MessageType.CONSENSUS_VOTE,
-                payload={"decision": "APPROVE"},
-            )
-            oracle.cast_vote(message)
+        assert auction_id is not None
+        assert auctioneer.get_auction_status(auction_id) == AuctionState.OPEN
 
-        result = oracle.evaluate_consensus("debate_001")
-        assert result["reached"] is True
-        assert result["verdict"] == "APPROVED"
-
-    def test_evaluate_consensus_rejected(self):
-        """Test evaluating consensus - rejected"""
-        oracle = ConsensusOracle(quorum_threshold=0.66)
-
-        for i in range(3):
-            message = GISPMessage(
-                header=GISPHeader(
-                    sender_id=f"voter_{i}",
-                    recipient_id="oracle",
-                    trace_id="debate_002",
-                ),
-                msg_type=MessageType.CONSENSUS_VOTE,
-                payload={"decision": "REJECT"},
-            )
-            oracle.cast_vote(message)
-
-        result = oracle.evaluate_consensus("debate_002")
-        assert result["reached"] is True
-        assert result["verdict"] == "REJECTED"
-
-    def test_clear_debate(self):
-        """Test clearing debate"""
-        oracle = ConsensusOracle()
-        message = GISPMessage(
-            header=GISPHeader(
-                sender_id="voter_001",
-                recipient_id="oracle",
-                trace_id="debate_003",
-            ),
-            msg_type=MessageType.CONSENSUS_VOTE,
-            payload={"decision": "APPROVE"},
+    @pytest.mark.asyncio
+    async def test_receive_bid(self, auctioneer):
+        auction = TaskAuction(
+            task_id="task_123",
+            task_description="Test task",
+            domain=TaskDomain.PYTHON,
+            timeout_seconds=5,
         )
-        oracle.cast_vote(message)
-        oracle.clear_debate("debate_003")
-        assert "debate_003" not in oracle.active_debates
+
+        await auctioneer.start_auction(auction, auto_close=False)
+
+        auctioneer._reputation.record_success("coder_01", "python")
+
+        bid = TaskBid(
+            task_id="task_123",
+            bidder_id="coder_01",
+            estimated_success_rate=0.9,
+            confidence_in_estimate=0.8,
+        )
+        bid.compute_utility_score(
+            reputation=auctioneer._reputation.get_domain_reputation("coder_01", "python")
+        )
+
+        accepted = await auctioneer.receive_bid(bid)
+
+        assert accepted is True
+
+    @pytest.mark.asyncio
+    async def test_close_auction(self, auctioneer):
+        auction = TaskAuction(
+            task_id="task_123",
+            task_description="Test task",
+            domain=TaskDomain.PYTHON,
+            timeout_seconds=5,
+        )
+
+        await auctioneer.start_auction(auction, auto_close=False)
+
+        for _ in range(5):
+            auctioneer._reputation.record_success("coder_01", "python")
+
+        bid = TaskBid(
+            task_id="task_123",
+            bidder_id="coder_01",
+            estimated_success_rate=0.9,
+            confidence_in_estimate=0.9,
+        )
+        bid.compute_utility_score(
+            reputation=auctioneer._reputation.get_domain_reputation("coder_01", "python")
+        )
+
+        await auctioneer.receive_bid(bid)
+
+        result = await auctioneer.close_auction(auction.message_id)
+
+        assert result.state == AuctionState.COMPLETED
+        assert result.winner_id == "coder_01"
 
 
-class TestTaskDomain:
-    """Tests for TaskDomain enum"""
+class TestFractalAgent:
+    """Tests for FractalAgent"""
 
-    def test_all_domains_exist(self):
-        """Test all expected domains exist"""
-        expected = {
-            "PYTHON",
-            "JAVASCRIPT",
-            "SQL",
-            "FRONTEND",
-            "BACKEND",
-            "SECURITY",
-            "TESTING",
-            "DOCUMENTATION",
-            "RESEARCH",
-            "GENERAL",
-        }
-        actual = {d.name for d in TaskDomain}
-        assert expected == actual
+    def test_initial_state(self, sample_fractal):
+        assert sample_fractal.state == FractalState.IDLE
+        assert sample_fractal.current_load == 0.0
+
+    def test_estimate_task(self, sample_fractal):
+        auction = TaskAuction(
+            task_id="task_123",
+            task_description="Write a Python function",
+            domain=TaskDomain.PYTHON,
+            complexity=5,
+        )
+
+        estimate = sample_fractal.estimate_task(auction)
+
+        assert estimate.can_execute is True
+        assert 0 <= estimate.estimated_success <= 1
+
+    def test_create_bid(self, sample_fractal):
+        auction = TaskAuction(
+            task_id="task_123",
+            task_description="Write a Python function",
+            domain=TaskDomain.PYTHON,
+            complexity=5,
+        )
+
+        estimate = sample_fractal.estimate_task(auction)
+        bid = sample_fractal.create_bid(auction, estimate)
+
+        assert bid.bidder_id == "coder_01"
+        assert bid.utility_score > 0
+
+    @pytest.mark.asyncio
+    async def test_execute_task(self, sample_fractal):
+        task = Mock()
+        task.id = "task_123"
+        task.description = "Write a function"
+
+        award = TaskAward(
+            task_id="task_123",
+            winner_id="coder_01",
+            utility_score=0.9,
+        )
+
+        result = await sample_fractal.execute_task(task, award)
+
+        assert result is not None
+        assert result.fractal_id == "coder_01"
+
+
+class TestGuild:
+    """Tests for Guild"""
+
+    @pytest.fixture
+    def guild(self, reputation_store):
+        return Guild(
+            guild_id="python_guild",
+            domain="python",
+            reputation_store=reputation_store,
+        )
+
+    def test_add_member(self, guild, reputation_store):
+        for _ in range(10):
+            reputation_store.record_success("coder_01", "python")
+
+        membership = guild.add_member("coder_01", role="founder")
+
+        assert membership is not None
+        assert guild.member_count == 1
+
+    def test_guild_activation(self, guild, reputation_store):
+        for i in range(1, 5):
+            fractal_id = f"coder_{i:02d}"
+            for _ in range(10):
+                reputation_store.record_success(fractal_id, "python")
+            role = "founder" if i == 1 else "member"
+            guild.add_member(fractal_id, role=role)
+
+        assert guild.state == GuildState.ACTIVE
+        assert guild.member_count >= 3
+
+    def test_proposal_voting(self, guild, reputation_store):
+        for i in range(1, 4):
+            fractal_id = f"coder_{i:02d}"
+            for _ in range(10):
+                reputation_store.record_success(fractal_id, "python")
+            guild.add_member(fractal_id, role="founder" if i == 1 else "member")
+
+        proposal = guild.create_proposal(
+            proposal_type="SOP",
+            content="Always use type hints",
+            proposer_id="coder_01",
+        )
+
+        assert proposal is not None
+
+        vote1 = ConsensusVote(
+            proposal_id=proposal.proposal_id,
+            voter_id="coder_02",
+            vote="APPROVE",
+            confidence=0.9,
+        )
+        vote2 = ConsensusVote(
+            proposal_id=proposal.proposal_id,
+            voter_id="coder_03",
+            vote="APPROVE",
+            confidence=0.8,
+        )
+
+        guild.vote(proposal.proposal_id, vote1)
+        guild.vote(proposal.proposal_id, vote2)
+
+        assert len(guild.get_sops()) > 0
 
 
 class TestSwarmOrchestrator:
     """Tests for SwarmOrchestrator"""
 
-    def test_create_orchestrator(self):
-        """Test creating orchestrator"""
-        from gaap.swarm import SwarmOrchestrator, SwarmConfig
-
-        config = SwarmConfig(max_parallel_tasks=5)
-        orchestrator = SwarmOrchestrator(config=config)
-
-        assert orchestrator is not None
-        assert len(orchestrator._fractals) >= 3
-
-    def test_register_custom_fractal(self):
-        """Test registering custom fractal"""
-        from gaap.swarm import SwarmOrchestrator
-
-        orchestrator = SwarmOrchestrator()
-        initial_count = len(orchestrator._fractals)
-
-        custom_coder = CoderFractal(fractal_id="custom_coder_001")
-        orchestrator.register_fractal(custom_coder)
-
-        assert len(orchestrator._fractals) == initial_count + 1
-
-    def test_execute_task_simple(self, sample_task):
-        """Test simple task execution"""
-        from gaap.swarm import SwarmOrchestrator
-
-        orchestrator = SwarmOrchestrator()
-        result = asyncio.run(orchestrator.execute_task(sample_task))
-
-        assert result.task_id == sample_task.id
-        assert result.winner_id != ""
-        assert result.all_bids >= 1
-
-    def test_execute_parallel(self):
-        """Test parallel task execution"""
-        from gaap.swarm import SwarmOrchestrator
-
-        orchestrator = SwarmOrchestrator()
-
-        tasks = [Task(id=f"task_{i}", description=f"Write Python function {i}") for i in range(3)]
-
-        results = asyncio.run(orchestrator.execute_parallel(tasks))
-
-        assert len(results) == 3
-        for r in results:
-            assert r.task_id.startswith("task_")
-
-    def test_get_stats(self):
-        """Test getting orchestrator stats"""
-        from gaap.swarm import SwarmOrchestrator
-
-        orchestrator = SwarmOrchestrator()
-        stats = orchestrator.get_stats()
-
-        assert "total_fractals" in stats
-        assert "total_tasks_executed" in stats
-        assert stats["total_fractals"] >= 3
-
-    def test_get_top_performers(self):
-        """Test getting top performers"""
-        from gaap.swarm import SwarmOrchestrator
-
-        orchestrator = SwarmOrchestrator()
-        top = orchestrator.get_top_performers(TaskDomain.PYTHON, limit=3)
-
-        assert isinstance(top, list)
-        assert len(top) <= 3
-
-
-class TestGAAPEngineSwarmIntegration:
-    """Tests for GAAPEngine swarm integration"""
-
-    def test_engine_with_swarm(self):
-        """Test creating engine with swarm enabled"""
-        from gaap.gaap_engine import GAAPEngine
-
-        engine = GAAPEngine(enable_swarm=True, enable_memory=False, enable_security=False)
-
-        assert engine.swarm_orchestrator is not None
-
-    def test_engine_without_swarm(self):
-        """Test creating engine without swarm"""
-        from gaap.gaap_engine import GAAPEngine
-
-        engine = GAAPEngine(enable_swarm=False, enable_memory=False, enable_security=False)
-
-        assert engine.swarm_orchestrator is None
-
-    def test_engine_swarm_execute(self):
-        """Test engine swarm execute method"""
-        from gaap.gaap_engine import GAAPEngine
-
-        engine = GAAPEngine(enable_swarm=True, enable_memory=False, enable_security=False)
-
-        task = Task(
-            id="engine_task_001",
-            description="Write a Python hello world",
+    @pytest.fixture
+    def orchestrator(self):
+        return SwarmOrchestrator(
+            config=SwarmConfig(
+                default_auction_timeout=2.0,
+                guild_formation_threshold=3,
+            )
         )
 
-        result = asyncio.run(engine.swarm_execute(task))
+    @pytest.mark.asyncio
+    async def test_start_stop(self, orchestrator):
+        await orchestrator.start()
+        assert orchestrator.state == OrchestratorState.RUNNING
 
-        assert "success" in result
-        assert "winner" in result
-        assert "bids_received" in result
+        await orchestrator.stop()
+        assert orchestrator.state == OrchestratorState.PAUSED
 
-    def test_engine_swarm_stats(self):
-        """Test engine stats include swarm stats"""
-        from gaap.gaap_engine import GAAPEngine
+    def test_register_fractal(self, orchestrator, sample_fractal):
+        success = orchestrator.register_fractal(sample_fractal)
 
-        engine = GAAPEngine(enable_swarm=True, enable_memory=False, enable_security=False)
+        assert success is True
+        assert len(orchestrator._fractals) == 1
 
-        stats = engine.get_stats()
+    @pytest.mark.asyncio
+    async def test_process_task(self, orchestrator, sample_fractal):
+        orchestrator.register_fractal(sample_fractal)
 
-        assert "swarm_stats" in stats
+        for _ in range(5):
+            orchestrator._reputation.record_success("coder_01", "python")
+
+        await orchestrator.start()
+
+        task = Mock()
+        task.id = "task_123"
+        task.description = "Write a function"
+
+        result = await orchestrator.process_task(
+            task=task,
+            domain="python",
+        )
+
+        await orchestrator.stop()
+
+        assert orchestrator.metrics.total_tasks_processed >= 1
+
+
+class TestIntegration:
+    """Integration tests"""
+
+    @pytest.fixture
+    def full_setup(self, temp_dir):
+        store = ReputationStore(storage_path=str(Path(temp_dir) / "reputation.json"))
+
+        orchestrator = SwarmOrchestrator(
+            reputation_store=store,
+            config=SwarmConfig(
+                default_auction_timeout=2.0,
+                enable_guild_formation=True,
+            ),
+        )
+
+        fractals = []
+        for i in range(5):
+            provider = Mock()
+            provider.default_model = "test-model"
+
+            response = Mock()
+            response.choices = [Mock()]
+            response.choices[0].message.content = f"Output from fractal {i}"
+            provider.chat_completion = AsyncMock(return_value=response)
+
+            memory = Mock()
+            memory.retrieve = Mock(return_value=[])
+            memory.record_episode = AsyncMock()
+
+            fractal = FractalAgent(
+                fractal_id=f"coder_{i:02d}",
+                domains=["python", "testing"],
+                provider=provider,
+                memory=memory,
+                reputation_store=store,
+            )
+
+            for _ in range(i * 2 + 1):
+                store.record_success(f"coder_{i:02d}", "python")
+
+            fractals.append(fractal)
+
+        return orchestrator, fractals, store
+
+    @pytest.mark.asyncio
+    async def test_full_workflow(self, full_setup):
+        orchestrator, fractals, store = full_setup
+
+        for fractal in fractals:
+            orchestrator.register_fractal(fractal)
+
+        await orchestrator.start()
+
+        task = Mock()
+        task.id = "integration_task"
+        task.description = "Implement feature X"
+
+        result = await orchestrator.process_task(
+            task=task,
+            domain="python",
+            complexity=5,
+        )
+
+        await orchestrator.stop()
+
+        stats = orchestrator.get_stats()
+
+        assert stats["metrics"]["total_tasks"] >= 1
+        assert len(stats["fractals"]) == 5
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
