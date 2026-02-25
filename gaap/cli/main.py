@@ -15,6 +15,7 @@ from gaap.cli.commands import (
     cmd_providers,
     cmd_status,
     cmd_version,
+    cmd_web,
 )
 
 
@@ -182,6 +183,16 @@ def create_parser() -> argparse.ArgumentParser:
     knowledge_p.add_argument("library", nargs="?", help="Library name")
     knowledge_p.add_argument("--max-tokens", type=int, default=4000, help="Max tokens for context")
 
+    # Web command
+    web_p = subparsers.add_parser("web", help="Start both frontend and backend servers")
+    web_p.add_argument(
+        "--backend-port", "-b", type=int, default=8000, help="Backend port (default: 8000)"
+    )
+    web_p.add_argument(
+        "--frontend-port", "-f", type=int, default=3000, help="Frontend port (default: 3000)"
+    )
+    web_p.add_argument("--host", default="localhost", help="Host to bind to (default: localhost)")
+
     return parser
 
 
@@ -251,6 +262,9 @@ def main() -> None:
         from gaap.cli.commands.learn import cmd_knowledge
 
         cmd_knowledge(args)
+
+    elif args.command == "web":
+        cmd_web(args)
 
     else:
         parser.print_help()
