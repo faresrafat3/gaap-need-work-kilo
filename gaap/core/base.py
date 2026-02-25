@@ -1037,7 +1037,7 @@ def measure_time(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
         finally:
             elapsed = time.time() - start
             if args and hasattr(args[0], "record_metric"):
-                args[0].record_metric(f"{func.__name__}_time", elapsed)  # type: ignore[union-attr]
+                args[0].record_metric(f"{func.__name__}_time", elapsed)
 
     return wrapper
 

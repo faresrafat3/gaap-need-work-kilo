@@ -6,16 +6,21 @@ Includes:
     - VCR cassette fixtures for deterministic API testing
     - LLM-as-a-Judge for semantic assertions
     - Chaos testing fixtures for fault injection
+    - Gauntlet runner for E2E scenarios
+
+Reference: docs/evolution_plan_2026/45_TESTING_AUDIT_SPEC.md
 """
 
 import asyncio
 import os
 import random
 from functools import wraps
+from pathlib import Path
 from typing import Any, Callable
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import vcr
 
 from gaap.core.types import (
     ChatCompletionChoice,
@@ -31,6 +36,44 @@ from gaap.core.types import (
     TaskType,
     Usage,
 )
+
+
+def pytest_addoption(parser):
+    """Add custom pytest options"""
+    parser.addoption(
+        "--run-e2e",
+        action="store_true",
+        default=False,
+        help="Run end-to-end tests that require real services",
+    )
+    parser.addoption(
+        "--run-benchmark",
+        action="store_true",
+        default=False,
+        help="Run benchmark tests",
+    )
+    parser.addoption(
+        "--run-slow",
+        action="store_true",
+        default=False,
+        help="Run slow tests",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip tests based on markers and options"""
+    skip_e2e = pytest.mark.skip(reason="Need --run-e2e option to run E2E tests")
+    skip_benchmark = pytest.mark.skip(reason="Need --run-benchmark option to run benchmarks")
+    skip_slow = pytest.mark.skip(reason="Need --run-slow option to run slow tests")
+
+    for item in items:
+        if "e2e" in item.keywords and not config.getoption("--run-e2e"):
+            item.add_marker(skip_e2e)
+        if "benchmark" in item.keywords and not config.getoption("--run-benchmark"):
+            item.add_marker(skip_benchmark)
+        if "slow" in item.keywords and not config.getoption("--run-slow"):
+            item.add_marker(skip_slow)
+
 
 # =============================================================================
 # Event Loop
@@ -56,7 +99,7 @@ def sample_message() -> Message:
     return Message(role=MessageRole.USER, content="Hello, how are you?")
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def sample_messages() -> list[Message]:
     """Create a list of sample messages"""
     return [
@@ -65,7 +108,7 @@ def sample_messages() -> list[Message]:
     ]
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def assistant_message() -> Message:
     """Create an assistant message"""
     return Message(role=MessageRole.ASSISTANT, content="Here is a sorting function...")
@@ -88,7 +131,7 @@ def sample_task() -> Task:
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def sample_tasks() -> list[Task]:
     """Create multiple sample tasks"""
     return [
@@ -453,18 +496,46 @@ def message_factory():
 # VCR Cassette Fixtures
 # =============================================================================
 
+CASSETTE_DIR = Path(__file__).parent / "cassettes"
 
-@pytest.fixture
+
+@pytest.fixture(scope="module")
 def vcr_config():
     """Default VCR configuration for recording API interactions."""
     return {
         "record_mode": "once",
         "match_on": ["method", "scheme", "host", "port", "path", "query"],
-        "filter_headers": ["authorization", "api-key", "x-api-key"],
+        "filter_headers": [
+            "authorization",
+            "api-key",
+            "x-api-key",
+            "x-goog-api-key",
+        ],
         "filter_query_parameters": ["key", "api_key", "token"],
         "decode_compressed_response": True,
-        "cassette_library_dir": "tests/cassettes",
+        "cassette_library_dir": str(CASSETTE_DIR),
     }
+
+
+@pytest.fixture(scope="module")
+def vcr_cassette_dir():
+    """Get VCR cassette directory."""
+    CASSETTE_DIR.mkdir(parents=True, exist_ok=True)
+    return CASSETTE_DIR
+
+
+@pytest.fixture
+def vcr_recorder(vcr_config):
+    """Create VCR recorder for recording/playing API interactions."""
+    my_vcr = vcr.VCR(
+        record_mode=vcr_config["record_mode"],
+        match_on=vcr_config["match_on"],
+        filter_headers=vcr_config["filter_headers"],
+        filter_query_parameters=vcr_config["filter_query_parameters"],
+        decode_compressed_response=vcr_config["decode_compressed_response"],
+        cassette_library_dir=vcr_config["cassette_library_dir"],
+    )
+    return my_vcr
 
 
 @pytest.fixture

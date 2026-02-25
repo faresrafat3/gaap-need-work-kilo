@@ -1,0 +1,229 @@
+axioms:
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-22T19:33:00.661428'
+  source: meta_learning
+  proposal_id: 5c44291420d4
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-22T19:34:09.911877'
+  source: meta_learning
+  proposal_id: 9ef09d382eb9
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-22T19:35:23.137614'
+  source: meta_learning
+  proposal_id: d9360700d7fb
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-22T22:18:46.946719'
+  source: meta_learning
+  proposal_id: 4fe2ab4fd994
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-22T22:20:00.432928'
+  source: meta_learning
+  proposal_id: d904331ec697
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-22T22:49:49.040577'
+  source: meta_learning
+  proposal_id: fa74d8816805
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-23T04:48:42.082237'
+  source: meta_learning
+  proposal_id: b2e3f43b560b
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-23T05:13:35.394550'
+  source: meta_learning
+  proposal_id: 6890fd93bc70
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-23T05:34:27.893584'
+  source: meta_learning
+  proposal_id: 962263c8b0dd
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-23T05:52:14.980222'
+  source: meta_learning
+  proposal_id: ef351b74a457
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-23T05:56:04.379191'
+  source: meta_learning
+  proposal_id: bbbc6eedd342
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-23T14:50:48.772276'
+  source: meta_learning
+  proposal_id: b565de8c8017
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-23T15:24:28.431025'
+  source: meta_learning
+  proposal_id: 467826d8806b
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-23T16:50:37.588731'
+  source: meta_learning
+  proposal_id: af37ba39a299
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-23T21:02:32.074508'
+  source: meta_learning
+  proposal_id: c5cc41b792b2
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-23T21:30:06.190795'
+  source: meta_learning
+  proposal_id: bdad85b00f20
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-23T23:41:34.609494'
+  source: meta_learning
+  proposal_id: b94aa066684e
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T05:00:04.457681'
+  source: meta_learning
+  proposal_id: 8e2d51e1ff6d
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T05:17:42.525693'
+  source: meta_learning
+  proposal_id: 6df091053b6a
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T05:28:22.897101'
+  source: meta_learning
+  proposal_id: e441b8899a8b
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T05:46:42.644862'
+  source: meta_learning
+  proposal_id: 09914049d0a2
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T13:46:36.677231'
+  source: meta_learning
+  proposal_id: 631281ae0a12
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T14:54:33.564213'
+  source: meta_learning
+  proposal_id: 08cce51cc995
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T15:21:31.412842'
+  source: meta_learning
+  proposal_id: 5dc4bb6f6eb3
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T15:25:13.118983'
+  source: meta_learning
+  proposal_id: 59b85045a0ae
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T15:26:20.124463'
+  source: meta_learning
+  proposal_id: f69a8cd6fd83
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T15:27:14.205785'
+  source: meta_learning
+  proposal_id: 9bac6c7355e7
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T15:27:42.054701'
+  source: meta_learning
+  proposal_id: baaf7717e8f1
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T15:28:07.462542'
+  source: meta_learning
+  proposal_id: 8195b58803c7
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T15:28:35.080368'
+  source: meta_learning
+  proposal_id: 2faca1757845
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T15:29:00.086706'
+  source: meta_learning
+  proposal_id: 80633e6208ab
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T15:29:38.078184'
+  source: meta_learning
+  proposal_id: 09cff7db05f6
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T15:30:01.337050'
+  source: meta_learning
+  proposal_id: b955653367cc
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T15:30:24.024474'
+  source: meta_learning
+  proposal_id: e9e780e7cc0a
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T16:51:23.527696'
+  source: meta_learning
+  proposal_id: 06751c1f87b6
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T17:55:08.908500'
+  source: meta_learning
+  proposal_id: fb8ebe45157c
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-24T18:10:45.124493'
+  source: meta_learning
+  proposal_id: 90b1fe203a37
+- name: committed_axiom
+  description: Test axiom to commit
+  level: GUIDELINE
+  added_at: '2026-02-25T04:59:28.543509'
+  source: meta_learning
+  proposal_id: eb810b57936e

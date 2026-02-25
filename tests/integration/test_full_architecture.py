@@ -2,12 +2,17 @@
 """
 GAAP Full Architecture Test — Kimi K2.5 Thinking
 =================================================
+
 اختبار شامل لمعمارية GAAP بالكامل مع Kimi K2.5 Thinking:
   - Layer 0: Security Firewall + Intent Classification + Routing
   - Layer 1: Tree of Thoughts + MAD Architecture Panel
   - Layer 2: Task Decomposition + DAG + Dependency Resolution
   - Layer 3: Executor Pool + Genetic Twin + MAD Quality Panel
   - Supporting: Self-Healing, Hierarchical Memory, Audit Trail
+
+NOTE: This is an E2E test that requires real API credentials.
+Run with: pytest -m e2e --run-e2e
+Skip by default in CI/CD.
 """
 
 import asyncio

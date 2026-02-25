@@ -15,6 +15,11 @@ Fallback System:
     - ProviderHealth: Health tracking per provider
     - CircuitBreaker: Prevent cascading failures
 
+Pricing Table:
+    - MODEL_PRICING: Live pricing per model
+    - ModelPricing: Pricing data class
+    - estimate_cost: Cost calculation utilities
+
 Features:
     - Task complexity analysis
     - Budget-aware routing
@@ -46,6 +51,24 @@ from .router import (
     SmartRouter,
     create_router,
 )
+from .pricing_table import (
+    MODEL_PRICING,
+    ModelPricing,
+    get_pricing,
+    get_all_pricing,
+    get_pricing_by_provider,
+    estimate_cost,
+    get_cheapest_model,
+    get_best_value_model,
+    count_tokens,
+)
+from .cascade_router import (
+    QualityGate,
+    QualityGateResult,
+    CascadeRouter,
+    CascadeResult,
+    create_cascade_router,
+)
 
 __all__ = [
     # Router
@@ -63,4 +86,14 @@ __all__ = [
     "ProviderHealth",
     "CircuitBreaker",
     "create_fallback_manager",
+    # Pricing
+    "MODEL_PRICING",
+    "ModelPricing",
+    "get_pricing",
+    "get_all_pricing",
+    "get_pricing_by_provider",
+    "estimate_cost",
+    "get_cheapest_model",
+    "get_best_value_model",
+    "count_tokens",
 ]

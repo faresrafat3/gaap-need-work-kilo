@@ -1,6 +1,7 @@
 # Self Healer
 import asyncio
 import logging
+import random
 import re
 import time
 import traceback
@@ -8,7 +9,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from gaap.core.exceptions import (
     ProviderError,
@@ -20,6 +21,11 @@ from gaap.core.types import (
     Task,
     TaskComplexity,
 )
+
+if TYPE_CHECKING:
+    from gaap.healing.reflexion import ReflexionEngine
+    from gaap.healing.healing_config import HealingConfig
+    from gaap.meta_learning.failure_store import FailureStore
 
 # =============================================================================
 # Logger Setup
@@ -192,6 +198,85 @@ class ErrorClassifier:
         return ErrorCategory.UNKNOWN
 
 
+class SemanticErrorClassifier:
+    """
+    مصنف الأخطاء الدلالي
+
+    Uses LLM for semantic classification when regex fails.
+    Provides more intelligent error categorization.
+    """
+
+    CLASSIFICATION_PROMPT = """Analyze this error and classify it into ONE category.
+
+Error Type: {error_type}
+Error Message: {error_message}
+Task Context: {task_context}
+
+Categories:
+- TRANSIENT: Network issues, rate limits, temporary failures (retry immediately)
+- SYNTAX: Code syntax errors, parsing failures (fix and retry)
+- LOGIC: Wrong output, validation failures, incorrect results (redesign approach)
+- MODEL_LIMIT: Token limits, timeouts, content policy (change model or simplify)
+- RESOURCE: Budget exceeded, quota issues, memory issues (escalate or wait)
+- CRITICAL: Security violations, auth failures (immediate escalation)
+
+Respond with ONLY the category name, nothing else."""
+
+    def __init__(self, llm_provider: Any = None, model: str = "gpt-4o-mini"):
+        self._llm_provider = llm_provider
+        self._model = model
+        self._logger = get_logger("gaap.healing.semantic_classifier")
+
+    async def classify(
+        self,
+        error: Exception,
+        task_context: str = "",
+    ) -> ErrorCategory:
+        """
+        Classify error using LLM for semantic understanding.
+
+        Args:
+            error: The exception to classify
+            task_context: Context about the task being executed
+
+        Returns:
+            ErrorCategory classification
+        """
+        regex_result = ErrorClassifier.classify(error)
+        if regex_result != ErrorCategory.UNKNOWN:
+            return regex_result
+
+        if self._llm_provider is None:
+            return ErrorCategory.UNKNOWN
+
+        try:
+            prompt = self.CLASSIFICATION_PROMPT.format(
+                error_type=type(error).__name__,
+                error_message=str(error)[:500],
+                task_context=task_context[:300],
+            )
+
+            messages = [{"role": "user", "content": prompt}]
+            response = await self._llm_provider.complete(
+                messages,
+                model=self._model,
+                max_tokens=20,
+                temperature=0.1,
+            )
+
+            category_str = response.strip().upper()
+            for cat in ErrorCategory:
+                if cat.name == category_str:
+                    self._logger.debug(f"Semantic classification: {cat.name}")
+                    return cat
+
+            return ErrorCategory.UNKNOWN
+
+        except Exception as e:
+            self._logger.warning(f"Semantic classification failed: {e}")
+            return ErrorCategory.UNKNOWN
+
+
 # =============================================================================
 # Prompt Refiner
 # =============================================================================
@@ -276,48 +361,58 @@ class SelfHealingSystem:
 
     يستخدم 5 مستويات للتعافي:
     - L1: إعادة المحاولة البسيطة
-    - L2: تحسين الـ Prompt
+    - L2: تحسين الـ Prompt (مع Reflexion)
     - L3: تغيير النموذج
     - L4: تغيير الاستراتيجية (تفكيك المهمة)
     - L5: تصعيد بشري
+
+    Features:
+    - ReflexionEngine للتفكير الذاتي في الفشل
+    - SemanticErrorClassifier للتصنيف الذكي
+    - Post-Mortem Memory لتخزين التجارب الفاشلة
+    - Pattern Detection للكشف عن أنماط الفشل
+    - Configurable via HealingConfig
+
     """
-
-    # حدود المستويات
-    MAX_RETRIES_PER_LEVEL = {
-        HealingLevel.L1_RETRY: 1,  # Was 3 — reduced: retrying timeouts 3× wastes 540s
-        HealingLevel.L2_REFINE: 1,  # Was 2 — reduced: with only 1 provider, repeated retries just timeout
-        HealingLevel.L3_PIVOT: 1,  # Was 2 — reduced
-        HealingLevel.L4_STRATEGY_SHIFT: 1,
-        HealingLevel.L5_HUMAN_ESCALATION: 0,
-    }
-
-    # تأخيرات المستويات
-    LEVEL_DELAYS = {
-        HealingLevel.L1_RETRY: 1.0,
-        HealingLevel.L2_REFINE: 2.0,
-        HealingLevel.L3_PIVOT: 3.0,
-        HealingLevel.L4_STRATEGY_SHIFT: 5.0,
-        HealingLevel.L5_HUMAN_ESCALATION: 0.0,
-    }
 
     def __init__(
         self,
         max_level: HealingLevel = HealingLevel.L4_STRATEGY_SHIFT,
         on_escalate: Callable[[ErrorContext], Awaitable[None]] | None = None,
         memory: Any = None,
+        reflexion_engine: "ReflexionEngine | None" = None,
+        failure_store: "FailureStore | None" = None,
+        semantic_classifier: SemanticErrorClassifier | None = None,
+        llm_provider: Any = None,
+        config: "HealingConfig | None" = None,
     ):
-        self.max_level = max_level
+        from gaap.healing.healing_config import HealingConfig
+
+        self._config = config or HealingConfig()
+        self.max_level = HealingLevel(self._config.max_healing_level)
         self.on_escalate = on_escalate
         self._logger = get_logger("gaap.healing")
         self._memory = memory
-
+        self._llm_provider = llm_provider
+        self._reflexion_engine = reflexion_engine
+        self._failure_store = failure_store
+        self._semantic_classifier = semantic_classifier or SemanticErrorClassifier(
+            llm_provider=llm_provider,
+            model=self._config.semantic_classifier.model,
+        )
         self._records: list[HealingRecord] = []
         self._error_history: dict[str, list[ErrorContext]] = {}
-
-        # إحصائيات
+        self._reflection_history: dict[str, list[Any]] = {}
+        self._pattern_history: dict[str, list[dict[str, Any]]] = {}
+        self._cooldown_patterns: dict[str, float] = {}
         self._total_healing_attempts = 0
         self._successful_recoveries = 0
         self._escalations = 0
+        self._patterns_detected = 0
+
+    @property
+    def config(self) -> "HealingConfig":
+        return self._config
 
     # =========================================================================
     # Main Healing Method
@@ -352,8 +447,12 @@ class SelfHealingSystem:
             self._inject_few_shot_examples(task, context)
 
         error_category = ErrorClassifier.classify(error)
+        if error_category == ErrorCategory.UNKNOWN and self._semantic_classifier:
+            try:
+                error_category = await self._semantic_classifier.classify(error, task.description)
+            except Exception as e:
+                self._logger.debug(f"Semantic classification failed: {e}")
 
-        # إنشاء سياق الخطأ
         error_ctx = ErrorContext(
             error=error,
             category=error_category,
@@ -365,11 +464,17 @@ class SelfHealingSystem:
             stack_trace=traceback.format_exc(),
         )
 
-        # تسجيل الخطأ
         self._record_error(error_ctx)
 
-        # تحديد نقطة البداية
-        current_level = self._determine_start_level(error_category)
+        pattern_id = self._detect_failure_pattern(error_ctx)
+        if pattern_id and self._should_auto_escalate(pattern_id):
+            escalation_level = self._get_pattern_escalation_level(pattern_id)
+            self._logger.warning(
+                f"Auto-escalating due to pattern {pattern_id} to {escalation_level.name}"
+            )
+            current_level = escalation_level
+        else:
+            current_level = self._determine_start_level(error_category)
 
         self._logger.info(
             f"Starting healing for task {task.id} "
@@ -377,7 +482,6 @@ class SelfHealingSystem:
             f"error category: {error_category.name}"
         )
 
-        # محاولة التعافي
         while current_level.value <= self.max_level.value:
             result = await self._attempt_level(
                 level=current_level,
@@ -397,23 +501,22 @@ class SelfHealingSystem:
                     success=True,
                     error_category=error_category,
                 )
-                # v2: Observability
+                if self._failure_store and error_ctx.attempt > 1:
+                    await self._record_successful_recovery(error_ctx, task, current_level)
                 try:
                     from gaap.core.observability import observability as _obs
 
                     _obs.record_healing(level=current_level.name, success=True)
-                except Exception as e:
-                    pass  # observability is never allowed to crash healing
+                except Exception:
+                    pass
                 return result
 
-            # الانتقال للمستوى التالي
             next_level = self._get_next_level(current_level)
             if next_level is None or next_level.value > self.max_level.value:
                 break
 
             current_level = next_level
 
-        # فشل التعافي
         self._escalations += 1
         result = RecoveryResult(
             success=False,
@@ -424,7 +527,9 @@ class SelfHealingSystem:
             time_spent_ms=(time.time() - start_time) * 1000,
         )
 
-        # التصعيد
+        if self._failure_store:
+            await self._record_failure(error_ctx, task)
+
         if self.on_escalate:
             await self.on_escalate(error_ctx)
 
@@ -436,13 +541,12 @@ class SelfHealingSystem:
             error_category=error_category,
             details=str(error),
         )
-        # v2: Observability
         try:
             from gaap.core.observability import observability as _obs
 
             _obs.record_healing(level=current_level.name, success=False)
-        except Exception as e:
-            pass  # observability is never allowed to crash healing
+        except Exception:
+            pass
 
         return result
 
@@ -461,6 +565,44 @@ class SelfHealingSystem:
         else:
             return HealingLevel.L1_RETRY
 
+    def _calculate_delay(self, level: HealingLevel, attempt: int) -> float:
+        """
+        Calculate delay with exponential backoff and jitter.
+
+        Args:
+            level: Current healing level
+            attempt: Current attempt number (0-indexed)
+
+        Returns:
+            Delay in seconds
+        """
+        if attempt == 0:
+            return 0.0
+
+        base_delay = self._config.base_delay_seconds
+        delay: float
+
+        if self._config.exponential_backoff:
+            level_multipliers: dict[HealingLevel, float] = {
+                HealingLevel.L1_RETRY: 1.0,
+                HealingLevel.L2_REFINE: 2.0,
+                HealingLevel.L3_PIVOT: 3.0,
+                HealingLevel.L4_STRATEGY_SHIFT: 5.0,
+                HealingLevel.L5_HUMAN_ESCALATION: 0.0,
+            }
+            multiplier: float = level_multipliers.get(level, 1.0)
+            delay = base_delay * multiplier * (2 ** (attempt - 1))
+        else:
+            delay = base_delay * (attempt + 1)
+
+        delay = min(delay, self._config.max_delay_seconds)
+
+        if self._config.jitter:
+            jitter_range = delay * 0.1
+            delay += random.uniform(-jitter_range, jitter_range)
+
+        return max(0.0, delay)
+
     async def _attempt_level(
         self,
         level: HealingLevel,
@@ -470,17 +612,16 @@ class SelfHealingSystem:
         context: dict[str, Any] | None = None,
     ) -> RecoveryResult:
         """محاولة مستوى معين"""
-        max_retries = self.MAX_RETRIES_PER_LEVEL.get(level, 1)
-        delay = self.LEVEL_DELAYS.get(level, 1.0)
+        max_retries = self._config.max_retries_per_level
 
         for attempt in range(max_retries):
             error_ctx.attempt = attempt + 1
 
             self._logger.info(f"Attempting {level.name} (attempt {attempt + 1}/{max_retries})")
 
-            # انتظار قبل المحاولة
-            if attempt > 0 and delay > 0:
-                await asyncio.sleep(delay * attempt)
+            delay = self._calculate_delay(level, attempt)
+            if delay > 0:
+                await asyncio.sleep(delay)
 
             try:
                 # تنفيذ الإجراء المناسب
@@ -536,14 +677,10 @@ class SelfHealingSystem:
         context = context or {}
 
         if level == HealingLevel.L1_RETRY:
-            # إعادة المحاولة كما هي
             return RecoveryAction.RETRY, task
 
         elif level == HealingLevel.L2_REFINE:
-            # تحسين الـ Prompt
-            refined_description = PromptRefiner.refine(
-                task.description, error_ctx.error, error_ctx.category
-            )
+            refined_description = await self._refine_with_reflexion(task, error_ctx, context)
 
             modified_task = Task(
                 id=task.id,
@@ -553,14 +690,16 @@ class SelfHealingSystem:
                 complexity=task.complexity,
                 context=task.context,
                 constraints=task.constraints,
-                metadata={**task.metadata, "refined": True},
+                metadata={
+                    **task.metadata,
+                    "refined": True,
+                    "reflexion_used": self._reflexion_engine is not None,
+                },
             )
 
             return RecoveryAction.REFINE_PROMPT, modified_task
 
         elif level == HealingLevel.L3_PIVOT:
-            # تغيير النموذج
-            # (يتم التعامل معه خارجياً عبر context)
             modified_task = Task(
                 id=task.id,
                 description=task.description,
@@ -575,7 +714,6 @@ class SelfHealingSystem:
             return RecoveryAction.CHANGE_MODEL, modified_task
 
         elif level == HealingLevel.L4_STRATEGY_SHIFT:
-            # تبسيط المهمة
             simplified_description = self._simplify_task(task)
 
             modified_task = Task(
@@ -625,6 +763,134 @@ This is a simplified version due to previous failures with the full implementati
         return None
 
     # =========================================================================
+    # Reflexion Integration
+    # =========================================================================
+
+    async def _refine_with_reflexion(
+        self,
+        task: Task,
+        error_ctx: ErrorContext,
+        context: dict[str, Any],
+    ) -> str:
+        """
+        Refine prompt using ReflexionEngine if available.
+        Falls back to PromptRefiner if no engine configured.
+        """
+        previous_output = context.get("previous_output", "")
+        attempt_count = len(self._error_history.get(task.id, []))
+
+        if self._reflexion_engine:
+            try:
+                reflection = await self._reflexion_engine.reflect(
+                    error=error_ctx.error,
+                    task_description=task.description,
+                    previous_output=previous_output,
+                    context=context,
+                    attempt_count=attempt_count,
+                )
+
+                if task.id not in self._reflection_history:
+                    self._reflection_history[task.id] = []
+                self._reflection_history[task.id].append(reflection)
+
+                refined = self._reflexion_engine.refine_prompt(task.description, reflection)
+                self._logger.info(
+                    f"Generated reflexion with confidence {reflection.confidence:.2f}"
+                )
+                return refined
+
+            except Exception as e:
+                self._logger.warning(f"Reflexion failed, using fallback: {e}")
+
+        return PromptRefiner.refine(task.description, error_ctx.error, error_ctx.category)
+
+    async def _record_failure(
+        self,
+        error_ctx: ErrorContext,
+        task: Task,
+    ) -> None:
+        """Record failure to FailureStore for future avoidance."""
+        if not self._failure_store:
+            return
+
+        try:
+            from gaap.meta_learning.failure_store import FailedTrace, FailureType
+
+            failure_type_map = {
+                ErrorCategory.SYNTAX: FailureType.SYNTAX,
+                ErrorCategory.LOGIC: FailureType.LOGIC,
+                ErrorCategory.TRANSIENT: FailureType.TIMEOUT,
+                ErrorCategory.MODEL_LIMIT: FailureType.RESOURCE,
+                ErrorCategory.RESOURCE: FailureType.RESOURCE,
+                ErrorCategory.CRITICAL: FailureType.SECURITY,
+                ErrorCategory.UNKNOWN: FailureType.UNKNOWN,
+            }
+
+            reflection = None
+            if task.id in self._reflection_history and self._reflection_history[task.id]:
+                reflection = self._reflection_history[task.id][-1]
+
+            trace = FailedTrace(
+                task_type=task.type.name if hasattr(task.type, "name") else str(task.type),
+                hypothesis=task.description[:500],
+                error=str(error_ctx.error)[:500],
+                error_type=failure_type_map.get(error_ctx.category, FailureType.UNKNOWN),
+                context={
+                    "provider": error_ctx.provider,
+                    "model": error_ctx.model,
+                    "attempts": error_ctx.attempt,
+                },
+                agent_thoughts=reflection.failure_analysis if reflection else None,
+                task_id=task.id,
+            )
+
+            self._failure_store.record(trace)
+            self._logger.info(f"Recorded failure trace for task {task.id}")
+
+        except Exception as e:
+            self._logger.warning(f"Failed to record to FailureStore: {e}")
+
+    async def _record_successful_recovery(
+        self,
+        error_ctx: ErrorContext,
+        task: Task,
+        level: HealingLevel,
+    ) -> None:
+        """Record successful recovery as corrective action."""
+        if not self._failure_store:
+            return
+
+        try:
+            from gaap.meta_learning.failure_store import CorrectiveAction
+
+            reflection = None
+            if task.id in self._reflection_history and self._reflection_history[task.id]:
+                reflection = self._reflection_history[task.id][-1]
+
+            trace_id = None
+            if hasattr(self._failure_store, "_failures"):
+                for fid, f in self._failure_store._failures.items():
+                    if f.task_id == task.id:
+                        trace_id = fid
+                        break
+
+            if trace_id and reflection and reflection.proposed_fix:
+                action = CorrectiveAction(
+                    failure_id=trace_id,
+                    solution=reflection.proposed_fix,
+                    explanation=reflection.failure_analysis,
+                    source="reflexion",
+                )
+                if trace_id not in self._failure_store._corrections:
+                    self._failure_store._corrections[trace_id] = []
+                self._failure_store._corrections[trace_id].append(action)
+                self._failure_store._save()
+                self._logger.info(f"Recorded corrective action for failure {trace_id}")
+
+        except Exception as e:
+            self._logger.warning(f"Failed to record successful recovery: {e}")
+
+    # =========================================================================
     # Recording Methods
     # =========================================================================
 
@@ -658,6 +924,111 @@ This is a simplified version due to previous failures with the full implementati
         )
 
         self._records.append(record)
+
+    # =========================================================================
+    # Pattern Detection
+    # =========================================================================
+
+    def _detect_failure_pattern(self, error_ctx: ErrorContext) -> str | None:
+        """
+        Detect if this error matches a repeated pattern.
+
+        Returns:
+            Pattern ID if pattern detected, None otherwise
+        """
+        if not self._config.pattern_detection.enabled:
+            return None
+
+        error_signature = self._compute_error_signature(error_ctx)
+
+        if error_signature not in self._pattern_history:
+            self._pattern_history[error_signature] = []
+
+        now = time.time()
+        window_seconds = self._config.pattern_detection.time_window_hours * 3600
+
+        recent_occurrences = [
+            occ
+            for occ in self._pattern_history[error_signature]
+            if now - occ["timestamp"] < window_seconds
+        ]
+
+        recent_occurrences.append(
+            {
+                "timestamp": now,
+                "task_id": error_ctx.task_id,
+                "error": str(error_ctx.error)[:200],
+                "category": error_ctx.category.name,
+            }
+        )
+
+        self._pattern_history[error_signature] = recent_occurrences
+
+        if len(recent_occurrences) >= self._config.pattern_detection.detection_threshold:
+            self._patterns_detected += 1
+            self._logger.warning(
+                f"Failure pattern detected: {error_signature} "
+                f"({len(recent_occurrences)} occurrences)"
+            )
+            return error_signature
+
+        return None
+
+    def _compute_error_signature(self, error_ctx: ErrorContext) -> str:
+        """
+        Compute a unique signature for an error for pattern matching.
+
+        Uses error type, category, and message patterns.
+        """
+        error_type = type(error_ctx.error).__name__
+        category = error_ctx.category.name
+
+        import hashlib
+
+        message_normalized = re.sub(r"\d+", "N", str(error_ctx.error).lower()[:100])
+        message_hash = hashlib.md5(message_normalized.encode()).hexdigest()[:8]
+
+        return f"{error_type}:{category}:{message_hash}"
+
+    def _should_auto_escalate(self, pattern_id: str) -> bool:
+        """
+        Check if pattern should trigger auto-escalation.
+
+        Args:
+            pattern_id: The detected pattern signature
+
+        Returns:
+            True if should auto-escalate
+        """
+        if not self._config.pattern_detection.auto_escalate_patterns:
+            return False
+
+        now = time.time()
+        cooldown_seconds = self._config.pattern_detection.pattern_cooldown_minutes * 60
+
+        if pattern_id in self._cooldown_patterns:
+            if now - self._cooldown_patterns[pattern_id] < cooldown_seconds:
+                return False
+
+        self._cooldown_patterns[pattern_id] = now
+        return True
+
+    def _get_pattern_escalation_level(self, pattern_id: str) -> HealingLevel:
+        """
+        Determine the escalation level for a detected pattern.
+
+        Patterns are escalated to a higher level than normal.
+        """
+        occurrences = len(self._pattern_history.get(pattern_id, []))
+
+        if occurrences >= 5:
+            return HealingLevel.L5_HUMAN_ESCALATION
+        elif occurrences >= 4:
+            return HealingLevel.L4_STRATEGY_SHIFT
+        elif occurrences >= 3:
+            return HealingLevel.L3_PIVOT
+        else:
+            return HealingLevel.L2_REFINE
 
     # =========================================================================
     # Dynamic Few-Shot Injection

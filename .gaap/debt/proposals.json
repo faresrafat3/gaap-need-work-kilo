@@ -1,0 +1,31 @@
+{
+  "prop-d6fd1639": {
+    "id": "prop-d6fd1639",
+    "debt_item": {
+      "id": "complexity-debt_scanner-386-2bef81d5",
+      "type": "COMPLEXITY",
+      "file_path": "gaap/maintenance/debt_scanner.py",
+      "line_number": 386,
+      "end_line": 432,
+      "message": "Function '_scan_dead_code' has complexity 14",
+      "priority": "HIGH",
+      "complexity": 14,
+      "function_name": "_scan_dead_code",
+      "snippet": null,
+      "interest_score": 0.7999999999999999,
+      "metadata": {},
+      "discovered_at": "2026-02-23T21:30:26.297627"
+    },
+    "proposed_fix": "# Consider simplifying this function (complexity: 14)",
+    "branch_name": "refactor/debt-complexity-debt_scanner-386-2b",
+    "status": "PENDING",
+    "created_at": "2026-02-23T21:30:26.844409",
+    "updated_at": null,
+    "llm_generated": false,
+    "confidence": 0.3,
+    "test_results": null,
+    "review_notes": null,
+    "applied_changes": [],
+    "metadata": {}
+  }
+}

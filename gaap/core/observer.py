@@ -8,6 +8,8 @@ Features:
     - Cognitive state tracking (lessons, tasks)
     - Strategic drift detection
     - Resource exhaustion warnings
+    - Axiom violation pattern detection
+    - Goal drift analysis
 
 Usage:
     >>> observer = create_observer(memory_system)
@@ -26,18 +28,10 @@ from gaap.memory import LessonStore
 
 logger = logging.getLogger("gaap.core.observer")
 
-# =============================================================================
-# Constants
-# =============================================================================
-
-# Default memory limit (4GB) - configurable via environment variable
 DEFAULT_MEMORY_LIMIT_MB = int(os.getenv("GAAP_MEMORY_LIMIT_MB", "4000"))
-
-# Default number of lessons to retrieve
 DEFAULT_LESSON_COUNT = 3
-
-# Threshold for failed tasks before triggering replanning
 FAILED_TASKS_THRESHOLD = 2
+AXIOM_VIOLATION_THRESHOLD = 3
 
 
 # =============================================================================
@@ -139,6 +133,8 @@ class Observer:
             2. Cognitive state (lessons, pending tasks)
             3. Strategic alignment (goal drift detection)
             4. Resource limits (memory threshold)
+            5. Axiom violation patterns (new)
+            6. Execution health (new)
 
         Args:
             ooda_state: Current OODA loop state for analysis
@@ -161,10 +157,8 @@ class Observer:
         state = EnvironmentState()
 
         try:
-            # 1. Resource Check (Mocked for now - TODO: Use psutil)
             state.memory_usage_mb = self._get_memory_usage()
 
-            # 2. Cognitive Check (Memory) - With error handling
             if self.lesson_store:
                 try:
                     query = " ".join(original_goals) if original_goals else "general execution"
@@ -175,12 +169,28 @@ class Observer:
                     logger.warning(f"Failed to retrieve lessons: {e}")
                     state.lessons_available = []
 
-            # 3. Strategic Drift Check
-            if ooda_state and len(ooda_state.failed_tasks) > FAILED_TASKS_THRESHOLD:
-                state.needs_replanning = True
-                state.replan_trigger = ReplanTrigger.L3_CRITICAL_FAILURE
+            if ooda_state:
+                state.pending_tasks = len(ooda_state.in_progress_tasks)
+                state.failed_tasks = len(ooda_state.failed_tasks)
 
-            # 4. Resource Exhaustion Check
+                if len(ooda_state.failed_tasks) > FAILED_TASKS_THRESHOLD:
+                    state.needs_replanning = True
+                    state.replan_trigger = ReplanTrigger.L3_CRITICAL_FAILURE
+
+                if len(ooda_state.axiom_violations) >= AXIOM_VIOLATION_THRESHOLD:
+                    state.needs_replanning = True
+                    state.replan_trigger = ReplanTrigger.AXIOM_VIOLATION
+                    logger.warning(
+                        f"AXIOM_VIOLATION pattern detected: {len(ooda_state.axiom_violations)} violations"
+                    )
+
+                if original_goals and len(ooda_state.completed_tasks) > 5:
+                    goal_alignment = self._check_goal_alignment(ooda_state, original_goals)
+                    if goal_alignment < 0.3:
+                        state.needs_replanning = True
+                        state.replan_trigger = ReplanTrigger.GOAL_DRIFT
+                        logger.warning(f"GOAL_DRIFT detected: alignment={goal_alignment:.2f}")
+
             memory_limit = int(os.getenv("GAAP_MEMORY_LIMIT_MB", str(DEFAULT_MEMORY_LIMIT_MB)))
             if state.memory_usage_mb > memory_limit:
                 state.needs_replanning = True
@@ -188,9 +198,49 @@ class Observer:
 
         except Exception as e:
             logger.error(f"Observer scan failed: {e}")
-            # Return partial state instead of crashing
 
         return state
+
+    def _check_goal_alignment(self, ooda_state: OODAState, original_goals: list[str]) -> float:
+        """
+        Check alignment between completed tasks and original goals.
+
+        Returns:
+            Alignment score (0.0 to 1.0)
+        """
+        if not original_goals or not ooda_state.lessons_learned:
+            return 1.0
+
+        goals_text = " ".join(original_goals).lower()
+        lessons_text = " ".join(ooda_state.lessons_learned).lower()
+
+        goal_keywords = set(goals_text.split())
+        lesson_keywords = set(lessons_text.split())
+        stop_words = {
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "to",
+            "of",
+            "and",
+            "in",
+            "that",
+            "for",
+        }
+        goal_keywords -= stop_words
+        lesson_keywords -= stop_words
+
+        if not goal_keywords:
+            return 1.0
+
+        overlap = len(goal_keywords & lesson_keywords)
+        return overlap / len(goal_keywords)
 
     def _get_memory_usage(self) -> float:
         """
@@ -206,7 +256,7 @@ class Observer:
             import psutil
 
             process = psutil.Process()
-            return process.memory_info().rss / 1024 / 1024
+            return float(process.memory_info().rss / 1024 / 1024)
         except ImportError:
             logger.debug("psutil not installed, using mocked memory value")
             return 1024.0  # Mocked value

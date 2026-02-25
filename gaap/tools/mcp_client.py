@@ -287,7 +287,8 @@ class MCPClient:
         if result and "contents" in result:
             contents = result["contents"]
             if isinstance(contents, list) and contents:
-                return contents[0].get("text", str(contents[0]))
+                text = contents[0].get("text", "")
+                return str(text) if text else str(contents[0])
 
         return ""
 
@@ -328,7 +329,8 @@ class MCPClient:
             if "error" in response:
                 raise RuntimeError(f"MCP error: {response['error']}")
 
-            return response.get("result")
+            result = response.get("result")
+            return result if isinstance(result, dict) else None
 
         except asyncio.TimeoutError:
             raise RuntimeError(f"Request timeout for method '{method}'")

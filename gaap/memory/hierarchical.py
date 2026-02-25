@@ -41,6 +41,8 @@ Usage:
 
 # Hierarchical Memory
 import hashlib
+
+from gaap.storage.atomic import atomic_write
 import logging
 import time
 from collections import deque, OrderedDict
@@ -640,8 +642,8 @@ class EpisodicMemoryStore:
                 "task_index": self._task_index,
             }
 
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+            content = json.dumps(data, ensure_ascii=False, indent=2, default=str)
+            atomic_write(filepath, content)
 
             self._logger.info(f"Saved {len(self._episodes)} episodes to {filepath}")
             return True
@@ -934,8 +936,8 @@ class SemanticMemoryStore:
                 "pattern_index": self._pattern_index,
             }
 
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+            content = json.dumps(data, ensure_ascii=False, indent=2, default=str)
+            atomic_write(filepath, content)
 
             self._logger.info(f"Saved {len(self._rules)} rules to {filepath}")
             return True
@@ -1152,8 +1154,8 @@ class ProceduralMemoryStore:
             Path(self.storage_path).mkdir(parents=True, exist_ok=True)
             filepath = Path(self.storage_path) / "procedural_memory.json"
 
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(self._procedures, f, ensure_ascii=False, indent=2, default=str)
+            content = json.dumps(self._procedures, ensure_ascii=False, indent=2, default=str)
+            atomic_write(filepath, content)
 
             self._logger.info(f"Saved {len(self._procedures)} procedures to {filepath}")
             return True

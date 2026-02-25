@@ -23,6 +23,34 @@ from gaap.core.world_model import Action, WorldModel
 from gaap.layers.layer1_strategic import ArchitectureSpec
 from gaap.memory import VECTOR_MEMORY_AVAILABLE
 
+from gaap.layers.layer2_config import Layer2Config, create_layer2_config
+from gaap.layers.task_schema import (
+    IntelligentTask,
+    Phase,
+    TaskPhase,
+    RiskLevel,
+    ReassessmentResult,
+)
+from gaap.layers.phase_planner import (
+    PhaseDiscoveryEngine,
+    PhaseReassessor,
+    PhaseExpander,
+    PhaseDiscoveryContext,
+    PhaseExpansionContext,
+)
+from gaap.layers.semantic_dependencies import (
+    SemanticDependencyEngine,
+    DependencyGraph,
+    ResolutionContext,
+)
+from gaap.layers.task_injector import (
+    DynamicTaskInjector,
+    InjectionContext,
+    InjectionDecision,
+)
+from gaap.layers.layer2_learner import Layer2Learner
+from gaap.tools import ToolSynthesizer
+
 # =============================================================================
 # Logger Setup
 # =============================================================================
@@ -527,42 +555,53 @@ Return a JSON array of objects with fields:
         self._task_counter = 0
         self._llm_decompositions = 0
         self._fallback_decompositions = 0
+        self._tool_synthesizer: ToolSynthesizer | None = None
+        self._synthesized_tools: dict[str, Any] = {}
 
         if VECTOR_MEMORY_AVAILABLE:
-            self._world_model = WorldModel(provider=provider)
+            self._world_model: WorldModel | None = WorldModel(provider=provider)
         else:
             self._world_model = None
 
-    async def decompose(self, spec: ArchitectureSpec, goals: list[str]) -> list[AtomicTask]:
+    async def decompose(
+        self, spec: ArchitectureSpec, goals: list[str], enable_jit_synthesis: bool = True
+    ) -> list[AtomicTask]:
         """
         تفكيك المواصفات لمهام ذرية
 
         يستخدم الـ LLM أولاً، وإذا فشل يرجع لتفكيك ذكي هيوريستيكي
         """
-        # استخراج النص الأصلي من الـ metadata
         original_intent = spec.metadata.get("original_intent", {})
         original_text = original_intent.get("original_text", "")
         intent_type = original_intent.get("intent_type", "UNKNOWN")
         explicit_goals = original_intent.get("explicit_goals", goals)
 
-        # محاولة التفكيك بالـ LLM
         if self._provider and original_text:
             try:
                 tasks = await self._llm_decompose(spec, original_text, intent_type, explicit_goals)
                 if tasks:
                     self._llm_decompositions += 1
                     self._logger.info(f"LLM decomposition successful: {len(tasks)} tasks")
+
+                    if enable_jit_synthesis:
+                        for task in tasks:
+                            task_obj = task.to_task()
+                            missing = self._detect_missing_capability(task_obj)
+                            if missing:
+                                self._logger.info(f"Detected missing capability: {missing}")
+                                success = await self._synthesize_tool_if_needed(missing)
+                                if success:
+                                    task.metadata["synthesized_tool"] = missing
+
                     return tasks
             except Exception as e:
                 self._logger.warning(f"LLM decomposition failed, using smart fallback: {e}")
 
-        # Fallback: تفكيك ذكي بدون LLM
         tasks = await self._smart_fallback_decompose(
             spec, original_text, intent_type, explicit_goals
         )
         self._fallback_decompositions += 1
 
-        # التفكير قبل التنفيذ: تحليل المخاطر
         if self._world_model:
             tasks = await self._think_before_act(tasks)
 
@@ -1194,6 +1233,88 @@ Return a JSON array of objects with fields:
         self._task_counter += 1
         return f"task_{int(time.time() * 1000)}_{self._task_counter}"
 
+    def _detect_missing_capability(self, task: Task) -> str | None:
+        """
+        Detect if a task requires a capability we don't have.
+        Returns the missing capability description or None.
+        """
+        description_lower = task.description.lower()
+
+        capability_patterns = {
+            "pdf_processing": ["pdf", "extract pdf", "parse pdf", "pdf to"],
+            "image_processing": ["image", "resize image", "convert image", "compress image"],
+            "excel_handling": ["excel", "xlsx", "spreadsheet", "csv to excel"],
+            "api_client": ["api client", "http client", "rest client", "webhook"],
+            "database_tool": ["database tool", "sql helper", "query builder"],
+            "file_conversion": ["convert file", "file format", "transform file"],
+            "data_validation": ["validate data", "schema validation", "data check"],
+            "authentication": ["oauth", "jwt", "token", "authenticate"],
+            "encryption": ["encrypt", "decrypt", "cipher", "crypto"],
+        }
+
+        for capability, patterns in capability_patterns.items():
+            if any(pattern in description_lower for pattern in patterns):
+                if not self._has_capability(capability):
+                    return capability
+
+        return None
+
+    def _has_capability(self, capability: str) -> bool:
+        """Check if a capability exists in available tools."""
+        builtin_capabilities = {
+            "file_operations",
+            "command_execution",
+            "text_processing",
+        }
+
+        if capability in builtin_capabilities:
+            return True
+
+        if capability in self._synthesized_tools:
+            return True
+
+        return False
+
+    def _has_required_tools(self, task: Task) -> bool:
+        """Check if all required tools are available."""
+        missing = self._detect_missing_capability(task)
+        return missing is None
+
+    async def _synthesize_tool_if_needed(self, capability: str) -> bool:
+        """
+        Attempt to synthesize a tool for the missing capability.
+        Returns True if successful.
+        """
+        if self._tool_synthesizer is None:
+            try:
+                self._tool_synthesizer = ToolSynthesizer(llm_provider=self._provider)
+            except Exception as e:
+                self._logger.warning(f"Failed to initialize ToolSynthesizer: {e}")
+                return False
+
+        try:
+            tool = await self._tool_synthesizer.synthesize(
+                intent=f"Create a tool for {capability}", context={"capability": capability}
+            )
+
+            if tool:
+                self._synthesized_tools[capability] = tool
+                self._logger.info(f"Successfully synthesized tool for {capability}")
+                return True
+
+            return False
+        except Exception as e:
+            self._logger.error(f"Tool synthesis failed for {capability}: {e}")
+            return False
+
+    def set_tool_synthesizer(self, synthesizer: ToolSynthesizer) -> None:
+        """Set a custom ToolSynthesizer instance."""
+        self._tool_synthesizer = synthesizer
+
+    def get_synthesized_tools(self) -> dict[str, Any]:
+        """Get all synthesized tools."""
+        return self._synthesized_tools.copy()
+
     def get_stats(self) -> dict[str, Any]:
         """إحصائيات المحلل"""
         return {
@@ -1273,22 +1394,46 @@ class Layer2Tactical(BaseLayer):
     - حل التبعيات وبناء رسم المهام
     - إنشاء طابور التنفيذ
     - تقدير الموارد
+
+    Evolution 2026:
+    - Rolling Wave Planning
+    - Semantic Dependency Resolution
+    - Dynamic Task Injection
+    - Tactical Learning
     """
 
     def __init__(
-        self, max_subtasks: int = 50, max_parallel: int = 10, provider: Any = None
+        self,
+        max_subtasks: int = 50,
+        max_parallel: int = 10,
+        provider: Any = None,
+        config: Layer2Config | None = None,
     ) -> None:
         super().__init__(LayerType.TACTICAL)
+
+        self._config = config or Layer2Config()
+        self._provider = provider
 
         self.decomposer = TacticalDecomposer(max_subtasks=max_subtasks, provider=provider)
         self.resolver = DependencyResolver()
         self.queue = ExecutionQueue(max_parallel=max_parallel)
 
+        self._phase_discovery = PhaseDiscoveryEngine(provider=provider, config=self._config)
+        self._phase_reassessor = PhaseReassessor(provider=provider, config=self._config)
+        self._phase_expander = PhaseExpander(provider=provider, config=self._config)
+        self._dependency_engine = SemanticDependencyEngine(provider=provider, config=self._config)
+        self._task_injector = DynamicTaskInjector(provider=provider, config=self._config)
+        self._learner = Layer2Learner(config=self._config)
+        self._tool_synthesizer: ToolSynthesizer | None = None
+        self._synthesized_tools: dict[str, Any] = {}
+
         self._logger = get_logger("gaap.layer2")
 
-        # الإحصائيات
         self._tasks_created = 0
         self._graphs_built = 0
+        self._phases: list[Phase] = []
+        self._current_phase_idx = 0
+        self._semantic_graph: DependencyGraph | None = None
 
     async def process(self, input_data: Any) -> TaskGraph:
         """معالجة المدخل"""
@@ -1311,15 +1456,17 @@ class Layer2Tactical(BaseLayer):
 
         self._logger.info("Tactical decomposition started")
 
-        # 1. تفكيك المهام
-        tasks = await self.decomposer.decompose(spec, goals)
+        if self._config.enable_jit_synthesis:
+            await self._check_and_synthesize_tools(spec)
+
+        tasks = await self.decomposer.decompose(
+            spec, goals, enable_jit_synthesis=self._config.enable_jit_synthesis
+        )
         self._tasks_created += len(tasks)
 
-        # 2. حل التبعيات وبناء الرسم
         graph = self.resolver.resolve(tasks)
         self._graphs_built += 1
 
-        # 3. إضافة للطابور
         self.queue.enqueue(tasks)
 
         elapsed = (time.time() - start_time) * 1000
@@ -1328,6 +1475,221 @@ class Layer2Tactical(BaseLayer):
         )
 
         return graph
+
+    async def process_with_phases(
+        self,
+        spec: ArchitectureSpec,
+        original_request: str,
+        goals: list[str] | None = None,
+    ) -> list[Phase]:
+        """
+        Process with rolling wave planning.
+
+        Returns phases instead of full task graph.
+        Phases are expanded JIT when they become active.
+        """
+        start_time = time.time()
+
+        context = PhaseDiscoveryContext(
+            architecture_spec=spec,
+            original_request=original_request,
+            complexity_score=self._estimate_complexity(spec),
+            has_security_requirements=self._check_security_requirements(original_request),
+            has_performance_requirements=self._check_performance_requirements(original_request),
+            has_integration_requirements=self._check_integration_requirements(original_request),
+        )
+
+        self._phases = await self._phase_discovery.discover_phases(context)
+
+        if self._config.learning_enabled:
+            for phase in self._phases:
+                insights = self._learner.get_insights()
+                if phase.name in insights.phase_recommendations:
+                    rec = insights.phase_recommendations[phase.name]
+                    if "estimated_tasks" in rec:
+                        phase.estimated_tasks = rec["estimated_tasks"]
+
+        self._logger.info(
+            f"Discovered {len(self._phases)} phases: {[p.name for p in self._phases]}"
+        )
+
+        elapsed = (time.time() - start_time) * 1000
+        self._logger.info(f"Phase discovery completed in {elapsed:.0f}ms")
+
+        return self._phases
+
+    async def expand_phase(
+        self,
+        phase: Phase,
+        codebase_state: dict[str, Any],
+        completed_phases: list[Phase] | None = None,
+    ) -> list[IntelligentTask]:
+        """
+        Expand a phase into atomic tasks (JIT).
+        """
+        start_time = time.time()
+
+        context = PhaseExpansionContext(
+            phase=phase,
+            codebase_state=codebase_state,
+            completed_phases=completed_phases or [],
+        )
+
+        tasks = await self._phase_expander.expand_phase(context)
+
+        if self._config.learning_enabled:
+            for task in tasks:
+                self._learner.apply_learning_to_task(task)
+
+        dep_context = ResolutionContext(
+            tasks=tasks,
+            codebase_context=codebase_state,
+        )
+        self._semantic_graph = await self._dependency_engine.resolve(dep_context)
+
+        self._tasks_created += len(tasks)
+
+        elapsed = (time.time() - start_time) * 1000
+        self._logger.info(f"Phase '{phase.name}' expanded: {len(tasks)} tasks in {elapsed:.0f}ms")
+
+        return tasks
+
+    async def reassess_after_phase(
+        self,
+        completed_phase: Phase,
+        code_changes: dict[str, str],
+        execution_signals: dict[str, Any],
+    ) -> ReassessmentResult:
+        """
+        Reassess remaining phases after phase completion.
+        """
+        remaining = [p for p in self._phases if p.order > completed_phase.order]
+
+        result = await self._phase_reassessor.reassess(
+            completed_phase=completed_phase,
+            code_changes=code_changes,
+            remaining_phases=remaining,
+            execution_signals=execution_signals,
+        )
+
+        if result.replan_needed:
+            for new_phase in result.phases_to_add:
+                self._phases.append(new_phase)
+
+            for phase_id in result.phases_to_remove:
+                self._phases = [p for p in self._phases if p.id != phase_id]
+
+            self._phases.sort(key=lambda p: p.order)
+
+        return result
+
+    async def inject_tasks(
+        self,
+        context: InjectionContext,
+    ) -> InjectionDecision:
+        """
+        Analyze and inject tasks if needed.
+        """
+        decision = await self._task_injector.analyze_and_inject(context)
+
+        if decision.should_inject and decision.tasks_to_inject:
+            if not decision.requires_user_approval:
+                for task in decision.tasks_to_inject:
+                    if context.current_phase.status == TaskPhase.EXECUTING:
+                        context.current_phase.tasks.append(task)
+
+                        if self._semantic_graph:
+                            self._semantic_graph.add_task(task)
+
+                self._tasks_created += len(decision.tasks_to_inject)
+
+        return decision
+
+    def record_task_completion(
+        self,
+        task: IntelligentTask,
+        actual_duration_minutes: int,
+        status: str,
+        retry_count: int = 0,
+    ) -> None:
+        """Record task completion for learning."""
+        if self._config.learning_enabled:
+            self._learner.record_task_execution(
+                task=task,
+                actual_duration_minutes=actual_duration_minutes,
+                status=status,
+                retry_count=retry_count,
+            )
+
+    def record_phase_completion(
+        self,
+        phase: Phase,
+        actual_duration_minutes: int,
+        status: str,
+    ) -> None:
+        """Record phase completion for learning."""
+        if self._config.learning_enabled:
+            self._learner.record_phase_execution(
+                phase=phase,
+                actual_duration_minutes=actual_duration_minutes,
+                status=status,
+            )
+
+    def get_semantic_graph(self) -> DependencyGraph | None:
+        """Get the current semantic dependency graph."""
+        return self._semantic_graph
+
+    def get_ready_tasks(self) -> list[IntelligentTask]:
+        """Get tasks ready for execution from current phase."""
+        if not self._semantic_graph:
+            return []
+
+        completed_ids = {t.id for t in self._get_current_phase_tasks() if t.status == "completed"}
+
+        ready_ids = self._semantic_graph.get_ready_tasks(completed_ids)
+
+        tasks = []
+        for task_id in ready_ids:
+            task = self._semantic_graph.tasks.get(task_id)
+            if task:
+                tasks.append(task)
+
+        return tasks
+
+    def _get_current_phase_tasks(self) -> list[IntelligentTask]:
+        """Get tasks from current active phase."""
+        if not self._phases:
+            return []
+
+        for phase in self._phases:
+            if phase.status in (TaskPhase.EXECUTING, TaskPhase.EXPANDED):
+                return phase.tasks
+
+        return []
+
+    def _estimate_complexity(self, spec: ArchitectureSpec) -> float:
+        """Estimate architecture complexity."""
+        complexity = 0.5
+
+        if spec.components:
+            complexity += min(0.2, len(spec.components) * 0.02)
+
+        if len(spec.tech_stack) > 3:
+            complexity += 0.1
+
+        return min(1.0, complexity)
+
+    def _check_security_requirements(self, text: str) -> bool:
+        keywords = ["security", "auth", "authentication", "authorization", "encrypt", "secure"]
+        return any(kw in text.lower() for kw in keywords)
+
+    def _check_performance_requirements(self, text: str) -> bool:
+        keywords = ["performance", "fast", "latency", "throughput", "scale", "optimize"]
+        return any(kw in text.lower() for kw in keywords)
+
+    def _check_integration_requirements(self, text: str) -> bool:
+        keywords = ["integrate", "api", "connect", "external", "third-party", "webhook"]
+        return any(kw in text.lower() for kw in keywords)
 
     def get_next_tasks(self, graph: TaskGraph) -> list[AtomicTask]:
         """الحصول على المهام التالية"""
@@ -1351,9 +1713,98 @@ class Layer2Tactical(BaseLayer):
             "layer": "L2_Tactical",
             "tasks_created": self._tasks_created,
             "graphs_built": self._graphs_built,
+            "phases_discovered": len(self._phases),
             "current_progress": self.get_progress(),
             "decomposer": self.decomposer.get_stats(),
+            "phase_discovery": self._phase_discovery.get_stats(),
+            "phase_reassessor": self._phase_reassessor.get_stats(),
+            "dependency_engine": self._dependency_engine.get_stats(),
+            "task_injector": self._task_injector.get_stats(),
+            "learner": self._learner.get_stats(),
+            "synthesized_tools": list(self._synthesized_tools.keys()),
         }
+
+    def _detect_missing_capability(self, task: Task) -> str | None:
+        """
+        Detect if a task requires a capability we don't have.
+        Returns the missing capability description or None.
+        """
+        description_lower = task.description.lower()
+
+        capability_patterns = {
+            "pdf_processing": ["pdf", "extract pdf", "parse pdf", "pdf to"],
+            "image_processing": ["image", "resize image", "convert image", "compress image"],
+            "excel_handling": ["excel", "xlsx", "spreadsheet", "csv to excel"],
+            "api_client": ["api client", "http client", "rest client", "webhook"],
+            "database_tool": ["database tool", "sql helper", "query builder"],
+            "file_conversion": ["convert file", "file format", "transform file"],
+            "data_validation": ["validate data", "schema validation", "data check"],
+            "authentication": ["oauth", "jwt", "token", "authenticate"],
+            "encryption": ["encrypt", "decrypt", "cipher", "crypto"],
+        }
+
+        for capability, patterns in capability_patterns.items():
+            if any(pattern in description_lower for pattern in patterns):
+                if capability not in self._synthesized_tools:
+                    return capability
+
+        return None
+
+    def _has_required_tools(self, task: Task) -> bool:
+        """Check if all required tools are available."""
+        missing = self._detect_missing_capability(task)
+        return missing is None
+
+    async def _synthesize_tool_if_needed(self, capability: str) -> bool:
+        """
+        Attempt to synthesize a tool for the missing capability.
+        Returns True if successful.
+        """
+        if self._tool_synthesizer is None:
+            try:
+                self._tool_synthesizer = ToolSynthesizer(llm_provider=self._provider)
+            except Exception as e:
+                self._logger.warning(f"Failed to initialize ToolSynthesizer: {e}")
+                return False
+
+        try:
+            tool = await self._tool_synthesizer.synthesize(
+                intent=f"Create a tool for {capability}", context={"capability": capability}
+            )
+
+            if tool:
+                self._synthesized_tools[capability] = tool
+                self._logger.info(f"Successfully synthesized tool for {capability}")
+                return True
+
+            return False
+        except Exception as e:
+            self._logger.error(f"Tool synthesis failed for {capability}: {e}")
+            return False
+
+    async def _check_and_synthesize_tools(self, spec: ArchitectureSpec) -> None:
+        """Check architecture spec and synthesize any missing tools."""
+        original_intent = spec.metadata.get("original_intent", {})
+        original_text = original_intent.get("original_text", "")
+
+        test_task = Task(
+            id="capability_check",
+            description=original_text,
+            type=TaskType.CODE_GENERATION,
+        )
+
+        missing = self._detect_missing_capability(test_task)
+        if missing:
+            self._logger.info(f"Detected missing capability from spec: {missing}")
+            await self._synthesize_tool_if_needed(missing)
+
+    def set_tool_synthesizer(self, synthesizer: ToolSynthesizer) -> None:
+        """Set a custom ToolSynthesizer instance."""
+        self._tool_synthesizer = synthesizer
+
+    def get_synthesized_tools(self) -> dict[str, Any]:
+        """Get all synthesized tools."""
+        return self._synthesized_tools.copy()
 
 
 # =============================================================================

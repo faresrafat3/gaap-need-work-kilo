@@ -10,6 +10,7 @@ Implements multiple rate limiting strategies:
 
 import asyncio
 import contextlib
+import logging
 import math
 import time
 from abc import ABC, abstractmethod
@@ -71,13 +72,16 @@ class RateLimitResult:
 
 
 class BaseRateLimiter(ABC):
-    """Abstract base class for rate limiters"""
+    _state: RateLimitState
+    _lock: asyncio.Lock
+    _callbacks: list[Callable[[RateLimitResult], Awaitable[None]]]
 
-    def __init__(self, config: RateLimitConfig):
+    def __init__(self, config: RateLimitConfig) -> None:
         self.config = config
         self._state = RateLimitState()
         self._lock = asyncio.Lock()
         self._callbacks: list[Callable[[RateLimitResult], Awaitable[None]]] = []
+        self._logger = logging.getLogger("gaap.core.rate_limiter")
 
     @abstractmethod
     async def acquire(self, tokens: int = 1) -> RateLimitResult:
@@ -306,7 +310,8 @@ class LeakyBucketRateLimiter(BaseRateLimiter):
             except asyncio.CancelledError:
                 break
             except Exception:
-                self._logger.debug("Leaky bucket background task error, retrying...")
+                if hasattr(self, "_logger"):
+                    self._logger.debug("Leaky bucket background task error, retrying...")
                 await asyncio.sleep(0.1)
 
     async def acquire(self, tokens: int = 1) -> RateLimitResult:

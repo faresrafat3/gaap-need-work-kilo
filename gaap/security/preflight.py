@@ -186,7 +186,7 @@ class PreFlightCheck:
 
     def _inject_lessons(self, task_description: str) -> list[str]:
         """Inject relevant lessons from memory"""
-        lessons = []
+        lessons: list[str] = []
 
         if not self._memory:
             return lessons

@@ -92,11 +92,11 @@ class KnowledgeGraph:
         استرجاع هجين يجمع بين البحث الدلالي والرسم المعرفي.
         """
         self._logger.info(f"MemoRAG: Performing hybrid retrieval for: {query}")
-        
+
         # 1. استرجاع العقد الدلالية (Semantic Retrieval)
         # (محاكاة الاسترجاع من Vector DB)
-        results = []
-        
+        results: list[RetrievalResult] = []
+
         # 2. توسيع النتائج عبر الرسم المعرفي (KG Expansion)
         # لكل نتيجة دلالية، نسحب العقد المرتبطة بها لزيادة السياق
         expanded_results = []
@@ -111,12 +111,12 @@ class KnowledgeGraph:
                         RetrievalResult(
                             content=neighbor.content,
                             source="knowledge_graph_neighbor",
-                            score=res.score * 0.8, # وزن أقل للجيران
+                            score=res.score * 0.8,  # وزن أقل للجيران
                             node_id=neighbor_id,
-                            metadata=neighbor.metadata
+                            metadata=neighbor.metadata,
                         )
                     )
-        
+
         return results + expanded_results[:n_results]
 
     def add_edge(

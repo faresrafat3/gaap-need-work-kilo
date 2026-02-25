@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Any
 
 from gaap.core.base import BaseLayer
+from gaap.core.streaming_auditor import AuditResult, StreamingAuditor
 from gaap.tools import NativeToolCaller, ToolCall, MCPClient, MCPToolRegistry
 from gaap.core.types import (
     CriticEvaluation,
@@ -31,10 +32,22 @@ from gaap.mad.response_parser import (
 )
 from gaap.memory import VECTOR_MEMORY_AVAILABLE, LessonStore
 from gaap.providers.base_provider import BaseProvider
+from gaap.providers.tool_calling import ToolRegistry as StructuredToolRegistry
 from gaap.routing.fallback import FallbackManager
 from gaap.routing.router import SmartRouter
-from gaap.tools.synthesizer import ToolSynthesizer  # Autonomous Tool Growth
-from gaap.layers.sop_mixin import SOPExecutionMixin  # SOP Governance
+from gaap.tools.synthesizer import ToolSynthesizer
+from gaap.layers.sop_mixin import SOPExecutionMixin
+
+from gaap.layers.layer3_config import Layer3Config, create_layer3_config
+from gaap.layers.execution_schema import (
+    StructuredOutput,
+    StructuredToolCall,
+    ToolDefinition,
+    ToolResult,
+)
+from gaap.layers.native_function_caller import NativeFunctionCaller, create_native_caller
+from gaap.layers.active_lesson_injector import ActiveLessonInjector, create_lesson_injector
+from gaap.layers.code_auditor import CodeAuditor, create_code_auditor
 
 
 # =============================================================================
@@ -857,6 +870,12 @@ class Layer3Execution(BaseLayer, SOPExecutionMixin):
     - تطبيق التوأم الجيني
     - تقييم الجودة (MAD)
     - التعافي الذاتي
+
+    Evolution 2026:
+    - Native Function Calling
+    - Active Lesson Injection
+    - Code Auditing
+    - Zero-Trust Execution
     """
 
     def __init__(
@@ -870,33 +889,52 @@ class Layer3Execution(BaseLayer, SOPExecutionMixin):
         enable_vector_memory: bool = True,
         enable_preflight: bool = True,
         enable_sop: bool = True,
+        config: Layer3Config | None = None,
     ):
         super().__init__(LayerType.EXECUTION)
 
-        self._init_sop(sop_enabled=enable_sop)
+        self._config = config or Layer3Config()
 
-        self.max_parallel = max_parallel
-        self.executor_pool = ExecutorPool(router, fallback, max_parallel)
-        self.twin_system = GeneticTwin(enabled=enable_twin)
+        # Override config with explicit parameters
+        if enable_sop != self._config.enable_sop:
+            self._config.enable_sop = enable_sop
+
+        self._init_sop(sop_enabled=self._config.enable_sop)
+
+        self.max_parallel = self._config.max_parallel
+        self.executor_pool = ExecutorPool(router, fallback, self.max_parallel)
+        self.twin_system = GeneticTwin(
+            enabled=self._config.enable_twin,
+            for_critical_only=self._config.twin_for_critical_only,
+        )
         self.mad_panel = MADQualityPanel(
-            min_score=quality_threshold,
+            min_score=self._config.quality_threshold,
             provider=provider,
         )
         self.quality_pipeline = QualityPipeline(self.mad_panel, self.twin_system)
-        self.synthesizer = ToolSynthesizer()  # v2 Feature integrated
+        self.synthesizer = ToolSynthesizer()
+
+        self._native_caller = create_native_caller(self._config)
+        self._lesson_injector = create_lesson_injector(self._config)
+        self._code_auditor = create_code_auditor(self._config)
+        self._auditor = StreamingAuditor(
+            enabled=self._config.enable_streaming_audit,
+            max_repetition=self._config.max_repetition,
+        )
 
         self._logger = get_logger("gaap.layer3")
 
-        if enable_vector_memory and VECTOR_MEMORY_AVAILABLE:
-            self._lesson_store = LessonStore()
-            self._logger.info("Vector memory enabled for lesson learning")
+        if self._config.lesson_injection.enabled and VECTOR_MEMORY_AVAILABLE:
+            self._lesson_store: LessonStore | None = LessonStore()
+            self._lesson_injector._memory = self._lesson_store
+            self._logger.debug("Vector memory enabled for lesson learning")
         else:
             self._lesson_store = None
-            if enable_vector_memory:
-                self._logger.warning("Vector memory requested but chromadb not available")
+            if self._config.lesson_injection.enabled:
+                self._logger.debug("Vector memory requested but chromadb not available")
 
         self._preflight = None
-        if enable_preflight:
+        if self._config.audit.enabled:
             from gaap.security.preflight import PreFlightCheck
 
             self._preflight = PreFlightCheck(memory=self._lesson_store)
@@ -915,6 +953,11 @@ class Layer3Execution(BaseLayer, SOPExecutionMixin):
             raise ValueError("Expected AtomicTask")
 
         self._logger.info(f"Executing task {task.id}: {task.name}")
+
+        self._set_audit_context(
+            goal=task.description,
+            keywords=[task.name, task.id, getattr(task, "task_type", "general")],
+        )
 
         # Start SOP tracking
         self._start_sop_tracking(task)
@@ -969,6 +1012,12 @@ class Layer3Execution(BaseLayer, SOPExecutionMixin):
             agreement = 1.0
             twin_used = False
 
+        if result.success and result.output:
+            audit_result = self._audit_execution_step(str(result.output))
+            if audit_result.should_interrupt:
+                self._logger.warning(f"Audit interrupt triggered: {audit_result.interrupt_message}")
+                result.metadata["audit_interrupt"] = audit_result.to_dict()
+
         # تقييم الجودة
         if result.success:
             artifact, quality_score, evaluations = await self.quality_pipeline.process(
@@ -999,7 +1048,7 @@ class Layer3Execution(BaseLayer, SOPExecutionMixin):
             )
             new_tool = await self.synthesizer.synthesize(
                 intent=f"Tool for {task.name}",
-                code_content=self._generate_tool_logic_proposal(task),
+                context={"code_proposal": self._generate_tool_logic_proposal(task)},
             )
             if new_tool:
                 self._logger.info(
@@ -1092,8 +1141,9 @@ def run(**kwargs):
                     category = "code"
 
                 if self._lesson_store:
-                    self._lesson_store.add_lesson(
+                    self._lesson_store.store_lesson(
                         lesson=lesson,
+                        context="execution",
                         category=category,
                         task_type=getattr(task, "task_type", "general"),
                         success=result.success,
@@ -1118,10 +1168,9 @@ def run(**kwargs):
             return_exceptions=True,
         )
 
-        # Convert exceptions to failed ExecutionResults
         final_results: list[ExecutionResult] = []
         for i, result in enumerate(results):
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 final_results.append(
                     ExecutionResult(
                         task_id=tasks[i].id,
@@ -1131,8 +1180,8 @@ def run(**kwargs):
                         quality_score=0.0,
                     )
                 )
-            else:
-                final_results.append(result)  # type: ignore[arg-type]  # type: ignore[arg-type]
+            elif isinstance(result, ExecutionResult):
+                final_results.append(result)
 
         return final_results
 
@@ -1144,18 +1193,37 @@ def run(**kwargs):
             "executor_stats": self.executor_pool.get_stats(),
             "twin_stats": self.twin_system.get_stats(),
             "mad_stats": self.mad_panel.get_stats(),
+            "native_caller_stats": self._native_caller.get_stats(),
+            "lesson_injector_stats": self._lesson_injector.get_stats(),
+            "code_auditor_stats": self._code_auditor.get_stats(),
+            "streaming_audit_stats": self.get_audit_stats(),
         }
 
+    def _audit_execution_step(self, thought: str) -> AuditResult:
+        """Audit a thought during execution"""
+        return self._auditor.audit_thought(thought)
 
-# =============================================================================
-# Convenience Functions
-# =============================================================================
+    def _set_audit_context(self, goal: str, keywords: list[str]) -> None:
+        """Set context for audit drift detection"""
+        self._auditor.set_context(goal, keywords)
+
+    def get_audit_stats(self) -> dict[str, Any]:
+        """Get streaming auditor statistics"""
+        return self._auditor.get_stats()
 
 
 def create_execution_layer(
-    router: SmartRouter, fallback: FallbackManager, enable_twin: bool = True, max_parallel: int = 10
+    router: SmartRouter,
+    fallback: FallbackManager,
+    enable_twin: bool = True,
+    max_parallel: int = 10,
+    config: Layer3Config | None = None,
 ) -> Layer3Execution:
     """إنشاء طبقة التنفيذ"""
     return Layer3Execution(
-        router=router, fallback=fallback, enable_twin=enable_twin, max_parallel=max_parallel
+        router=router,
+        fallback=fallback,
+        enable_twin=enable_twin,
+        max_parallel=max_parallel,
+        config=config,
     )

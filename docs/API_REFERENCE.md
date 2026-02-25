@@ -12,7 +12,11 @@ This document provides complete API documentation for GAAP.
 6. [Memory](#memory)
 7. [Security](#security)
 8. [Configuration](#configuration)
-9. [CLI Commands](#cli-commands)
+9. [Research API](#research-api)
+10. [REST API Reference](#rest-api-reference)
+11. [WebSocket API](#websocket-api)
+12. [Pydantic Models Reference](#pydantic-models-reference)
+13. [CLI Commands](#cli-commands)
 
 ---
 
@@ -590,6 +594,1361 @@ episode = EpisodicMemory(
 )
 
 memory.record_episode(episode)
+```
+
+---
+
+## Research API
+
+### DeepDiscoveryEngine
+
+Main orchestrator for deep research and knowledge building.
+
+```python
+from gaap.research import DeepDiscoveryEngine, DDEConfig
+
+engine = DeepDiscoveryEngine(
+    config=DDEConfig(research_depth=3),
+    llm_provider=provider,
+)
+
+result = await engine.research("FastAPI async best practices")
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `config` | `DDEConfig` | Configuration options |
+| `llm_provider` | `BaseProvider` | LLM provider for synthesis |
+| `knowledge_graph` | `KnowledgeGraphBuilder` | Knowledge graph storage |
+| `sqlite_store` | `SQLiteStore` | Persistent storage |
+
+#### Methods
+
+| Method | Return Type | Description |
+|--------|-------------|-------------|
+| `research(query: str)` | `ResearchResult` | Main research method |
+| `quick_search(query: str, max_results: int)` | `list[Source]` | Quick search without deep analysis |
+| `get_stats()` | `dict` | Get engine statistics |
+| `update_config(new_config: DDEConfig)` | `None` | Update configuration |
+| `close()` | `None` | Close all resources |
+
+---
+
+### DDEConfig
+
+Master configuration for Deep Discovery Engine.
+
+```python
+from gaap.research import DDEConfig
+
+# Default configuration
+config = DDEConfig()
+
+# Presets
+config = DDEConfig.quick()      # Quick research (depth=1)
+config = DDEConfig.standard()   # Standard research (depth=3)
+config = DDEConfig.deep()       # Deep research (depth=5)
+config = DDEConfig.academic()   # Academic research (high ETS)
+
+# Custom configuration
+config = DDEConfig(
+    research_depth=4,
+    max_total_sources=100,
+    web_fetcher=WebFetcherConfig(provider="serper", api_key="..."),
+)
+```
+
+#### Global Settings
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `research_depth` | `int` | `3` | Exploration depth (1-5) |
+| `max_total_sources` | `int` | `50` | Maximum sources to process |
+| `max_total_hypotheses` | `int` | `20` | Maximum hypotheses to build |
+| `max_execution_time_seconds` | `int` | `300` | Timeout for research |
+| `parallel_processing` | `bool` | `True` | Enable parallel processing |
+| `max_parallel_tasks` | `int` | `5` | Maximum parallel tasks |
+| `check_existing_research` | `bool` | `True` | Check cache before research |
+
+#### WebFetcherConfig
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `provider` | `str` | `"duckduckgo"` | Search provider |
+| `api_key` | `str \| None` | `None` | API key (if required) |
+| `max_results` | `int` | `10` | Maximum search results |
+| `timeout_seconds` | `int` | `30` | Request timeout |
+| `rate_limit_per_second` | `float` | `2.0` | Rate limiting |
+
+#### SourceAuditConfig
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `min_ets_threshold` | `float` | `0.3` | Minimum ETS score |
+| `domain_overrides` | `dict` | `{}` | Custom domain scores |
+| `blacklist_domains` | `list` | `[]` | Blacklisted domains |
+| `check_author` | `bool` | `True` | Check author credibility |
+| `check_date` | `bool` | `True` | Check content freshness |
+
+#### SynthesizerConfig
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `max_hypotheses` | `int` | `10` | Maximum hypotheses per research |
+| `min_confidence_threshold` | `float` | `0.5` | Minimum hypothesis confidence |
+| `cross_validate_enabled` | `bool` | `True` | Enable cross-validation |
+| `detect_contradictions` | `bool` | `True` | Detect contradictions |
+
+#### DeepDiveConfig
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `default_depth` | `int` | `3` | Default exploration depth |
+| `max_depth` | `int` | `5` | Maximum depth allowed |
+| `citation_follow_depth` | `int` | `2` | Citation following depth |
+| `max_sources_per_depth` | `int` | `20` | Sources per depth level |
+
+---
+
+### Types
+
+#### Source
+
+```python
+from gaap.research import Source, SourceStatus
+
+source = Source(
+    url="https://fastapi.tiangolo.com/async/",
+    title="Async in FastAPI",
+    domain="fastapi.tiangolo.com",
+    ets_score=1.0,  # Official docs
+    content="...",
+    author="Sebastián Ramírez",
+    publish_date=date(2024, 1, 15),
+    status=SourceStatus.AUDITED,
+)
+```
+
+#### Hypothesis
+
+```python
+from gaap.research import Hypothesis, HypothesisStatus
+
+hypothesis = Hypothesis(
+    id="abc123",
+    statement="FastAPI supports async/await for concurrent operations",
+    status=HypothesisStatus.VERIFIED,
+    confidence=0.95,
+    supporting_sources=[source1, source2],
+    reasoning="Verified across official docs and examples",
+)
+```
+
+#### ETSLevel
+
+```python
+from gaap.research import ETSLevel
+
+# Epistemic Trust Score levels
+ETSLevel.VERIFIED      # 1.0 - Official docs, verified repos
+ETSLevel.RELIABLE      # 0.7 - Peer-reviewed papers, high-reputation SO
+ETSLevel.QUESTIONABLE  # 0.5 - Medium articles, tutorials
+ETSLevel.UNRELIABLE    # 0.3 - Random blogs, AI summaries
+ETSLevel.BLACKLISTED   # 0.0 - Contradictory or banned domains
+```
+
+#### ResearchResult
+
+```python
+@dataclass
+class ResearchResult:
+    success: bool
+    query: str
+    finding: ResearchFinding | None
+    metrics: ResearchMetrics
+    execution_trace: list[ExecutionStep]
+    total_time_ms: float
+    error: str | None
+```
+
+#### ResearchMetrics
+
+```python
+@dataclass
+class ResearchMetrics:
+    sources_found: int
+    sources_fetched: int
+    sources_passed_ets: int
+    hypotheses_generated: int
+    hypotheses_verified: int
+    triples_extracted: int
+    avg_ets_score: float
+    llm_calls: int
+    web_requests: int
+```
+
+---
+
+### WebFetcher
+
+Web search and content fetching with multiple providers.
+
+```python
+from gaap.research import WebFetcher, WebFetcherConfig
+
+fetcher = WebFetcher(WebFetcherConfig(
+    provider="duckduckgo",  # Free, no API key
+    max_results=10,
+))
+
+# Search the web
+results = await fetcher.search("Python async best practices")
+
+# Fetch content from URL
+content = await fetcher.fetch_content("https://example.com/article")
+
+# Batch fetch
+contents = await fetcher.fetch_batch(["url1", "url2", "url3"])
+```
+
+#### Supported Providers
+
+| Provider | API Key | Description |
+|----------|---------|-------------|
+| `duckduckgo` | No | Free HTML scraping (default) |
+| `serper` | Yes | Google search via Serper API |
+| `perplexity` | Yes | Perplexity AI search |
+| `brave` | Yes | Brave Search API |
+
+---
+
+### SourceAuditor
+
+Epistemic Trust Score (ETS) evaluation for sources.
+
+```python
+from gaap.research import SourceAuditor, SourceAuditConfig
+
+auditor = SourceAuditor(SourceAuditConfig(
+    min_ets_threshold=0.3,
+))
+
+# Audit a single source
+result = auditor.audit(source)
+print(f"ETS Score: {result.ets_score}")
+print(f"ETS Level: {result.ets_level}")
+
+# Audit batch with filtering
+passed, filtered = auditor.audit_batch(sources)
+
+# Customize domain scores
+auditor.set_domain_score("mydomain.com", 0.9)
+auditor.add_blacklist_domain("spam.com")
+```
+
+#### Domain Scores (Default)
+
+| Category | Score | Examples |
+|----------|-------|----------|
+| Official Docs | 1.0 | docs.python.org, fastapi.tiangolo.com |
+| Official Repos | 0.85-0.9 | github.com, pypi.org |
+| Community Q&A | 0.7-0.75 | stackoverflow.com, wikipedia.org |
+| Tech Blogs | 0.5-0.55 | medium.com, dev.to |
+| Random Blogs | 0.3-0.4 | blogspot.com, wordpress.com |
+| Blacklisted | 0.0 | example.com, test.com |
+
+---
+
+### ContentExtractor
+
+Clean text extraction from web pages.
+
+```python
+from gaap.research import ContentExtractor, ContentExtractorConfig
+
+extractor = ContentExtractor(ContentExtractorConfig(
+    max_content_length=50000,
+    extract_code_blocks=True,
+    extract_links=True,
+))
+
+# Extract from URL
+content = await extractor.extract("https://example.com/article")
+print(content.title)
+print(content.content)
+print(content.author)
+print(content.code_blocks)
+print(content.links)
+```
+
+---
+
+### Synthesizer
+
+LLM-powered hypothesis synthesis and verification.
+
+```python
+from gaap.research import Synthesizer, SynthesizerConfig
+
+synthesizer = Synthesizer(
+    llm_provider=provider,
+    config=SynthesizerConfig(
+        max_hypotheses=10,
+        cross_validate_enabled=True,
+    ),
+)
+
+# Extract claims from content
+claims = await synthesizer.extract_claims(content, source)
+
+# Build hypothesis from claim
+hypothesis = await synthesizer.build_hypothesis(claims[0], sources)
+
+# Verify hypothesis against sources
+verified = await synthesizer.verify_hypothesis(hypothesis, all_sources)
+
+# Extract knowledge triples
+triples = await synthesizer.extract_triples(content, source)
+
+# Find contradictions between hypotheses
+contradictions = await synthesizer.find_contradictions(hypotheses)
+```
+
+---
+
+### DeepDive
+
+Deep exploration protocol with citation mapping.
+
+```python
+from gaap.research import DeepDive, DeepDiveConfig
+
+deep_dive = DeepDive(DeepDiveConfig(
+    default_depth=3,
+    max_depth=5,
+    citation_follow_depth=2,
+))
+
+# Execute deep dive
+result = await deep_dive.explore(
+    query="FastAPI async best practices",
+    depth=4,
+)
+
+print(f"Sources found: {len(result.sources)}")
+print(f"Primary sources: {len(result.primary_sources)}")
+print(f"Citations followed: {result.citations_followed}")
+```
+
+#### Depth Levels
+
+| Depth | Actions |
+|-------|---------|
+| 1 | Basic search + content extraction |
+| 2 | + Citation following |
+| 3 | + Cross-validation + hypothesis building |
+| 4 | + Related topic exploration |
+| 5 | Full deep dive with all features |
+
+---
+
+### KnowledgeIntegrator
+
+Permanent storage for research results (no TTL).
+
+```python
+from gaap.research import KnowledgeIntegrator, StorageConfig
+
+integrator = KnowledgeIntegrator(
+    knowledge_graph=kg_builder,
+    sqlite_store=sqlite,
+    config=StorageConfig(
+        knowledge_graph_enabled=True,
+        sqlite_cache_enabled=True,
+    ),
+)
+
+# Store research finding
+finding_id = await integrator.store_research(finding)
+
+# Find similar existing research
+existing = await integrator.find_similar("FastAPI async")
+
+# Get research by topic
+findings = await integrator.get_by_topic("async")
+
+# Add triple to knowledge graph
+triple_id = await integrator.add_triple(
+    subject="FastAPI",
+    predicate="supports",
+    object="async/await",
+    source=source,
+)
+```
+
+---
+
+## REST API Reference
+
+GAAP provides a comprehensive REST API with 47 endpoints across 7 modules for system management, session handling, budget tracking, memory operations, healing configuration, and provider management.
+
+### System API (`/api/system`)
+
+System-level operations for health monitoring, metrics, and administration.
+
+#### GET /api/system/health
+
+Check system health status.
+
+```bash
+curl http://localhost:8000/api/system/health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "version": "1.0.0",
+  "uptime_seconds": 3600,
+  "components": {
+    "database": "healthy",
+    "providers": "healthy",
+    "memory": "healthy"
+  }
+}
+```
+
+#### GET /api/system/metrics
+
+Get system performance metrics.
+
+```bash
+curl http://localhost:8000/api/system/metrics
+```
+
+**Response:**
+```json
+{
+  "requests_total": 1523,
+  "requests_per_minute": 12.5,
+  "avg_latency_ms": 245,
+  "error_rate": 0.02,
+  "memory_usage_mb": 512,
+  "cpu_usage_percent": 45
+}
+```
+
+#### GET /api/system/logs
+
+Retrieve system logs with filtering.
+
+```bash
+curl "http://localhost:8000/api/system/logs?level=ERROR&limit=100"
+```
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `level` | `string` | `INFO` | Log level filter |
+| `limit` | `int` | `100` | Maximum entries |
+| `since` | `datetime` | `null` | Start timestamp |
+
+#### POST /api/system/restart
+
+Restart the system (requires admin privileges).
+
+```bash
+curl -X POST http://localhost:8000/api/system/restart
+```
+
+#### GET /api/system/info
+
+Get system information and version.
+
+```bash
+curl http://localhost:8000/api/system/info
+```
+
+**Response:**
+```json
+{
+  "name": "GAAP",
+  "version": "1.0.0",
+  "python_version": "3.11.0",
+  "environment": "production",
+  "features": ["healing", "memory", "security"]
+}
+```
+
+#### GET /api/system/events
+
+Stream system events (Server-Sent Events).
+
+```bash
+curl http://localhost:8000/api/system/events
+```
+
+#### POST /api/system/clear-cache
+
+Clear system caches.
+
+```bash
+curl -X POST http://localhost:8000/api/system/clear-cache
+```
+
+---
+
+### Sessions API (`/api/sessions`)
+
+Session lifecycle management for request tracking.
+
+#### GET /api/sessions
+
+List all sessions with pagination.
+
+```bash
+curl "http://localhost:8000/api/sessions?status=active&limit=50"
+```
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `status` | `string` | `null` | Filter by status |
+| `limit` | `int` | `50` | Max results |
+| `offset` | `int` | `0` | Pagination offset |
+
+#### POST /api/sessions
+
+Create a new session.
+
+```bash
+curl -X POST http://localhost:8000/api/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My Session", "budget_limit": 10.0}'
+```
+
+**Request Body:**
+```json
+{
+  "name": "My Session",
+  "budget_limit": 10.0,
+  "metadata": {}
+}
+```
+
+#### GET /api/sessions/{session_id}
+
+Get session details.
+
+```bash
+curl http://localhost:8000/api/sessions/abc123
+```
+
+#### PUT /api/sessions/{session_id}
+
+Update session properties.
+
+```bash
+curl -X PUT http://localhost:8000/api/sessions/abc123 \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Updated Name"}'
+```
+
+#### DELETE /api/sessions/{session_id}
+
+Delete a session.
+
+```bash
+curl -X DELETE http://localhost:8000/api/sessions/abc123
+```
+
+#### POST /api/sessions/{session_id}/pause
+
+Pause an active session.
+
+```bash
+curl -X POST http://localhost:8000/api/sessions/abc123/pause
+```
+
+#### POST /api/sessions/{session_id}/resume
+
+Resume a paused session.
+
+```bash
+curl -X POST http://localhost:8000/api/sessions/abc123/resume
+```
+
+#### POST /api/sessions/{session_id}/export
+
+Export session data.
+
+```bash
+curl -X POST http://localhost:8000/api/sessions/abc123/export \
+  -H "Content-Type: application/json" \
+  -d '{"format": "json"}'
+```
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `format` | `string` | `json` | Export format (`json`, `csv`, `markdown`) |
+
+#### POST /api/sessions/{session_id}/cancel
+
+Cancel an active session.
+
+```bash
+curl -X POST http://localhost:8000/api/sessions/abc123/cancel
+```
+
+---
+
+### Budget API (`/api/budget`)
+
+Budget tracking and alerting.
+
+#### GET /api/budget
+
+Get current budget status.
+
+```bash
+curl http://localhost:8000/api/budget
+```
+
+**Response:**
+```json
+{
+  "total_budget": 100.0,
+  "used": 23.45,
+  "remaining": 76.55,
+  "percent_used": 23.45
+}
+```
+
+#### GET /api/budget/usage
+
+Get detailed usage breakdown.
+
+```bash
+curl "http://localhost:8000/api/budget/usage?period=daily"
+```
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `period` | `string` | `daily` | Period (`hourly`, `daily`, `weekly`, `monthly`) |
+
+#### GET /api/budget/alerts
+
+List budget alerts.
+
+```bash
+curl http://localhost:8000/api/budget/alerts
+```
+
+#### PUT /api/budget/limits
+
+Update budget limits.
+
+```bash
+curl -X PUT http://localhost:8000/api/budget/limits \
+  -H "Content-Type: application/json" \
+  -d '{"daily_limit": 10.0, "monthly_limit": 200.0}'
+```
+
+#### POST /api/budget/alerts/{alert_id}/acknowledge
+
+Acknowledge a budget alert.
+
+```bash
+curl -X POST http://localhost:8000/api/budget/alerts/alert123/acknowledge
+```
+
+---
+
+### Memory API (`/api/memory`)
+
+Hierarchical memory operations.
+
+#### GET /api/memory/stats
+
+Get memory statistics.
+
+```bash
+curl http://localhost:8000/api/memory/stats
+```
+
+**Response:**
+```json
+{
+  "working_memory_size": 45,
+  "episodic_count": 234,
+  "semantic_triples": 1500,
+  "total_size_mb": 12.5
+}
+```
+
+#### GET /api/memory/tiers
+
+List memory tiers and their status.
+
+```bash
+curl http://localhost:8000/api/memory/tiers
+```
+
+#### POST /api/memory/consolidate
+
+Trigger memory consolidation.
+
+```bash
+curl -X POST http://localhost:8000/api/memory/consolidate
+```
+
+#### POST /api/memory/clear/{tier}
+
+Clear a specific memory tier.
+
+```bash
+curl -X POST http://localhost:8000/api/memory/clear/working
+```
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `tier` | `string` | Tier name (`working`, `episodic`, `semantic`) |
+
+#### GET /api/memory/search
+
+Search memory contents.
+
+```bash
+curl "http://localhost:8000/api/memory/search?q=fastapi&limit=20"
+```
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `q` | `string` | required | Search query |
+| `tier` | `string` | `null` | Filter by tier |
+| `limit` | `int` | `20` | Max results |
+
+#### POST /api/memory/save
+
+Save memory state to disk.
+
+```bash
+curl -X POST http://localhost:8000/api/memory/save
+```
+
+#### POST /api/memory/load
+
+Load memory state from disk.
+
+```bash
+curl -X POST http://localhost:8000/api/memory/load
+```
+
+---
+
+### Healing API (`/api/healing`)
+
+Self-healing system configuration and monitoring.
+
+#### GET /api/healing/config
+
+Get healing configuration.
+
+```bash
+curl http://localhost:8000/api/healing/config
+```
+
+#### PUT /api/healing/config
+
+Update healing configuration.
+
+```bash
+curl -X PUT http://localhost:8000/api/healing/config \
+  -H "Content-Type: application/json" \
+  -d '{"max_level": "L3_PIVOT", "auto_escalate": true}'
+```
+
+#### GET /api/healing/history
+
+Get healing attempt history.
+
+```bash
+curl "http://localhost:8000/api/healing/history?limit=50"
+```
+
+#### GET /api/healing/patterns
+
+Get learned healing patterns.
+
+```bash
+curl http://localhost:8000/api/healing/patterns
+```
+
+#### POST /api/healing/reset
+
+Reset healing statistics.
+
+```bash
+curl -X POST http://localhost:8000/api/healing/reset
+```
+
+#### GET /api/healing/stats
+
+Get healing statistics.
+
+```bash
+curl http://localhost:8000/api/healing/stats
+```
+
+**Response:**
+```json
+{
+  "total_attempts": 45,
+  "successful_recoveries": 42,
+  "escalations": 3,
+  "recovery_rate": 0.933,
+  "by_level": {
+    "L1_RETRY": 20,
+    "L2_REFINE": 15,
+    "L3_PIVOT": 7,
+    "L4_STRATEGY_SHIFT": 3
+  }
+}
+```
+
+---
+
+### Config API (`/api/config`)
+
+Configuration management.
+
+#### GET /api/config
+
+Get complete configuration.
+
+```bash
+curl http://localhost:8000/api/config
+```
+
+#### PUT /api/config
+
+Update configuration.
+
+```bash
+curl -X PUT http://localhost:8000/api/config \
+  -H "Content-Type: application/json" \
+  -d '{"system": {"log_level": "DEBUG"}}'
+```
+
+#### GET /api/config/{module}
+
+Get module-specific configuration.
+
+```bash
+curl http://localhost:8000/api/config/healing
+```
+
+#### PUT /api/config/{module}
+
+Update module-specific configuration.
+
+```bash
+curl -X PUT http://localhost:8000/api/config/healing \
+  -H "Content-Type: application/json" \
+  -d '{"max_level": "L4_STRATEGY_SHIFT"}'
+```
+
+#### POST /api/config/validate
+
+Validate configuration changes.
+
+```bash
+curl -X POST http://localhost:8000/api/config/validate \
+  -H "Content-Type: application/json" \
+  -d '{"system": {"log_level": "INVALID"}}'
+```
+
+**Response:**
+```json
+{
+  "valid": false,
+  "errors": ["Invalid log level: INVALID"]
+}
+```
+
+#### POST /api/config/reload
+
+Reload configuration from file.
+
+```bash
+curl -X POST http://localhost:8000/api/config/reload
+```
+
+#### GET /api/config/presets/list
+
+List available configuration presets.
+
+```bash
+curl http://localhost:8000/api/config/presets/list
+```
+
+#### GET /api/config/schema/all
+
+Get complete configuration schema.
+
+```bash
+curl http://localhost:8000/api/config/schema/all
+```
+
+---
+
+### Providers API (`/api/providers`)
+
+Provider management and testing.
+
+#### GET /api/providers
+
+List all configured providers.
+
+```bash
+curl http://localhost:8000/api/providers
+```
+
+**Response:**
+```json
+{
+  "providers": [
+    {
+      "name": "groq",
+      "type": "groq",
+      "status": "healthy",
+      "models": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+    }
+  ]
+}
+```
+
+#### POST /api/providers
+
+Add a new provider.
+
+```bash
+curl -X POST http://localhost:8000/api/providers \
+  -H "Content-Type: application/json" \
+  -d '{"name": "openai", "type": "openai", "api_key": "sk-..."}'
+```
+
+#### GET /api/providers/{name}
+
+Get provider details.
+
+```bash
+curl http://localhost:8000/api/providers/groq
+```
+
+#### PUT /api/providers/{name}
+
+Update provider configuration.
+
+```bash
+curl -X PUT http://localhost:8000/api/providers/groq \
+  -H "Content-Type: application/json" \
+  -d '{"rate_limit": 60}'
+```
+
+#### DELETE /api/providers/{name}
+
+Remove a provider.
+
+```bash
+curl -X DELETE http://localhost:8000/api/providers/groq
+```
+
+#### POST /api/providers/{name}/test
+
+Test provider connectivity.
+
+```bash
+curl -X POST http://localhost:8000/api/providers/groq/test
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "latency_ms": 245,
+  "model_tested": "llama-3.3-70b-versatile"
+}
+```
+
+#### POST /api/providers/{name}/enable
+
+Enable a disabled provider.
+
+```bash
+curl -X POST http://localhost:8000/api/providers/groq/enable
+```
+
+#### POST /api/providers/{name}/disable
+
+Temporarily disable a provider.
+
+```bash
+curl -X POST http://localhost:8000/api/providers/groq/disable
+```
+
+---
+
+## WebSocket API
+
+GAAP provides real-time communication through WebSocket endpoints for live events, OODA loop visualization, and steering commands.
+
+### /ws/events
+
+Real-time events stream for all system events.
+
+**Connection:**
+```javascript
+const ws = new WebSocket('ws://localhost:8000/ws/events');
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Event:', data);
+};
+```
+
+**Event Types:**
+| Type | Description |
+|------|-------------|
+| `request.started` | New request started |
+| `request.completed` | Request finished |
+| `request.failed` | Request failed |
+| `healing.triggered` | Healing initiated |
+| `healing.recovered` | Recovery successful |
+| `budget.warning` | Budget threshold reached |
+| `provider.status` | Provider status change |
+
+**Sample Event:**
+```json
+{
+  "type": "request.completed",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "data": {
+    "request_id": "abc123",
+    "duration_ms": 1250,
+    "cost_usd": 0.0023
+  }
+}
+```
+
+---
+
+### /ws/ooda
+
+OODA (Observe-Orient-Decide-Act) loop visualization for real-time agent monitoring.
+
+**Connection:**
+```javascript
+const ws = new WebSocket('ws://localhost:8000/ws/ooda');
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('OODA State:', data);
+};
+```
+
+**OODA States:**
+| State | Description |
+|-------|-------------|
+| `OBSERVE` | Gathering information |
+| `ORIENT` | Analyzing context |
+| `DECIDE` | Making routing decisions |
+| `ACT` | Executing actions |
+
+**Sample Message:**
+```json
+{
+  "phase": "ORIENT",
+  "session_id": "sess123",
+  "context": {
+    "intent": "code_generation",
+    "complexity": "moderate",
+    "estimated_tokens": 2000
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
+---
+
+### /ws/steering
+
+Steering commands for manual control (pause, resume, veto).
+
+**Connection:**
+```javascript
+const ws = new WebSocket('ws://localhost:8000/ws/steering');
+
+// Send steering command
+ws.send(JSON.stringify({
+  "command": "pause",
+  "session_id": "sess123",
+  "reason": "User requested pause"
+}));
+```
+
+**Commands:**
+| Command | Description |
+|---------|-------------|
+| `pause` | Pause current execution |
+| `resume` | Resume paused execution |
+| `veto` | Cancel current action |
+| `redirect` | Change execution path |
+| `escalate` | Force human review |
+
+**Sample Command:**
+```json
+{
+  "command": "veto",
+  "session_id": "sess123",
+  "action_id": "act456",
+  "reason": "Potential security risk detected"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "acknowledged",
+  "command": "veto",
+  "executed_at": "2024-01-15T10:30:00Z"
+}
+```
+
+---
+
+## Pydantic Models Reference
+
+### System Models
+
+```python
+from gaap.api.models import (
+    HealthResponse,
+    MetricsResponse,
+    SystemInfo,
+    LogEntry,
+    SystemEvent,
+)
+
+class HealthResponse(BaseModel):
+    status: Literal["healthy", "degraded", "unhealthy"]
+    version: str
+    uptime_seconds: float
+    components: dict[str, str]
+
+class MetricsResponse(BaseModel):
+    requests_total: int
+    requests_per_minute: float
+    avg_latency_ms: float
+    error_rate: float
+    memory_usage_mb: float
+    cpu_usage_percent: float
+```
+
+### Session Models
+
+```python
+from gaap.api.models import (
+    SessionCreate,
+    SessionUpdate,
+    SessionResponse,
+    SessionList,
+    SessionExport,
+)
+
+class SessionCreate(BaseModel):
+    name: str
+    budget_limit: float | None = None
+    metadata: dict[str, Any] = {}
+
+class SessionResponse(BaseModel):
+    id: str
+    name: str
+    status: Literal["active", "paused", "completed", "cancelled"]
+    created_at: datetime
+    budget_limit: float | None
+    budget_used: float
+    request_count: int
+    metadata: dict[str, Any]
+```
+
+### Budget Models
+
+```python
+from gaap.api.models import (
+    BudgetStatus,
+    BudgetUsage,
+    BudgetAlert,
+    BudgetLimits,
+)
+
+class BudgetStatus(BaseModel):
+    total_budget: float
+    used: float
+    remaining: float
+    percent_used: float
+    period_start: datetime
+    period_end: datetime
+
+class BudgetAlert(BaseModel):
+    id: str
+    type: Literal["warning", "critical", "exceeded"]
+    threshold: float
+    current_value: float
+    message: str
+    acknowledged: bool
+    created_at: datetime
+```
+
+### Memory Models
+
+```python
+from gaap.api.models import (
+    MemoryStats,
+    MemoryTier,
+    MemorySearchRequest,
+    MemorySearchResult,
+)
+
+class MemoryStats(BaseModel):
+    working_memory_size: int
+    episodic_count: int
+    semantic_triples: int
+    total_size_mb: float
+    last_consolidation: datetime | None
+
+class MemorySearchRequest(BaseModel):
+    query: str
+    tier: MemoryTier | None = None
+    limit: int = 20
+    include_metadata: bool = True
+```
+
+### Healing Models
+
+```python
+from gaap.api.models import (
+    HealingConfig,
+    HealingHistory,
+    HealingPattern,
+    HealingStats,
+)
+
+class HealingConfig(BaseModel):
+    max_level: HealingLevel
+    auto_escalate: bool
+    escalation_timeout_seconds: int
+    notify_on_escalation: bool
+
+class HealingStats(BaseModel):
+    total_attempts: int
+    successful_recoveries: int
+    escalations: int
+    recovery_rate: float
+    by_level: dict[str, int]
+    errors_by_category: dict[str, int]
+```
+
+### Config Models
+
+```python
+from gaap.api.models import (
+    ConfigUpdate,
+    ConfigValidation,
+    ConfigPreset,
+    ConfigSchema,
+)
+
+class ConfigUpdate(BaseModel):
+    system: SystemConfig | None = None
+    healing: HealingConfig | None = None
+    budget: BudgetConfig | None = None
+    providers: list[ProviderConfig] | None = None
+
+class ConfigValidation(BaseModel):
+    valid: bool
+    errors: list[str]
+    warnings: list[str]
+```
+
+### Provider Models
+
+```python
+from gaap.api.models import (
+    ProviderCreate,
+    ProviderUpdate,
+    ProviderResponse,
+    ProviderTestResult,
+)
+
+class ProviderCreate(BaseModel):
+    name: str
+    type: str
+    api_key: str | None = None
+    base_url: str | None = None
+    models: list[str] | None = None
+    rate_limit: int = 60
+    timeout: int = 120
+
+class ProviderResponse(BaseModel):
+    name: str
+    type: str
+    status: Literal["healthy", "degraded", "disabled"]
+    models: list[str]
+    rate_limit: int
+    request_count: int
+    last_request: datetime | None
+
+class ProviderTestResult(BaseModel):
+    success: bool
+    latency_ms: float
+    model_tested: str
+    error: str | None = None
+```
+
+### WebSocket Models
+
+```python
+from gaap.api.models import (
+    WSEventMessage,
+    WSOODAMessage,
+    WSSteeringCommand,
+    WSSteeringResponse,
+)
+
+class WSEventMessage(BaseModel):
+    type: str
+    timestamp: datetime
+    data: dict[str, Any]
+
+class WSOODAMessage(BaseModel):
+    phase: Literal["OBSERVE", "ORIENT", "DECIDE", "ACT"]
+    session_id: str
+    context: dict[str, Any]
+    timestamp: datetime
+
+class WSSteeringCommand(BaseModel):
+    command: Literal["pause", "resume", "veto", "redirect", "escalate"]
+    session_id: str
+    action_id: str | None = None
+    reason: str | None = None
+    redirect_target: str | None = None
 ```
 
 ---

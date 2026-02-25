@@ -61,13 +61,13 @@ class SOPExecutionMixin:
         TaskType.CODE_GENERATION: "coder",
         TaskType.CODE_REVIEW: "critic",
         TaskType.RESEARCH: "researcher",
-        TaskType.ARCHITECTURE: "architect",
+        TaskType.PLANNING: "architect",
         TaskType.TESTING: "coder",
         TaskType.DOCUMENTATION: "researcher",
         TaskType.DEBUGGING: "critic",
         TaskType.REFACTORING: "coder",
         TaskType.ANALYSIS: "researcher",
-        TaskType.PLANNING: "architect",
+        TaskType.ORCHESTRATION: "architect",
     }
 
     def _init_sop(
@@ -100,7 +100,7 @@ class SOPExecutionMixin:
         """
         # Check if task has explicit role
         if hasattr(task, "sop_role") and task.sop_role:
-            return task.sop_role
+            return str(task.sop_role)
 
         # Check if task has explicit type
         if hasattr(task, "type") and task.type:

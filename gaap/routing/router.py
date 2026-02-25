@@ -65,7 +65,7 @@ class KeyState:
     consecutive_errors: int = 0
     is_exhausted: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         now = time.time()
         self.minute_window_start = now
         self.day_start = now
@@ -366,6 +366,7 @@ class SmartRouter:
         self._provider_states: dict[str, list[KeyState]] = {}
 
         # v2: Adaptive Rate Limiter — self-adjusts based on provider success/failure
+        self._adaptive_rate_limiter: Any = None
         try:
             from gaap.core.rate_limiter import AdaptiveRateLimiter, RateLimitConfig
 
@@ -379,7 +380,6 @@ class SmartRouter:
             )
         except Exception as e:
             self._logger.debug(f"Adaptive rate limiter init failed: {e}")
-            self._adaptive_rate_limiter = None
 
         # Register providers
         if providers:

@@ -1,5 +1,7 @@
 # GAAP Evolution: The Virtual Colleague (Integration & Collaboration)
 
+**Status:** ⏸️ DEFERRED - Major milestone for future version
+
 **Focus:** Moving from a Tool to a Team Member.
 
 ## 1. The Interaction Problem

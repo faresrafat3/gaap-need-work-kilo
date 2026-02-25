@@ -30,13 +30,14 @@ Usage:
 """
 
 # Layer 1: Strategic Layer
+import asyncio
 import contextlib
 import json
 import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import Enum, auto
 from typing import Any, Optional
 
 from gaap.core.base import BaseLayer
@@ -53,6 +54,49 @@ from gaap.mad.response_parser import (
     fallback_architecture_evaluation,
     parse_architecture_critic_response,
 )
+
+try:
+    from gaap.meta_learning.wisdom_distiller import WisdomDistiller, ProjectHeuristic
+    from gaap.meta_learning.failure_store import FailureStore, FailedTrace
+
+    MEMORY_AVAILABLE = True
+except ImportError:
+    MEMORY_AVAILABLE = False
+    WisdomDistiller = None  # type: ignore[misc,assignment]
+    FailureStore = None  # type: ignore[misc,assignment]
+    ProjectHeuristic = None  # type: ignore[misc,assignment]
+    FailedTrace = None  # type: ignore[misc,assignment]
+
+try:
+    from gaap.core.persona import PersonaSwitcher, PersonaRegistry, Persona, PersonaTier
+    from gaap.core.contrastive import ContrastiveReasoner, ContrastiveResult, ContrastivePath
+    from gaap.core.semantic_pressure import SemanticConstraints, ConstraintSeverity
+
+    ADVANCED_LLM_AVAILABLE = True
+except ImportError:
+    ADVANCED_LLM_AVAILABLE = False
+    PersonaSwitcher = None  # type: ignore[misc,assignment]
+    PersonaRegistry = None  # type: ignore[misc,assignment]
+    Persona = None  # type: ignore[misc,assignment]
+    PersonaTier = None  # type: ignore[misc,assignment]
+    ContrastiveReasoner = None  # type: ignore[misc,assignment]
+    ContrastiveResult = None  # type: ignore[misc,assignment]
+    ContrastivePath = None  # type: ignore[misc,assignment]
+    SemanticConstraints = None  # type: ignore[misc,assignment]
+    ConstraintSeverity = None  # type: ignore[misc,assignment]
+
+try:
+    from gaap.layers.got_strategic import GoTStrategic, ThoughtNode, GoTGraph
+    from gaap.layers.evidence_critic import EvidenceMADPanel, EvidenceBasedEvaluation
+
+    GOT_AVAILABLE = True
+except ImportError:
+    GOT_AVAILABLE = False
+    GoTStrategic = None  # type: ignore[misc,assignment]
+    ThoughtNode = None  # type: ignore[misc,assignment]
+    GoTGraph = None  # type: ignore[misc,assignment]
+    EvidenceMADPanel = None  # type: ignore[misc,assignment]
+    EvidenceBasedEvaluation = None  # type: ignore[misc,assignment]
 
 # =============================================================================
 # Logger Setup
@@ -138,6 +182,27 @@ class CommunicationPattern(Enum):
     GRPC = "grpc"
     MESSAGE_QUEUE = "message_queue"
     EVENT_BUS = "event_bus"
+
+
+class ResearchDecision(Enum):
+    """Decision on whether to block for research or continue"""
+
+    BLOCKED_AND_RESOLVED = auto()
+    CONTINUE_WITH_PLACEHOLDER = auto()
+    NO_RESEARCH_NEEDED = auto()
+
+
+@dataclass
+class EpistemicCheckResult:
+    """Result of epistemic knowledge check"""
+
+    needs_research: bool = False
+    unknown_terms: list[str] = field(default_factory=list)
+    critical_gaps: list[str] = field(default_factory=list)
+    relevant_wisdom: list[Any] = field(default_factory=list)
+    relevant_pitfalls: list[tuple[Any, list[Any]]] = field(default_factory=list)
+    confidence: float = 0.5
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -359,15 +424,31 @@ class ToTStrategic:
 
     def _generate_options(self, level: int, intent: StructuredIntent) -> list[str]:
         """توليد الخيارات حسب المستوى والنية"""
-        
+
         # 1. Research Thinking Stream
         if intent.intent_type in (IntentType.RESEARCH, IntentType.ANALYSIS):
             research_map = {
-                0: ["systematic_review", "deep_dive", "comparative_analysis", "exploratory_research"],
-                1: ["academic_papers", "technical_docs", "source_code", "market_data", "public_apis"],
+                0: [
+                    "systematic_review",
+                    "deep_dive",
+                    "comparative_analysis",
+                    "exploratory_research",
+                ],
+                1: [
+                    "academic_papers",
+                    "technical_docs",
+                    "source_code",
+                    "market_data",
+                    "public_apis",
+                ],
                 2: ["cross_reference", "empirical_testing", "expert_validation", "logical_proof"],
-                3: ["qualitative_analysis", "quantitative_analysis", "statistical_modeling", "pattern_recognition"],
-                4: ["detailed_report", "comparison_matrix", "executive_summary", "raw_data_dump"]
+                3: [
+                    "qualitative_analysis",
+                    "quantitative_analysis",
+                    "statistical_modeling",
+                    "pattern_recognition",
+                ],
+                4: ["detailed_report", "comparison_matrix", "executive_summary", "raw_data_dump"],
             }
             return research_map.get(level, [])
 
@@ -375,10 +456,31 @@ class ToTStrategic:
         elif intent.intent_type in (IntentType.DEBUGGING, IntentType.CODE_REVIEW):
             diagnostic_map = {
                 0: ["reproduce_first", "log_analysis_first", "code_audit_first", "trace_analysis"],
-                1: ["error_logs", "system_metrics", "stack_traces", "network_traffic", "database_state"],
-                2: ["binary_search_isolation", "component_mocking", "traffic_replay", "state_injection"],
-                3: ["logic_error_hypothesis", "resource_leak_hypothesis", "concurrency_hypothesis", "config_hypothesis"],
-                4: ["point_fix", "architectural_refactor", "configuration_change", "dependency_update"]
+                1: [
+                    "error_logs",
+                    "system_metrics",
+                    "stack_traces",
+                    "network_traffic",
+                    "database_state",
+                ],
+                2: [
+                    "binary_search_isolation",
+                    "component_mocking",
+                    "traffic_replay",
+                    "state_injection",
+                ],
+                3: [
+                    "logic_error_hypothesis",
+                    "resource_leak_hypothesis",
+                    "concurrency_hypothesis",
+                    "config_hypothesis",
+                ],
+                4: [
+                    "point_fix",
+                    "architectural_refactor",
+                    "configuration_change",
+                    "dependency_update",
+                ],
             }
             return diagnostic_map.get(level, [])
 
@@ -443,42 +545,57 @@ class ToTStrategic:
         # 1. Handling Research Stream
         if intent.intent_type in (IntentType.RESEARCH, IntentType.ANALYSIS):
             for node in path[1:]:
-                if node.level == 1: spec.metadata["research_methodology"] = node.content
-                elif node.level == 2: spec.metadata["source_strategy"] = node.content
-                elif node.level == 3: spec.metadata["verification_method"] = node.content
-            
-            spec.paradigm = ArchitectureParadigm.LAYERED # Default safe placeholder
-            spec.decisions.append(ArchitectureDecision(
-                aspect="research_strategy", 
-                choice=spec.metadata.get("research_methodology", "exploratory"),
-                reasoning="Tailored research approach for high-fidelity information gathering.",
-                trade_offs=["Speed vs. Accuracy"], confidence=0.9
-            ))
+                if node.level == 1:
+                    spec.metadata["research_methodology"] = node.content
+                elif node.level == 2:
+                    spec.metadata["source_strategy"] = node.content
+                elif node.level == 3:
+                    spec.metadata["verification_method"] = node.content
+
+            spec.paradigm = ArchitectureParadigm.LAYERED  # Default safe placeholder
+            spec.decisions.append(
+                ArchitectureDecision(
+                    aspect="research_strategy",
+                    choice=spec.metadata.get("research_methodology", "exploratory"),
+                    reasoning="Tailored research approach for high-fidelity information gathering.",
+                    trade_offs=["Speed vs. Accuracy"],
+                    confidence=0.9,
+                )
+            )
 
         # 2. Handling Diagnostic Stream
         elif intent.intent_type in (IntentType.DEBUGGING, IntentType.CODE_REVIEW):
             for node in path[1:]:
-                if node.level == 1: spec.metadata["diagnostic_approach"] = node.content
-                elif node.level == 2: spec.metadata["data_collection"] = node.content
-                elif node.level == 3: spec.metadata["isolation_method"] = node.content
-            
-            spec.paradigm = ArchitectureParadigm.MODULAR_MONOLITH # Placeholder
-            spec.decisions.append(ArchitectureDecision(
-                aspect="diagnostic_strategy",
-                choice=spec.metadata.get("diagnostic_approach", "log_analysis"),
-                reasoning="Focused diagnostic path to identify root cause.",
-                trade_offs=["Completeness vs. MTTR"], confidence=0.85
-            ))
+                if node.level == 1:
+                    spec.metadata["diagnostic_approach"] = node.content
+                elif node.level == 2:
+                    spec.metadata["data_collection"] = node.content
+                elif node.level == 3:
+                    spec.metadata["isolation_method"] = node.content
+
+            spec.paradigm = ArchitectureParadigm.MODULAR_MONOLITH  # Placeholder
+            spec.decisions.append(
+                ArchitectureDecision(
+                    aspect="diagnostic_strategy",
+                    choice=spec.metadata.get("diagnostic_approach", "log_analysis"),
+                    reasoning="Focused diagnostic path to identify root cause.",
+                    trade_offs=["Completeness vs. MTTR"],
+                    confidence=0.85,
+                )
+            )
 
         # 3. Standard Architecture Stream
         else:
             for node in path[1:]:
                 if node.level == 1:
-                    with contextlib.suppress(BaseException): spec.paradigm = ArchitectureParadigm(node.content)
+                    with contextlib.suppress(BaseException):
+                        spec.paradigm = ArchitectureParadigm(node.content)
                 elif node.level == 2:
-                    with contextlib.suppress(BaseException): spec.data_strategy = DataStrategy(node.content)
+                    with contextlib.suppress(BaseException):
+                        spec.data_strategy = DataStrategy(node.content)
                 elif node.level == 3:
-                    with contextlib.suppress(BaseException): spec.communication = CommunicationPattern(node.content)
+                    with contextlib.suppress(BaseException):
+                        spec.communication = CommunicationPattern(node.content)
 
             spec.decisions.append(
                 ArchitectureDecision(
@@ -1090,6 +1207,9 @@ Return ONLY a valid JSON object mapping diagnostic steps to the architecture sch
         consensus_threshold: float = 0.85,
         provider: Any = None,
         enable_mcts: bool = True,
+        memory: Any = None,
+        enable_got: bool = True,
+        enable_evidence_critics: bool = True,
     ) -> None:
         """
         Initialize Layer 1 Strategic.
@@ -1101,11 +1221,17 @@ Return ONLY a valid JSON object mapping diagnostic steps to the architecture sch
             consensus_threshold: Consensus threshold (default: 0.85)
             provider: LLM provider for architecture generation
             enable_mcts: Enable MCTS for high-complexity tasks (default: True)
+            memory: HierarchicalMemory for memory-augmented planning
+            enable_got: Enable Graph of Thoughts (default: True)
+            enable_evidence_critics: Enable evidence-based critics (default: True)
         """
         super().__init__(LayerType.STRATEGIC)
 
         self._provider = provider
         self._enable_mcts = enable_mcts
+        self._memory = memory
+        self._enable_got = enable_got and GOT_AVAILABLE
+        self._enable_evidence_critics = enable_evidence_critics and GOT_AVAILABLE
 
         # Fallback components (used when LLM is unavailable)
         self.tot = ToTStrategic(max_depth=tot_depth, branching_factor=tot_branching)
@@ -1117,6 +1243,37 @@ Return ONLY a valid JSON object mapping diagnostic steps to the architecture sch
         # MCTS for high-complexity tasks
         self._mcts: MCTSStrategic | None = None
 
+        # GoT for enhanced exploration (replaces ToT when available)
+        self._got: Any = None
+        if self._enable_got and GoTStrategic is not None:
+            self._got = GoTStrategic(provider=provider, max_nodes=50, max_generations=4)
+
+        # Evidence-based MAD panel
+        self._evidence_mad: Any = None
+        if self._enable_evidence_critics and EvidenceMADPanel is not None:
+            self._evidence_mad = EvidenceMADPanel(provider=provider)
+
+        # Memory-augmented planning components
+        self._wisdom_distiller: Any = None
+        self._failure_store: Any = None
+        if MEMORY_AVAILABLE:
+            if WisdomDistiller is not None:
+                self._wisdom_distiller = WisdomDistiller(llm_client=provider)
+            if FailureStore is not None:
+                self._failure_store = FailureStore()
+
+        # Advanced LLM Interaction components (Spec 19)
+        self._persona_switcher: Any = None
+        self._contrastive_reasoner: Any = None
+        self._semantic_constraints: Any = None
+        if ADVANCED_LLM_AVAILABLE:
+            if PersonaSwitcher is not None:
+                self._persona_switcher = PersonaSwitcher()
+            if ContrastiveReasoner is not None:
+                self._contrastive_reasoner = ContrastiveReasoner(provider=provider)
+            if SemanticConstraints is not None:
+                self._semantic_constraints = SemanticConstraints()
+
         self._logger = get_logger("gaap.layer1")
 
         # Statistics
@@ -1124,6 +1281,9 @@ Return ONLY a valid JSON object mapping diagnostic steps to the architecture sch
         self._llm_strategies = 0
         self._fallback_strategies = 0
         self._mcts_strategies = 0
+        self._got_strategies = 0
+        self._research_blocked = 0
+        self._research_continued = 0
 
     async def process(self, input_data: Any) -> ArchitectureSpec:
         """
@@ -1140,10 +1300,18 @@ Return ONLY a valid JSON object mapping diagnostic steps to the architecture sch
 
         Process:
             1. Extract intent from input
-            2. Try LLM-based strategy generation first
-            3. Fallback to ToT + MAD + Planner if LLM fails
-            4. Save original intent metadata for Layer 2
-            5. Estimate resources if not specified
+            2. Switch persona based on intent type
+            3. Perform epistemic check for knowledge gaps
+            4. Handle research trigger if needed
+            5. Apply contrastive reasoning for complex decisions
+            6. Try LLM-based strategy generation first
+            7. Try GoT exploration (new)
+            8. Try MCTS for high-complexity tasks
+            9. Fallback to ToT + MAD + Planner if all fail
+            10. Apply evidence-based criticism
+            11. Apply semantic constraints to outputs
+            12. Save original intent metadata for Layer 2
+            13. Estimate resources if not specified
 
         Example:
             >>> layer1 = Layer1Strategic(provider=provider)
@@ -1162,6 +1330,26 @@ Return ONLY a valid JSON object mapping diagnostic steps to the architecture sch
 
         original_text = intent.metadata.get("original_text", "")
 
+        # NEW: Switch persona based on intent type
+        current_persona = None
+        persona_prompt = ""
+        if self._persona_switcher:
+            current_persona = self._persona_switcher.switch(intent.intent_type.name)
+            persona_prompt = self._persona_switcher.get_system_prompt(current_persona)
+            self._logger.debug(f"Switched to persona: {current_persona.name}")
+
+        # NEW: Epistemic Check - Find knowledge gaps and relevant memory
+        epistemic = await self._epistemic_check(intent, original_text)
+
+        # NEW: Research Trigger - Handle unknown terms
+        if epistemic.needs_research:
+            decision = await self._handle_unknown_terms(intent, epistemic.unknown_terms)
+            if decision == ResearchDecision.BLOCKED_AND_RESOLVED:
+                epistemic.metadata["research_completed"] = True
+                self._research_blocked += 1
+            else:
+                self._research_continued += 1
+
         # Try LLM planning first
         spec = None
         source = "fallback"
@@ -1175,6 +1363,17 @@ Return ONLY a valid JSON object mapping diagnostic steps to the architecture sch
                     self._logger.info("LLM strategy generation successful")
             except Exception as e:
                 self._logger.warning(f"LLM strategy failed, using fallback: {e}")
+
+        # NEW: Try GoT exploration (replaces or supplements ToT)
+        if spec is None and self._enable_got and self._got:
+            try:
+                spec = await self._got_strategize(intent, original_text, epistemic)
+                if spec:
+                    source = "got"
+                    self._got_strategies += 1
+                    self._logger.info("GoT strategy generation successful")
+            except Exception as e:
+                self._logger.warning(f"GoT strategy failed, trying MCTS: {e}")
 
         # Try MCTS for high-complexity tasks
         if spec is None and self._enable_mcts and self._should_use_mcts(intent):
@@ -1196,6 +1395,52 @@ Return ONLY a valid JSON object mapping diagnostic steps to the architecture sch
             self._fallback_strategies += 1
             source = "fallback"
 
+        # NEW: Apply contrastive reasoning for complex decisions
+        if self._contrastive_reasoner and intent.intent_type in (
+            IntentType.PLANNING,
+            IntentType.ANALYSIS,
+        ):
+            try:
+                decision_context = f"{original_text} - {spec.paradigm.value} vs alternatives"
+                contrastive_result = self._contrastive_reasoner.reason_about(
+                    decision_context,
+                    context={
+                        "budget": intent.implicit_requirements.budget,
+                        "timeline": intent.implicit_requirements.timeline,
+                    },
+                )
+                spec.metadata["contrastive_analysis"] = contrastive_result.to_dict()
+                self._logger.debug(
+                    f"Contrastive reasoning applied: {contrastive_result.final_decision[:50]}..."
+                )
+            except Exception as e:
+                self._logger.warning(f"Contrastive reasoning failed: {e}")
+
+        # NEW: Apply evidence-based criticism if available
+        if self._enable_evidence_critics and self._evidence_mad:
+            try:
+                spec, evaluations = await self._evidence_mad.evaluate_with_evidence(spec, intent)
+                spec.metadata["evidence_evaluations"] = [e.to_dict() for e in evaluations]
+            except Exception as e:
+                self._logger.warning(f"Evidence evaluation failed: {e}")
+
+        # NEW: Apply semantic constraints check to spec description
+        if self._semantic_constraints:
+            try:
+                spec_description = f"{spec.paradigm.value} {spec.data_strategy.value}"
+                for decision in spec.decisions:
+                    spec_description += f" {decision.reasoning}"
+                violations = self._semantic_constraints.check_text_severity(
+                    spec_description,
+                    min_severity=ConstraintSeverity.WARNING if ADVANCED_LLM_AVAILABLE else None,  # type: ignore[arg-type]
+                )
+                if violations:
+                    spec.metadata["semantic_violations"] = [v.to_dict() for v in violations]
+                    pressure_prompt = self._semantic_constraints.apply_pressure_prompt_short()
+                    spec.metadata["semantic_pressure_prompt"] = pressure_prompt
+            except Exception as e:
+                self._logger.warning(f"Semantic constraint check failed: {e}")
+
         # Save original intent metadata for L2
         spec.metadata["original_intent"] = {
             "request_id": intent.request_id,
@@ -1207,6 +1452,11 @@ Return ONLY a valid JSON object mapping diagnostic steps to the architecture sch
             "original_text": original_text,
         }
         spec.metadata["strategy_source"] = source
+        spec.metadata["epistemic_check"] = {
+            "unknown_terms": epistemic.unknown_terms,
+            "critical_gaps": epistemic.critical_gaps,
+            "confidence": epistemic.confidence,
+        }
 
         # Estimate resources (if not specified by LLM)
         if not spec.estimated_resources:
@@ -1221,6 +1471,195 @@ Return ONLY a valid JSON object mapping diagnostic steps to the architecture sch
         )
 
         return spec
+
+    async def _epistemic_check(
+        self,
+        intent: StructuredIntent,
+        original_text: str,
+    ) -> EpistemicCheckResult:
+        """
+        Check for knowledge gaps and retrieve relevant memory.
+
+        Args:
+            intent: The structured intent
+            original_text: Original user request
+
+        Returns:
+            EpistemicCheckResult with gaps and relevant memory
+        """
+        result = EpistemicCheckResult()
+
+        # Extract potential unknown terms from goals
+        all_text = " ".join(intent.explicit_goals) + " " + original_text
+
+        # Technical terms that might need research
+        technical_patterns = [
+            "kubernetes",
+            "docker",
+            "microservices",
+            "graphql",
+            "grpc",
+            "kafka",
+            "redis",
+            "elasticsearch",
+            "terraform",
+            "ansible",
+            "tensorflow",
+            "pytorch",
+            "kafka",
+            "rabbitmq",
+            "mongodb",
+        ]
+
+        for pattern in technical_patterns:
+            if pattern.lower() in all_text.lower():
+                if intent.knowledge_gaps and pattern not in intent.knowledge_gaps:
+                    result.unknown_terms.append(pattern)
+
+        # Check for critical paths
+        critical_keywords = ["security", "auth", "crypto", "encryption", "data"]
+        for kw in critical_keywords:
+            if kw.lower() in all_text.lower():
+                result.critical_gaps.append(kw)
+
+        # Retrieve relevant wisdom from memory
+        if self._wisdom_distiller and intent.explicit_goals:
+            try:
+                context = " ".join(intent.explicit_goals)
+                result.relevant_wisdom = self._wisdom_distiller.get_heuristics_for_context(
+                    context, min_confidence=0.5, limit=3
+                )
+            except Exception as e:
+                self._logger.debug(f"Failed to retrieve wisdom: {e}")
+
+        # Retrieve relevant pitfalls from failure store
+        if self._failure_store and intent.explicit_goals:
+            try:
+                context = " ".join(intent.explicit_goals)
+                result.relevant_pitfalls = self._failure_store.find_similar(context, limit=3)
+            except Exception as e:
+                self._logger.debug(f"Failed to retrieve pitfalls: {e}")
+
+        # Determine if research is needed
+        result.needs_research = len(result.unknown_terms) > 0 or len(result.critical_gaps) > 0
+        result.confidence = max(
+            0.3, 1.0 - (len(result.unknown_terms) * 0.1) - (len(result.critical_gaps) * 0.15)
+        )
+
+        return result
+
+    async def _handle_unknown_terms(
+        self,
+        intent: StructuredIntent,
+        unknown_terms: list[str],
+    ) -> ResearchDecision:
+        """
+        Hybrid Research with Reasonable Blocking.
+
+        Scoring factors for BLOCKING:
+        - Term appears in core requirements: +3
+        - Multiple unknown terms: +2 per term
+        - Term in critical path (security, data): +2
+        - No fallback/alternative available: +2
+
+        BLOCK if score >= 5, else continue with placeholder
+
+        Args:
+            intent: The structured intent
+            unknown_terms: List of unknown terms
+
+        Returns:
+            ResearchDecision indicating whether to block or continue
+        """
+        score = 0
+
+        for term in unknown_terms:
+            # Check if term appears in core requirements
+            if intent.explicit_goals and term.lower() in intent.explicit_goals[0].lower():
+                score += 3
+
+            # Check if term is in critical path
+            if term.lower() in ["security", "auth", "crypto", "data"]:
+                score += 2
+
+            # Per-term penalty
+            score += 2
+
+        if score >= 5:
+            # BLOCK: Launch research, wait for result
+            research_task = await self._launch_research(unknown_terms)
+
+            # In a real implementation, this would wait for research to complete
+            # For now, we mark it as resolved
+            self._logger.info(f"Research blocked for terms: {unknown_terms}")
+            return ResearchDecision.BLOCKED_AND_RESOLVED
+        else:
+            # CONTINUE: Launch in background, use placeholder
+            if unknown_terms:
+                asyncio.create_task(self._launch_research(unknown_terms))
+            self._logger.info(f"Research continued in background for terms: {unknown_terms}")
+            return ResearchDecision.CONTINUE_WITH_PLACEHOLDER
+
+    async def _launch_research(self, terms: list[str]) -> dict[str, Any]:
+        """
+        Launch research task for unknown terms.
+
+        Args:
+            terms: Terms to research
+
+        Returns:
+            Research findings (placeholder for now)
+        """
+        # Placeholder - in real implementation, this would call a research agent
+        self._logger.info(f"Research launched for: {terms}")
+        return {
+            "terms": terms,
+            "findings": {},
+            "status": "completed",
+        }
+
+    async def _got_strategize(
+        self,
+        intent: StructuredIntent,
+        original_text: str,
+        epistemic: EpistemicCheckResult,
+    ) -> ArchitectureSpec | None:
+        """
+        Generate architecture strategy using Graph of Thoughts.
+
+        Args:
+            intent: Structured intent from Layer 0
+            original_text: Original user request text
+            epistemic: Epistemic check result with wisdom/pitfalls
+
+        Returns:
+            ArchitectureSpec if successful, None otherwise
+        """
+        if not self._got:
+            return None
+
+        context = {
+            "original_text": original_text,
+            "constraints": intent.constraints,
+            "implicit": {
+                "scalability": intent.implicit_requirements.scalability,
+                "security": intent.implicit_requirements.security,
+                "performance": intent.implicit_requirements.performance,
+                "budget": intent.implicit_requirements.budget,
+            },
+        }
+
+        spec = await self._got.explore(
+            intent,
+            context,
+            wisdom=epistemic.relevant_wisdom if epistemic else None,
+            pitfalls=epistemic.relevant_pitfalls if epistemic else None,
+        )
+
+        if spec:
+            spec.metadata["got_nodes"] = len(self._got._graph.nodes) if self._got._graph else 0
+
+        return spec  # type: ignore[no-any-return]
 
     async def _llm_strategize(
         self, intent: StructuredIntent, original_text: str
@@ -1244,14 +1683,22 @@ Return ONLY a valid JSON object mapping diagnostic steps to the architecture sch
         # Dynamic Prompt Selection
         if intent.intent_type in (IntentType.RESEARCH, IntentType.ANALYSIS, IntentType.PLANNING):
             prompt_template = self.STRATEGY_PROMPT_RESEARCH
-            system_role = "You are a precise strategic planning engine. Output only valid JSON objects."
-        elif intent.intent_type in (IntentType.DEBUGGING, IntentType.CODE_REVIEW, IntentType.TESTING):
+            system_role = (
+                "You are a precise strategic planning engine. Output only valid JSON objects."
+            )
+        elif intent.intent_type in (
+            IntentType.DEBUGGING,
+            IntentType.CODE_REVIEW,
+            IntentType.TESTING,
+        ):
             prompt_template = self.STRATEGY_PROMPT_DEBUG
             system_role = "You are an expert diagnostic engineer. Output only valid JSON objects."
         else:
             # Default to Architecture for CODE_GENERATION, REFACTORING, etc.
             prompt_template = self.STRATEGY_PROMPT_ARCH
-            system_role = "You are a precise software architecture engine. Output only valid JSON objects."
+            system_role = (
+                "You are a precise software architecture engine. Output only valid JSON objects."
+            )
 
         prompt = prompt_template.format(
             original_text=original_text,
@@ -1603,9 +2050,15 @@ Return ONLY a valid JSON object mapping diagnostic steps to the architecture sch
             "specs_created": self._specs_created,
             "llm_strategies": self._llm_strategies,
             "mcts_strategies": self._mcts_strategies,
+            "got_strategies": self._got_strategies,
             "fallback_strategies": self._fallback_strategies,
             "tot_nodes_explored": self.tot._explored_nodes,
             "mcts_enabled": self._enable_mcts,
+            "got_enabled": self._enable_got,
+            "evidence_critics_enabled": self._enable_evidence_critics,
+            "memory_enabled": MEMORY_AVAILABLE,
+            "research_blocked": self._research_blocked,
+            "research_continued": self._research_continued,
         }
 
 

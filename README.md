@@ -1,51 +1,56 @@
-# GAAP - Generative Agentic Architecture Platform (v2.2.0)
+# GAAP - Generative Agentic Architecture Platform (v0.9.0)
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![OODA Loop](https://img.shields.io/badge/Engine-OODA%20Loop-red.svg)](#)
-[![Type Coverage](https://img.shields.io/badge/type%20hints-80%25-green.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-1,500+-green.svg)](#)
+[![Coverage](https://img.shields.io/badge/coverage-~55%25-yellow.svg)](#)
+[![Lines of Code](https://img.shields.io/badge/LOC-90,000+-orange.svg)](#)
 
-**GAAP** is a high-fidelity Sovereign AGI orchestration system. Built on the **OODA Loop** (Observe-Orient-Decide-Act), it transcends traditional coding assistants by integrating Deep Research, Predictive Simulation, and Metacognitive Awareness into a unified cognitive architecture.
+**GAAP** is an autonomous AI coding agent with a **4-layer OODA architecture**. It integrates Deep Research, Self-Healing, Meta-Learning, and Swarm Intelligence into a unified cognitive system with a full Web GUI featuring real-time updates.
 
-## 🚀 Latest Release (v2.2.0)
+## ✨ Features
 
-**Code Quality Renaissance** - Major refactoring and cleanup:
-- Type hints coverage: 35% → 80%
-- Docstring coverage: 15% → 65%
-- Dead code removal: ~8,500 lines
-- New: SOP Governance, Axiom Validator, Kilo Gateway
-
-## ✨ Key Cognitive Features
-
-- **🧠 OODA Loop Engine**: A circular cognitive process that continuously observes the environment and learns from every action.
-- **🔍 STORM Deep Research**: Augmented planning that performs exhaustive web/scientific research before making strategic decisions.
-- **🧬 Dynamic Personas**: Agents that adopt specialized roles (Researcher, Debugger, Coder) with domain-specific tool filtering.
-- **⚖️ SOP Governance**: Process-driven intelligence with mandatory artifact validation.
-- **🛡️ Constitutional Axioms**: Invariant checks for syntax, dependencies, and interfaces.
-- **🛠️ Just-in-Time Tool Synthesis**: The system autonomously writes and registers its own tools to overcome capability gaps.
-- **💾 Domain-Partitioned Memory**: Hierarchical memory that segregates lessons by field for high-precision retrieval.
+- **4-Layer OODA Architecture**: Observe-Orient-Decide-Act cognitive loop
+- **Deep Research Engine**: Web-augmented research with ETS scoring and hypothesis building
+- **Self-Healing System**: Automatic error detection and recovery
+- **Meta-Learning**: Continuous learning from past executions
+- **Swarm Intelligence**: Multi-agent coordination and collaboration
+- **Web Interface**: Full GUI with real-time updates
+- **Metacognition & Confidence Scoring**: Self-awareness and decision confidence
+- **Advanced LLM Interaction**: Dynamic persona adoption and tool synthesis
 
 ## 🧠 Cognitive Architecture
 
-GAAP implements a multi-layered cognitive system that operates in a loop:
+GAAP implements a 4-layer OODA (Observe-Orient-Decide-Act) cognitive system:
 
 ```
 User Input → Layer 0: Observe → Layer 1: Orient → Layer 2: Decide → Layer 3: Act → Learn → Loop
 ```
 
-| Phase | Engine Component | Responsibility |
+| Layer | Engine Component | Responsibility |
 |-------|------------------|----------------|
-| **OBSERVE** | `PromptFirewall` | Security scanning, intent classification, and environment sensing. |
-| **ORIENT** | `StrategicToT` | Deep Research (STORM) and Strategy Generation (Tree of Thoughts). |
-| **DECIDE** | `TacticalDecomposer` | Multi-domain task breakdown and dependency graph (DAG) construction. |
-| **ACT** | `SpecializedExecutors` | Action execution with Genetic Twin verification and Tool Synthesis. |
-| **LEARN** | `Metacognition` | Reflective learning, reputation updates, and episodic memory storage. |
+| **OBSERVE** | `PromptFirewall` | Security scanning, intent classification, and environment sensing |
+| **ORIENT** | `StrategicToT` | Deep Research (STORM) and Strategy Generation (Tree of Thoughts) |
+| **DECIDE** | `TacticalDecomposer` | Multi-domain task breakdown and dependency graph (DAG) construction |
+| **ACT** | `SpecializedExecutors` | Action execution with Genetic Twin verification and Tool Synthesis |
+| **LEARN** | `Metacognition` | Reflective learning, reputation updates, and episodic memory storage |
 
-## 📦 Quick Setup
+## 📊 Project Status
+
+- **38 specifications implemented (73%)**
+- **~90,000 lines of Python code**
+- **1,500+ tests**
+- **~55% test coverage**
+
+## 📦 Installation
 
 ```bash
+# Clone and install the package
 git clone https://github.com/gaap-system/gaap.git
 cd gaap
-pip install -e ".[dev]"
+pip install -e .
+
+# Frontend setup
+cd frontend && npm install && npm run build
 ```
 
 ## 🛠️ Development Commands
@@ -58,6 +63,31 @@ make eval    # Run the Sovereign IQ test
 make audit   # Verify axiomatic integrity
 ```
 
+## 💻 Usage
+
+### CLI
+
+```bash
+gaap --help
+gaap run "Your task here"
+gaap research "Research topic"
+```
+
+### API
+
+```bash
+# Start the API server
+gaap api --port 8000
+```
+
+### Web GUI
+
+```bash
+# Start the web interface
+gaap web
+# Then open http://localhost:5173 in your browser
+```
+
 ## 📚 Documentation
 
 - [Architecture Guide](docs/ARCHITECTURE.md)
@@ -67,14 +97,6 @@ make audit   # Verify axiomatic integrity
 - [Troubleshooting](docs/TROUBLESHOOTING_FLOWCHARTS.md)
 - [Evolution Plan 2026](docs/evolution_plan_2026/) - 50+ technical specifications
 
-## 📊 Code Quality
-
-| Module | Docstrings | Type Hints |
-|--------|------------|------------|
-| Core | 100% | 100% |
-| Layers L0 | 100% | 100% |
-| Memory | 95% | 95% |
-| Providers | 85% | 85% |
-
 ---
+
 **GAAP: The future of autonomous cognitive engineering.**

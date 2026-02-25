@@ -259,9 +259,14 @@ class PromptFirewall:
 
         # 1. تكتيكات هجومية استراتيجية
         adversarial_tactics = [
-            "instead of", "forget previous", "now act as", 
-            "bypass", "emergency override", "developer mode",
-            "unrestricted", "no filters"
+            "instead of",
+            "forget previous",
+            "now act as",
+            "bypass",
+            "emergency override",
+            "developer mode",
+            "unrestricted",
+            "no filters",
         ]
 
         text_lower = text.lower()
@@ -353,6 +358,56 @@ class PromptFirewall:
                 self._blocked_count / len(self._scan_history) if self._scan_history else 0
             ),
         }
+
+    def scan_output(self, output: str) -> FirewallResult:
+        """
+        Outbound DLP scan - prevents leaking secrets in responses.
+
+        Args:
+            output: Output text to scan
+
+        Returns:
+            FirewallResult with sanitized output
+        """
+        from gaap.security.dlp import DLPScanner, LeakType
+
+        dlp = DLPScanner()
+        scan_result = dlp.scan(output)
+
+        detected_patterns = []
+        for finding in scan_result.findings:
+            detected_patterns.append(f"DLP:{finding.leak_type.name}")
+
+        risk_level = RiskLevel.SAFE
+        if scan_result.findings:
+            critical_count = sum(1 for f in scan_result.findings if f.severity == "critical")
+            high_count = sum(1 for f in scan_result.findings if f.severity == "high")
+
+            if critical_count > 0:
+                risk_level = RiskLevel.CRITICAL
+            elif high_count > 0:
+                risk_level = RiskLevel.HIGH
+            else:
+                risk_level = RiskLevel.MEDIUM
+
+        result = FirewallResult(
+            is_safe=scan_result.is_safe,
+            risk_level=risk_level,
+            detected_patterns=detected_patterns,
+            sanitized_input=scan_result.redacted_text,
+            recommendations=(
+                ["Potential secrets detected and redacted"] if scan_result.findings else []
+            ),
+            scan_time_ms=scan_result.scan_time_ms,
+        )
+
+        self._scan_history.append(result)
+
+        if not result.is_safe:
+            self._blocked_count += 1
+            self._logger.warning(f"Output DLP blocked: {len(scan_result.findings)} potential leaks")
+
+        return result
 
 
 # =============================================================================

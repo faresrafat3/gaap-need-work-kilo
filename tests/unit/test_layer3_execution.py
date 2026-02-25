@@ -41,12 +41,13 @@ class TestTaskExecution:
         assert result["success"]
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_execution_timeout(self):
         """Test execution timeout handling"""
-        timeout_seconds = 1.0
+        timeout_seconds = 0.1
 
         async def slow_operation():
-            await asyncio.sleep(2.0)
+            await asyncio.sleep(0.2)
             return "done"
 
         with pytest.raises(asyncio.TimeoutError):

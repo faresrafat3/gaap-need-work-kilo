@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gaap"
-version = "1.0.0"
+version = "0.9.0"
 description = "General-purpose AI Architecture Platform - Multi-layer LLM orchestration system"
 readme = "README.md"
 license = {text = "MIT"}
@@ -12,7 +12,7 @@ requires-python = ">=3.10"
 authors = [
     {name = "GAAP Team", email = "team@gaap.io"}
 ]
-keywords = ["ai", "llm", "orchestration", "agents", "multi-layer"]
+keywords = ["ai", "llm", "orchestration", "agents", "multi-layer", "rag", "vector-db", "llmops"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -38,7 +38,7 @@ dependencies = [
     "docker>=6.0.0",
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",
-    "opentelemetry-instrumentation-aiohttp-client>=0.41b0",
+    "opentelemetry-instrumentation-aiohttp-client>=1.20.0",
     "prometheus-client>=0.19.0",
 ]
 
@@ -48,6 +48,8 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
     "pytest-vcr>=1.0.0",
+    "pytest-xdist>=3.0.0",
+    "pytest-timeout>=2.0.0",
     "vcrpy>=5.0.0",
     "black>=23.0.0",
     "isort>=5.0.0",
@@ -143,6 +145,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 minversion = "7.0"
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests", "."]
 python_files = ["test_*.py", "*_test.py"]
 python_functions = ["test_*"]
@@ -154,11 +157,14 @@ addopts = [
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests",
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
     "unit: marks tests as unit tests",
-    "gauntlet: marks tests as E2E gauntlet scenarios",
+    "gauntlet: marks tests as E2E gauntlet scenarios (skip by default)",
     "chaos: marks tests as chaos/fault injection tests",
     "vcr: marks tests that use VCR cassettes",
+    "benchmark: marks tests as benchmarks (skip by default)",
+    "e2e: marks tests as end-to-end requiring real services",
+    "requires_api: marks tests that require real API keys",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",

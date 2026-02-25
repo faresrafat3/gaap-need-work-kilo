@@ -10,6 +10,7 @@ from typing import Any
 
 import yaml
 
+from gaap.storage.atomic import atomic_write
 from .exceptions import (
     ConfigLoadError,
     ConfigurationError,
@@ -786,14 +787,14 @@ class ConfigBuilder:
     def to_yaml(self, path: str) -> None:
         """حفظ التكوين كملف YAML"""
         config = self.build()
-        with open(path, "w") as f:
-            yaml.dump(config.to_dict(), f, default_flow_style=False)
+        content = yaml.dump(config.to_dict(), default_flow_style=False)
+        atomic_write(path, content)
 
     def to_json(self, path: str) -> None:
         """حفظ التكوين كملف JSON"""
         config = self.build()
-        with open(path, "w") as f:
-            json.dump(config.to_dict(), f, indent=2)
+        content = json.dumps(config.to_dict(), indent=2)
+        atomic_write(path, content)
 
 
 # =============================================================================

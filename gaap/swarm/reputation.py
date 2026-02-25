@@ -545,7 +545,7 @@ class ReputationStore:
     def get_stats(self) -> dict[str, Any]:
         """إحصائيات المخزن"""
         total_fractals = len(self._entries)
-        total_domains = set()
+        total_domains: set[str] = set()
 
         for entry in self._entries.values():
             total_domains.update(entry.domains.keys())

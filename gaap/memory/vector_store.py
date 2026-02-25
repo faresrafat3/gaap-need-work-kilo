@@ -13,10 +13,20 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-import chromadb
-from chromadb.config import Settings
-
 logger = logging.getLogger("gaap.memory.vector")
+
+CHROMADB_AVAILABLE = False
+_chromadb = None
+_Settings = None
+try:
+    import chromadb as _chromadb_module
+    from chromadb.config import Settings as _Settings_class
+
+    _chromadb = _chromadb_module
+    _Settings = _Settings_class
+    CHROMADB_AVAILABLE = True
+except ImportError:
+    pass
 
 
 @dataclass
@@ -64,12 +74,20 @@ class VectorStore:
         self.persist_dir = persist_dir
         self.collection_name = collection_name
         self._available = False
+        self._fallback_store: dict[str, tuple[str, dict[str, Any]]] = {}
+
+        if not CHROMADB_AVAILABLE:
+            logger.debug(
+                "ChromaDB not installed. Using in-memory fallback. Install with: pip install chromadb"
+            )
+            return
 
         os.makedirs(persist_dir, exist_ok=True)
 
         try:
-            self.client = chromadb.PersistentClient(
-                path=persist_dir, settings=Settings(allow_reset=True)
+            self.client = _chromadb.PersistentClient(  # type: ignore[union-attr]
+                path=persist_dir,
+                settings=_Settings(allow_reset=True),  # type: ignore[misc]
             )
 
             self.embedding_fn = self._get_embedding_function()
@@ -80,12 +98,11 @@ class VectorStore:
                 metadata={"hnsw:space": "cosine"},
             )
             self._available = True
-            logger.info(f"VectorStore initialized at {persist_dir}")
+            logger.debug(f"VectorStore initialized at {persist_dir}")
 
         except Exception as e:
             logger.warning(f"VectorStore unavailable: {e}. Using in-memory fallback.")
             self._available = False
-            self._fallback_store: dict[str, tuple[str, dict[str, Any]]] = {}
 
     def _get_embedding_function(self) -> Any:
         """Get embedding function with fallback."""
@@ -95,7 +112,7 @@ class VectorStore:
             ef = embedding_functions.SentenceTransformerEmbeddingFunction(
                 model_name="all-MiniLM-L6-v2"
             )
-            logger.info("Using SentenceTransformer embeddings")
+            logger.debug("Using SentenceTransformer embeddings")
             return ef
         except Exception as e:
             logger.warning(f"SentenceTransformer unavailable: {e}. Using hash-based fallback.")
@@ -154,11 +171,13 @@ class VectorStore:
                     metadatas = results["metadatas"][0] if results["metadatas"] else []
 
                     for i, doc_id in enumerate(ids):
+                        meta_raw = metadatas[i] if i < len(metadatas) else {}
+                        meta: dict[str, Any] = dict(meta_raw) if meta_raw else {}
                         entries.append(
                             VectorEntry(
                                 id=doc_id,
                                 content=documents[i] if i < len(documents) else "",
-                                metadata=metadatas[i] if i < len(metadatas) else {},
+                                metadata=meta,
                             )
                         )
                 return entries
@@ -197,7 +216,8 @@ class VectorStore:
     def count(self) -> int:
         """Return total count of embeddings."""
         if self._available:
-            return self.collection.count()
+            count: int = self.collection.count()
+            return count
         return len(self._fallback_store)
 
     def reset(self) -> None:

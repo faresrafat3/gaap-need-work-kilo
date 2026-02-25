@@ -384,16 +384,16 @@ class WebChatBridgeProvider(BaseProvider):
 
                     self._logger.warning(
                         f"Transient error on '{current_account}' (attempt {attempt}/{max_retries}), "
-                        f"retrying in {wait}s: {e}"
+                        f"retrying in {wait}s: {full_err}"
                     )
                     gc.collect()
                     await asyncio.sleep(wait)
                     continue
 
-                self._logger.error(f"webchat_call failed on '{current_account}': {e}")
+                self._logger.error(f"webchat_call failed on '{current_account}': {full_err}")
                 gc.collect()
                 raise ProviderResponseError(
-                    provider_name=self.name, status_code=500, response_body=str(e)
+                    provider_name=self.name, status_code=500, response_body=full_err
                 )
 
         # Should not reach here, but safety net

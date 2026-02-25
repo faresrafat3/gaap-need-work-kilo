@@ -10,6 +10,8 @@ from .providers import cmd_providers
 from .system import cmd_doctor, cmd_status, cmd_version
 
 from .sovereign import cmd_research, cmd_debug, cmd_dream, cmd_audit
+from .feedback import cmd_feedback
+from .debt import cmd_debt
 
 __all__ = [
     "cmd_chat",
@@ -21,9 +23,10 @@ __all__ = [
     "cmd_status",
     "cmd_version",
     "cmd_doctor",
-
     "cmd_research",
     "cmd_debug",
     "cmd_dream",
     "cmd_audit",
+    "cmd_feedback",
+    "cmd_debt",
 ]

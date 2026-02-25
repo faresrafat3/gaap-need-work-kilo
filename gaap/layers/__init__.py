@@ -61,6 +61,16 @@ from .mcts_logic import (
     create_mcts,
     create_mcts_for_priority,
 )
+from .sop_manager import (
+    ArtifactValidationResult,
+    QualityGate,
+    QualityGateStatus,
+    SOP,
+    SOPManager,
+    SOPStep,
+    StepType,
+    create_sop_manager,
+)
 
 __all__ = [
     "Layer0Interface",
@@ -94,4 +104,13 @@ __all__ = [
     "ExecutionResult",
     "MADQualityPanel",
     "QualityPipeline",
+    # SOP Manager
+    "SOPManager",
+    "SOP",
+    "SOPStep",
+    "StepType",
+    "QualityGate",
+    "QualityGateStatus",
+    "ArtifactValidationResult",
+    "create_sop_manager",
 ]

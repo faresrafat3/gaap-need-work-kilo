@@ -87,6 +87,16 @@ from gaap.swarm.orchestrator import (
     SwarmMetrics,
 )
 
+# Profile Evolver (MorphAgent-inspired)
+from gaap.swarm.profile_evolver import (
+    EvolutionStatus,
+    EvolutionTrigger,
+    PerformanceSnapshot,
+    ProfileEvolution,
+    ProfileEvolver,
+    create_profile_evolver,
+)
+
 __all__ = [
     "ReputationStore",
     "ReputationEntry",
@@ -110,4 +120,11 @@ __all__ = [
     "SwarmOrchestrator",
     "SwarmConfig",
     "SwarmMetrics",
+    # Profile Evolver
+    "EvolutionTrigger",
+    "EvolutionStatus",
+    "ProfileEvolution",
+    "PerformanceSnapshot",
+    "ProfileEvolver",
+    "create_profile_evolver",
 ]

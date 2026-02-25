@@ -455,8 +455,9 @@ class TestSOPExecutionMixin:
         executor = MockExecutor()
         executor._init_sop(sop_enabled=True)
 
-        task = Mock()
+        task = Mock(spec=["type", "name", "description", "id", "sop_role"])
         task.type = TaskType.CODE_GENERATION
+        task.sop_role = None
 
         role = executor._detect_role(task)
         assert role == "coder"
@@ -471,9 +472,11 @@ class TestSOPExecutionMixin:
         executor = MockExecutor()
         executor._init_sop(sop_enabled=True)
 
-        task = Mock()
+        task = Mock(spec=["type", "name", "description", "id", "sop_role"])
         task.name = "Security review for authentication"
         task.description = ""
+        task.type = None
+        task.sop_role = None
 
         role = executor._detect_role(task)
         assert role == "critic"
@@ -481,22 +484,26 @@ class TestSOPExecutionMixin:
     def test_start_and_end_sop_tracking(self):
         """Test starting and ending SOP tracking"""
         from gaap.layers.sop_mixin import SOPExecutionMixin
+        from gaap.core.governance import SOPStore
 
         class MockExecutor(SOPExecutionMixin):
             pass
 
-        executor = MockExecutor()
-        executor._init_sop(sop_enabled=True)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sop_store = SOPStore(roles_dir=tmpdir)
+            executor = MockExecutor()
+            executor._init_sop(sop_enabled=True, sop_store=sop_store)
 
-        task = Mock()
-        task.id = "test_task"
-        task.type = None
-        task.name = "Write code"
-        task.description = ""
+            task = Mock(spec=["type", "name", "description", "id", "sop_role"])
+            task.id = "test_task"
+            task.type = None
+            task.name = "Write code"
+            task.description = ""
+            task.sop_role = None
 
-        execution = executor._start_sop_tracking(task)
-        assert execution is not None
-        assert execution.task_id == "test_task"
+            execution = executor._start_sop_tracking(task)
+            assert execution is not None
+            assert execution.task_id == "test_task"
 
         summary = executor._end_sop_tracking()
         assert summary["sop_enabled"] is True
@@ -504,90 +511,106 @@ class TestSOPExecutionMixin:
     def test_complete_step_tracking(self):
         """Test completing SOP step"""
         from gaap.layers.sop_mixin import SOPExecutionMixin
+        from gaap.core.governance import SOPStore
 
         class MockExecutor(SOPExecutionMixin):
             pass
 
-        executor = MockExecutor()
-        executor._init_sop(sop_enabled=True)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sop_store = SOPStore(roles_dir=tmpdir)
+            executor = MockExecutor()
+            executor._init_sop(sop_enabled=True, sop_store=sop_store)
 
-        task = Mock()
-        task.id = "test_task"
-        task.type = None
-        task.name = "Write code"
-        task.description = ""
+            task = Mock(spec=["type", "name", "description", "id", "sop_role"])
+            task.id = "test_task"
+            task.type = None
+            task.name = "Write code"
+            task.description = ""
+            task.sop_role = None
 
-        executor._start_sop_tracking(task)
-        executor._complete_step(1, "Requirements analyzed")
+            executor._start_sop_tracking(task)
+            executor._complete_step(1, "Requirements analyzed")
 
-        pending = executor._get_pending_steps()
-        assert all(s.step_id != 1 for s in pending)
+            pending = executor._get_pending_steps()
+            assert all(s.step_id != 1 for s in pending)
 
     def test_skip_step_triggers_reflexion(self):
         """Test skipping step triggers reflexion"""
         from gaap.layers.sop_mixin import SOPExecutionMixin
+        from gaap.core.governance import SOPStore
 
         class MockExecutor(SOPExecutionMixin):
             pass
 
-        executor = MockExecutor()
-        executor._init_sop(sop_enabled=True)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sop_store = SOPStore(roles_dir=tmpdir)
+            executor = MockExecutor()
+            executor._init_sop(sop_enabled=True, sop_store=sop_store)
 
-        task = Mock()
-        task.id = "test_task"
-        task.type = None
-        task.name = "Write code"
-        task.description = ""
+            task = Mock(spec=["type", "name", "description", "id", "sop_role"])
+            task.id = "test_task"
+            task.type = None
+            task.name = "Write code"
+            task.description = ""
+            task.sop_role = None
 
-        executor._start_sop_tracking(task)
-        executor._skip_step(1, "Not applicable for this task")
+            executor._start_sop_tracking(task)
+            executor._skip_step(1, "Not applicable for this task")
 
-        assert executor._requires_reflexion() is True
-        prompt = executor._get_reflexion_prompt()
-        assert prompt is not None
-        assert "Not applicable" in prompt
+            assert executor._requires_reflexion() is True
+            prompt = executor._get_reflexion_prompt()
+            assert prompt is not None
+            assert "Not applicable" in prompt
 
     def test_artifact_registration(self):
         """Test artifact registration"""
         from gaap.layers.sop_mixin import SOPExecutionMixin
+        from gaap.core.governance import SOPStore
 
         class MockExecutor(SOPExecutionMixin):
             pass
 
-        executor = MockExecutor()
-        executor._init_sop(sop_enabled=True)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sop_store = SOPStore(roles_dir=tmpdir)
+            executor = MockExecutor()
+            executor._init_sop(sop_enabled=True, sop_store=sop_store)
 
-        task = Mock()
-        task.id = "test_task"
-        task.type = None
-        task.name = "Write code"
-        task.description = ""
+            task = Mock(spec=["type", "name", "description", "id", "sop_role"])
+            task.id = "test_task"
+            task.type = None
+            task.name = "Write code"
+            task.description = ""
+            task.sop_role = None
 
-        executor._start_sop_tracking(task)
-        result = executor._register_artifact("source_code", "def foo(): pass")
+            executor._start_sop_tracking(task)
+            result = executor._register_artifact("source_code", "def foo(): pass")
 
-        assert result is True
+            assert result is True
 
     def test_sop_completion_validation(self):
         """Test SOP completion validation"""
         from gaap.layers.sop_mixin import SOPExecutionMixin
+        from gaap.core.governance import SOPStore
 
         class MockExecutor(SOPExecutionMixin):
             pass
 
-        executor = MockExecutor()
-        executor._init_sop(sop_enabled=True)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sop_store = SOPStore(roles_dir=tmpdir)
+            executor = MockExecutor()
+            executor._init_sop(sop_enabled=True, sop_store=sop_store)
 
-        task = Mock()
-        task.id = "test_task"
-        task.type = None
-        task.name = "Write code"
-        task.description = ""
+            task = Mock(spec=["type", "name", "description", "id", "sop_role"])
+            task.id = "test_task"
+            task.type = None
+            task.name = "Write code"
+            task.description = ""
+            task.sop_role = None
 
-        executor._start_sop_tracking(task)
+            executor._start_sop_tracking(task)
 
-        status = executor._validate_sop_completion()
-        assert status["complete"] is False
+            status = executor._validate_sop_completion()
+            assert status["complete"] is False
 
 
 class TestSOPIntegration:
@@ -640,9 +663,10 @@ class TestSOPIntegration:
             enable_sop=True,
         )
 
-        task = Mock()
+        task = Mock(spec=["type", "name", "description", "id", "sop_role"])
         task.id = "test"
         task.type = TaskType.RESEARCH
+        task.sop_role = None
 
         role = layer._detect_role(task)
         assert role == "researcher"
@@ -657,15 +681,16 @@ class TestSOPIntegration:
             enable_sop=True,
         )
 
-        task = Mock()
+        task = Mock(spec=["type", "name", "description", "id", "sop_role", "priority"])
         task.id = "test_task"
         task.type = None
         task.name = "Write code"
         task.description = "Test"
         task.priority = None
+        task.sop_role = None
 
         layer._start_sop_tracking(task)
         summary = layer._get_sop_summary()
 
         assert "sop_enabled" in summary
-        assert summary["role"] == "Code Generator"
+        assert summary.get("role") == "Code Generator"

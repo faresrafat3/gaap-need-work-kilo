@@ -1,47 +1,32 @@
 {
-  "profiles": {
-    "default_coder": {
-      "name": "Coder",
-      "specialization": "PYTHON",
-      "guild": null,
-      "total_tasks": 0,
-      "reputation_scores": {}
-    },
-    "default_critic": {
-      "name": "Critic",
-      "specialization": "SECURITY",
-      "guild": null,
-      "total_tasks": 0,
-      "reputation_scores": {}
-    },
-    "default_researcher": {
-      "name": "Researcher",
-      "specialization": "RESEARCH",
-      "guild": null,
-      "total_tasks": 0,
-      "reputation_scores": {}
-    },
-    "custom_coder_001": {
-      "name": "Coder",
-      "specialization": "PYTHON",
-      "guild": null,
-      "total_tasks": 0,
-      "reputation_scores": {}
-    },
-    "agent_1": {
-      "name": "Coder",
-      "specialization": "PYTHON",
-      "guild": null,
-      "total_tasks": 0,
-      "reputation_scores": {}
-    },
-    "agent_2": {
-      "name": "Critic",
-      "specialization": "SECURITY",
-      "guild": null,
-      "total_tasks": 0,
-      "reputation_scores": {}
+  "version": "2.0",
+  "updated_at": "2026-02-25T16:02:16.309510",
+  "entries": {
+    "coder_01": {
+      "fractal_id": "coder_01",
+      "domains": {
+        "python": {
+          "domain": "python",
+          "successes": 85,
+          "failures": 0,
+          "predicted_failures": 0,
+          "total_tasks": 85,
+          "score": 1.0,
+          "adjusted_score": 1.0,
+          "confidence": 1.0,
+          "last_updated": "2026-02-25T16:02:16.309502"
+        }
+      },
+      "overall_score": 1.0,
+      "reliability": 0.5,
+      "created_at": "2026-02-25T16:02:16.308225",
+      "last_active": "2026-02-25T16:02:16.309503",
+      "specializations": [],
+      "preferred_domains": []
     }
   },
-  "guilds": {}
+  "auction_stats": {
+    "participated": {},
+    "total": {}
+  }
 }

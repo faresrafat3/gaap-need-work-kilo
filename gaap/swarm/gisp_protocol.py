@@ -529,7 +529,7 @@ def parse_message(data: dict[str, Any]) -> GISPMessage:
     """
     msg_type = data.get("message_type", "")
 
-    message_classes = {
+    message_classes: dict[str, type[GISPMessage]] = {
         "TASK_AUCTION": TaskAuction,
         "TASK_BID": TaskBid,
         "TASK_AWARD": TaskAward,

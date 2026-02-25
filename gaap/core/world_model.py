@@ -82,7 +82,7 @@ class WorldModel:
         self._enable_llm = enable_llm_prediction and provider is not None
 
         if VECTOR_MEMORY_AVAILABLE:
-            self._lesson_store = lesson_store or LessonStore()
+            self._lesson_store: LessonStore | None = lesson_store or LessonStore()
         else:
             self._lesson_store = None
 
@@ -253,7 +253,7 @@ Parameters: {action.parameters}{context_str}{similar_str}"""
                 json_start = content.find("{")
                 json_end = content.rfind("}") + 1
                 if json_start >= 0 and json_end > json_start:
-                    return json.loads(content[json_start:json_end])
+                    return json.loads(content[json_start:json_end])  # type: ignore[no-any-return]
         except Exception as e:
             self._logger.debug(f"LLM prediction failed: {e}")
 

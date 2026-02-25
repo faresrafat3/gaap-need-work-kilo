@@ -431,6 +431,70 @@ __all__.extend(
     ]
 )
 
+# Dynamic Persona Engine
+from gaap.core.persona import (
+    Persona,
+    PersonaRegistry,
+    PersonaSwitcher,
+    PersonaTier,
+)
+
+__all__.extend(
+    [
+        "Persona",
+        "PersonaRegistry",
+        "PersonaSwitcher",
+        "PersonaTier",
+    ]
+)
+
+# Semantic Distiller
+from gaap.core.semantic_distiller import (
+    SemanticDistiller,
+    SemanticMatrix,
+)
+
+__all__.extend(
+    [
+        "SemanticDistiller",
+        "SemanticMatrix",
+    ]
+)
+
+# Contrastive Reasoning
+from gaap.core.contrastive import (
+    ContrastivePath,
+    ContrastiveReasoner,
+    ContrastiveResult,
+)
+
+__all__.extend(
+    [
+        "ContrastivePath",
+        "ContrastiveReasoner",
+        "ContrastiveResult",
+    ]
+)
+
+# Semantic Pressure
+from gaap.core.semantic_pressure import (
+    Constraint,
+    ConstraintSeverity,
+    ConstraintViolation,
+    SemanticConstraints,
+    create_semantic_constraints,
+)
+
+__all__.extend(
+    [
+        "Constraint",
+        "ConstraintSeverity",
+        "ConstraintViolation",
+        "SemanticConstraints",
+        "create_semantic_constraints",
+    ]
+)
+
 # Real-Time Reflection
 from gaap.core.reflection import (
     ExecutionSummary,
@@ -453,7 +517,7 @@ __all__.extend(
 
 # SOP Governance
 from gaap.core.governance import (
-    Artifact,
+    Artifact as GovernanceArtifact,
     ArtifactStatus,
     RoleDefinition,
     SOPExecution,
@@ -468,7 +532,7 @@ from gaap.core.governance import (
 __all__.extend(
     [
         # Governance
-        "Artifact",
+        "GovernanceArtifact",
         "ArtifactStatus",
         "RoleDefinition",
         "SOPExecution",
@@ -478,5 +542,61 @@ __all__.extend(
         "SOPStore",
         "create_sop_gatekeeper",
         "create_sop_store",
+    ]
+)
+
+# Declarative Signatures (DSPy-inspired)
+from gaap.core.signatures import (
+    Example,
+    ExecutionTrace,
+    FieldType,
+    Module,
+    ModuleRegistry,
+    OptimizationResult,
+    Signature,
+    SignatureField,
+    Teleprompter,
+    get_registry,
+)
+
+__all__.extend(
+    [
+        # Signatures
+        "FieldType",
+        "SignatureField",
+        "Signature",
+        "Example",
+        "Teleprompter",
+        "OptimizationResult",
+        "Module",
+        "ExecutionTrace",
+        "ModuleRegistry",
+        "get_registry",
+    ]
+)
+
+# Artifact System (MetaGPT-inspired)
+from gaap.core.artifacts import (
+    Artifact,
+    ArtifactBuilder,
+    ArtifactLink,
+    ArtifactMetadata,
+    ArtifactRegistry,
+    ArtifactStatus as ArtifactStatusType,
+    ArtifactType,
+    create_artifact_registry,
+)
+
+__all__.extend(
+    [
+        # Artifacts
+        "ArtifactType",
+        "ArtifactStatusType",
+        "ArtifactMetadata",
+        "Artifact",
+        "ArtifactLink",
+        "ArtifactBuilder",
+        "ArtifactRegistry",
+        "create_artifact_registry",
     ]
 )

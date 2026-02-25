@@ -7,6 +7,20 @@ from .kilo_gateway import KiloGatewayProvider
 from .kilo_multi_account import KiloMultiAccountProvider
 from .unified_gaap_provider import UnifiedGAAPProvider
 
+# Spec 38: Async & Native Streaming
+from .async_session import AsyncSessionManager, AsyncSessionPool
+from .streaming import NativeStreamer, StreamConfig, StreamProtocol, TokenChunk
+from .prompt_caching import PromptCache, CacheConfig
+from .tool_calling import (
+    ToolRegistry,
+    ToolDefinition,
+    ToolCall,
+    ToolResult,
+    ParameterSchema,
+    tool,
+    create_tool_from_function,
+)
+
 
 def get_provider(name: str, **kwargs: Any) -> Any:
     """Get provider by name"""
@@ -32,4 +46,20 @@ __all__ = [
     "KiloGatewayProvider",
     "KiloMultiAccountProvider",
     "get_provider",
+    # Spec 38
+    "AsyncSessionManager",
+    "AsyncSessionPool",
+    "NativeStreamer",
+    "StreamConfig",
+    "StreamProtocol",
+    "TokenChunk",
+    "PromptCache",
+    "CacheConfig",
+    "ToolRegistry",
+    "ToolDefinition",
+    "ToolCall",
+    "ToolResult",
+    "ParameterSchema",
+    "tool",
+    "create_tool_from_function",
 ]

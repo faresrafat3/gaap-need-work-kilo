@@ -22,17 +22,48 @@ Pre-flight Checks:
 DLP (Data Loss Prevention):
     - DLPScanner: Sensitive data detection
     - Pattern matching for PII, secrets
+    - Entropy-based detection
+
+Audit Logger:
+    - AuditLogger: Persistent audit trail
+    - Hash chain verification
+    - Automatic rotation
 
 Usage:
-    from gaap.security import PromptFirewall, DockerSandbox
+    from gaap.security import PromptFirewall, DockerSandbox, DLPScanner, AuditLogger
 
     firewall = PromptFirewall(strictness="high")
     result = firewall.scan(user_input)
+
+    dlp = DLPScanner()
+    safe_output = dlp.scan_and_redact(output)
 """
 
 from typing import TYPE_CHECKING, Any, Protocol
 
 from .firewall import AuditTrail, CapabilityManager, FirewallResult, PromptFirewall, RiskLevel
+
+from .dlp import (
+    DLPScanner,
+    DLPScanResult,
+    DLPFinding,
+    LeakType,
+    create_dlp_scanner,
+)
+
+from .semantic_shield import (
+    SemanticShield,
+    ThreatCategory,
+    ThreatAssessment,
+    create_semantic_shield,
+)
+
+from .audit_logger import (
+    AuditLogger,
+    AuditLoggerConfig,
+    AuditLogEntry,
+    create_audit_logger,
+)
 
 # =============================================================================
 # Type Stubs for Optional Dependencies
@@ -115,4 +146,17 @@ __all__ = [
     "CheckSeverity",
     "BANNED_IMPORTS",
     "create_preflight_check",
+    "DLPScanner",
+    "DLPScanResult",
+    "DLPFinding",
+    "LeakType",
+    "create_dlp_scanner",
+    "SemanticShield",
+    "ThreatCategory",
+    "ThreatAssessment",
+    "create_semantic_shield",
+    "AuditLogger",
+    "AuditLoggerConfig",
+    "AuditLogEntry",
+    "create_audit_logger",
 ]

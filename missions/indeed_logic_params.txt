@@ -1,0 +1,27 @@
+# Indeed Logic Vulnerability Parameters (Sovereign List)
+# Use these with Burp Suite or Manual Tampering
+
+INDEED_SENSITIVE_PARAMS = {
+    "billing": [
+        "invoiceId", "billingId", "account_number", "statement_id", 
+        "payment_method_token", "amount", "currency"
+    ],
+    "hiring": [
+        "job_id", "posting_key", "employer_id", "recruiter_id",
+        "company_id", "campaign_id"
+    ],
+    "credits": [
+        "credit_amount", "discount_code", "promo_id", "balance_adjustment",
+        "points_to_redeem"
+    ],
+    "resume_search": [
+        "resume_id", "unlock_token", "view_count", "subscription_tier",
+        "limit_override"
+    ]
+}
+
+# TESTING STRATEGY:
+# 1. Replace your own 'employer_id' with a similar number (+1 or -1) to check for IDOR.
+# 2. Change 'amount' from positive to negative (e.g., -100) during checkout.
+# 3. Use 'admin=true' or 'is_internal=true' in API requests.
+# 4. Try applying the same 'promo_id' multiple times in separate parallel threads.

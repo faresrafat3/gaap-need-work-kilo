@@ -1,0 +1,24 @@
+{
+  "target": "Indeed.com",
+  "platform": "Bugcrowd",
+  "scope": [
+    "*.indeed.com",
+    "*.indeed.jobs",
+    "indeed.secure.force.com"
+  ],
+  "forbidden": [
+    "thirdparty.indeed.com"
+  ],
+  "focus_areas": [
+    "Information Disclosure",
+    "IDOR in Employer Dashboards",
+    "Prompt Injection in AI Search",
+    "Cloud Misconfigurations"
+  ],
+  "vrt_mapping": {
+    "P1": "Remote Code Execution",
+    "P2": "Significant Data Leak",
+    "P3": "Broken Authentication"
+  },
+  "tactical_instructions": "Focus on subdomains returned by STORM research. Use indeed_scanner tool for automated fingerprinting."
+}

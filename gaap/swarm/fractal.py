@@ -191,7 +191,7 @@ class FractalAgent:
     @property
     def current_load(self) -> float:
         """التحميل الحالي (0.0 to 1.0)"""
-        return len(self._active_tasks) / self._max_concurrent_tasks
+        return float(len(self._active_tasks)) / float(self._max_concurrent_tasks)
 
     async def announce_capabilities(self) -> CapabilityAnnounce:
         """

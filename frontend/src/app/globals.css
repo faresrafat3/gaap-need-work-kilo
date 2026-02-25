@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground: #ffffff;
+  --background: #0a0a0f;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4a0e78;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5a1e88;
+}
+
+/* Glow effects */
+.glow-layer1 {
+  box-shadow: 0 0 15px rgba(74, 14, 120, 0.5);
+}
+
+.glow-layer2 {
+  box-shadow: 0 0 15px rgba(13, 71, 161, 0.5);
+}
+
+.glow-layer3 {
+  box-shadow: 0 0 15px rgba(46, 125, 50, 0.5);
+}
+
+.glow-healing {
+  box-shadow: 0 0 15px rgba(230, 81, 0, 0.5);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}

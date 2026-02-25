@@ -8,14 +8,14 @@ from gaap.core.types import (
     ProviderType,
 )
 from gaap.providers.base_provider import BaseProvider, register_provider
-from gaap.providers.chat_based.g4f_provider import G4FProvider # Sovereign Replacement
+from gaap.providers.chat_based.g4f_provider import G4FProvider  # Sovereign Replacement
 
 
 @register_provider("unified_gaap")
 class UnifiedGAAPProvider(BaseProvider):
     """
     Sovereign Unified Provider
-    
+
     Acts as a high-level facade for the best available free-tier models (G4F).
     """
 
@@ -46,10 +46,25 @@ class UnifiedGAAPProvider(BaseProvider):
         self._logger.info(f"UnifiedGAAPProvider initialized (Backend: G4F)")
 
     async def chat_completion(
-        self, messages: list[Message], model: str | None = None, **kwargs: Any
+        self,
+        messages: list[Message],
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        top_p: float = 1.0,
+        stop: list[str] | None = None,
+        **kwargs: Any,
     ) -> Any:
         """Forward to backend"""
-        return await self._backend.chat_completion(messages, model, **kwargs)
+        return await self._backend.chat_completion(
+            messages,
+            model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=top_p,
+            stop=stop,
+            **kwargs,
+        )
 
     async def _make_request(
         self, messages: list[Message], model: str, **kwargs: Any

@@ -391,24 +391,13 @@ class JSONFormatter(logging.Formatter):
 
 @lru_cache(maxsize=MAX_CACHE_SIZE)
 def get_logger(name: str, level: int | None = None) -> GAAPLogger:
-    """
-    Get or create a logger instance.
-
-    Uses LRU cache for efficient logger retrieval.
-
-    Args:
-        name: Logger name (typically __name__ of calling module)
-        level: Optional log level override (default: from GAAP_LOG_LEVEL env)
-
-    Returns:
-        Configured GAAPLogger instance
-
-    Example:
-        >>> logger = get_logger("gaap.provider.groq")
-        >>> logger.info("Request processed", tokens=100, latency_ms=250)
-    """
-    log_level = level or getattr(
-        logging, os.getenv("GAAP_LOG_LEVEL", "INFO").upper(), DEFAULT_LOG_LEVEL
+    env_level = getattr(logging, os.getenv("GAAP_LOG_LEVEL", "INFO").upper(), DEFAULT_LOG_LEVEL)
+    log_level = (
+        level
+        if level is not None
+        else int(env_level)
+        if isinstance(env_level, int)
+        else DEFAULT_LOG_LEVEL
     )
     json_format = os.getenv("GAAP_LOG_FORMAT", DEFAULT_LOG_FORMAT) == "json"
 
@@ -516,7 +505,14 @@ def get_standard_logger(name: str, level: int | None = None) -> logging.Logger:
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-    log_level = level or getattr(logging, os.getenv("GAAP_LOG_LEVEL", "INFO").upper(), logging.INFO)
+    env_level = getattr(logging, os.getenv("GAAP_LOG_LEVEL", "INFO").upper(), logging.INFO)
+    log_level = (
+        level
+        if level is not None
+        else int(env_level)
+        if isinstance(env_level, int)
+        else logging.INFO
+    )
     logger.setLevel(log_level)
 
     return logger

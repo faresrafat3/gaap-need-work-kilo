@@ -7,10 +7,16 @@ This guide covers setting up a development environment and contributing to GAAP.
 1. [Prerequisites](#prerequisites)
 2. [Setup](#setup)
 3. [Project Structure](#project-structure)
-4. [Code Style](#code-style)
-5. [Testing](#testing)
-6. [Debugging](#debugging)
-7. [Documentation](#documentation)
+4. [Frontend Development](#frontend-development)
+5. [Code Style](#code-style)
+6. [Testing](#testing)
+7. [Running the Full Stack](#running-the-full-stack)
+8. [Common Tasks](#common-tasks)
+9. [Debugging](#debugging)
+10. [Documentation](#documentation)
+11. [Troubleshooting](#troubleshooting)
+12. [Code Quality Standards](#code-quality-standards)
+13. [Resources](#resources)
 
 ---
 
@@ -20,6 +26,12 @@ This guide covers setting up a development environment and contributing to GAAP.
 - **pip** or **uv** package manager
 - **Git**
 - **Make** (optional, for shortcuts)
+
+### Frontend Prerequisites
+
+- **Node.js 18+**
+- **npm** or **yarn**
+- **Modern browser**
 
 ---
 
@@ -52,6 +64,14 @@ pip install streamlit pandas plotly
 
 # Setup pre-commit hooks
 pre-commit install
+```
+
+### Frontend Setup
+
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
 ### Environment Variables
@@ -133,6 +153,19 @@ gaap/
 +-- validators/             # Code validators
 +-- mad/                    # Multi-Agent Debate
 +-- meta_learning/          # Meta-learning
+
+frontend/
++-- src/
+    +-- app/              # 10 Next.js pages
+    +-- components/
+        +-- common/       # 17 reusable components
+        +-- dashboard/    # Dashboard widgets
+        +-- layout/       # Header, Sidebar
+        +-- ooda/         # OODA visualization
+        +-- steering/     # Steering controls
+    +-- stores/           # 5 Zustand stores
+    +-- hooks/            # 3 custom hooks
+    +-- lib/              # API client, types
 ```
 
 ---
@@ -228,6 +261,55 @@ MODEL_COSTS: Final[dict[str, float]] = {
 
 ---
 
+## Frontend Development
+
+### Code Style
+
+- **ESLint** for linting
+- **Prettier** for formatting
+- **TypeScript** strict mode enabled
+
+```bash
+cd frontend
+npm run lint
+npm run format
+npm run typecheck
+```
+
+### Component Development
+
+Components are organized by domain:
+- `common/` - Reusable UI components (buttons, inputs, modals)
+- `dashboard/` - Dashboard-specific widgets
+- `layout/` - Header, Sidebar, and navigation
+- `ooda/` - OODA loop visualization components
+- `steering/` - Steering control components
+
+### State Management
+
+State is managed using **Zustand** stores located in `src/stores/`:
+- `useTaskStore` - Task management state
+- `useUIStore` - UI state (sidebar, modals)
+- `useSettingsStore` - User preferences
+- `useWebSocketStore` - Real-time connection state
+- `useAuthStore` - Authentication state
+
+### API Integration
+
+- **React Query** for server state and caching
+- **WebSocket** for real-time updates
+
+```typescript
+const { data, isLoading } = useQuery({
+  queryKey: ['tasks'],
+  queryFn: fetchTasks,
+});
+
+const socket = useWebSocket('/ws/tasks');
+```
+
+---
+
 ## Testing
 
 ### Running Tests
@@ -317,6 +399,26 @@ Available in `conftest.py`:
 - `mock_memory` - Mock memory
 - `healing_context` - Healing test context
 - `safe_input` / `malicious_input` - Security test inputs
+
+### Frontend Testing
+
+```bash
+cd frontend
+
+# Unit tests
+npm test
+
+# E2E tests
+npm run test:e2e
+
+# Coverage report
+npm run test:coverage
+```
+
+**Testing Stack:**
+- **Jest** for unit tests
+- **React Testing Library** for component tests
+- **Playwright** for E2E tests
 
 ---
 
@@ -430,6 +532,28 @@ async def process_task(
 
 ---
 
+## Running the Full Stack
+
+### Backend
+
+```bash
+uvicorn gaap.api.main:app --reload
+```
+
+### Frontend
+
+```bash
+cd frontend && npm run dev
+```
+
+### Access
+
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+
+---
+
 ## Common Tasks
 
 ### Adding a New Provider
@@ -456,6 +580,34 @@ async def process_task(
 4. Integrate in `GAAPEngine`
 5. Add tests
 6. Update architecture docs
+
+### Adding a New Page (Frontend)
+
+1. Create page file in `frontend/src/app/`
+2. Add route configuration if needed
+3. Create associated components
+4. Add tests
+
+### Adding a New Component (Frontend)
+
+1. Create component in appropriate directory under `src/components/`
+2. Export from barrel file (`index.ts`)
+3. Add TypeScript types for props
+4. Add tests
+
+### Adding a New Store (Frontend)
+
+1. Create store file in `frontend/src/stores/`
+2. Define state interface
+3. Implement actions and selectors
+4. Export from `stores/index.ts`
+
+### Adding a New API Endpoint (Frontend)
+
+1. Add API function in `frontend/src/lib/api.ts`
+2. Add types in `frontend/src/lib/types.ts`
+3. Create React Query hook if needed
+4. Add error handling
 
 ---
 
@@ -512,6 +664,56 @@ pre-commit run --all-files
 
 # Skip pre-commit (not recommended)
 git commit --no-verify
+```
+
+### Frontend Troubleshooting
+
+#### Node Module Issues
+
+```bash
+# Clear cache and reinstall
+cd frontend
+rm -rf node_modules package-lock.json
+npm install
+```
+
+#### Type Errors
+
+```bash
+# Check TypeScript errors
+npm run typecheck
+
+# Regenerate types if API changed
+npm run generate:types
+```
+
+#### Build Errors
+
+```bash
+# Clear Next.js cache
+rm -rf .next
+npm run build
+```
+
+#### WebSocket Connection Issues
+
+```bash
+# Check backend is running
+curl http://localhost:8000/health
+
+# Check WebSocket endpoint
+wscat -c ws://localhost:8000/ws
+```
+
+#### Hot Reload Not Working
+
+```bash
+# Restart dev server
+npm run dev
+
+# Check for file watcher limits (Linux)
+echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
 ```
 
 ---
@@ -647,6 +849,72 @@ Before submitting a PR, ensure:
 - [ ] Tests pass: `pytest tests/`
 - [ ] Linting passes: `ruff check gaap/`
 - [ ] Type check passes: `mypy gaap/`
+
+### Frontend Quality Standards
+
+#### TypeScript Strict Mode
+
+All TypeScript code must pass strict mode checks:
+
+```typescript
+{
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true
+  }
+}
+```
+
+#### Component Props Typing
+
+All component props must be explicitly typed:
+
+```typescript
+interface ButtonProps {
+  label: string;
+  onClick: () => void;
+  variant?: 'primary' | 'secondary';
+  disabled?: boolean;
+}
+
+export const Button: React.FC<ButtonProps> = ({
+  label,
+  onClick,
+  variant = 'primary',
+  disabled = false,
+}) => {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`btn btn-${variant}`}
+    >
+      {label}
+    </button>
+  );
+};
+```
+
+#### Accessibility Requirements
+
+All components must meet WCAG 2.1 AA standards:
+- All interactive elements must be keyboard accessible
+- Images must have alt text
+- Forms must have proper labels
+- Color contrast must meet minimum ratios
+- Focus states must be visible
+
+### Frontend Quality Checklist
+
+Before submitting a PR, ensure:
+
+- [ ] TypeScript compiles without errors
+- [ ] ESLint passes: `npm run lint`
+- [ ] Components have proper prop types
+- [ ] Accessibility requirements met
+- [ ] Unit tests pass: `npm test`
+- [ ] No console errors in browser
 
 ---
 

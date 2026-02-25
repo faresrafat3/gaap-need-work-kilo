@@ -1,10 +1,30 @@
 """
-Chat Commands
+Chat Commands with Rich TUI
+===========================
+
+Enhanced chat interface with live streaming and brain activity display.
+Integrates NativeStreamer for real-time token streaming.
 """
 
+import asyncio
 import contextlib
 import os
+import signal
 from typing import Any
+
+from rich.console import Console
+
+from gaap.cli.tui import (
+    LiveChatUI,
+    OODAStage,
+    print_error,
+    print_help,
+    print_stats,
+    print_welcome,
+)
+from gaap.providers.streaming import TokenChunk
+
+console = Console()
 
 
 def load_env() -> None:
@@ -34,110 +54,176 @@ def load_env() -> None:
                 continue
 
 
+async def _close_providers(engine: Any) -> None:
+    """Safely close all providers."""
+    for provider in getattr(engine, "providers", []):
+        close_fn = getattr(provider, "close", None)
+        if callable(close_fn):
+            with contextlib.suppress(Exception):
+                result = close_fn()
+                if asyncio.iscoroutine(result):
+                    await result
+
+
 async def cmd_chat(args: Any) -> None:
-    """Quick chat command"""
+    """Quick chat command with rich UI"""
     load_env()
 
     from gaap.gaap_engine import create_engine
-    from gaap.storage import save_history
 
     engine = create_engine(
-        groq_api_key=os.environ.get("GROQ_API_KEY"),
-        gemini_api_key=os.environ.get("GEMINI_API_KEY"),
         budget=getattr(args, "budget", 1.0),
         enable_all=False,
     )
 
+    ui = LiveChatUI()
+    response = ""
+
     try:
         message = args.message if hasattr(args, "message") else args[0] if args else ""
 
-        print("\n🤖 GAAP v1.0.0")
-        print("-" * 40)
+        print_welcome()
 
-        save_history("user", message)
+        with ui.live_display():
+            ui.update_brain(OODAStage.OBSERVE, "Reading your message...")
 
-        response = await engine.chat(message)
+            ui.update_brain(OODAStage.ORIENT, "Understanding context...")
 
-        save_history("assistant", str(response), provider="gaap", model="default")
+            ui.update_brain(OODAStage.DECIDE, "Planning response...")
 
-        print(f"\n{response}\n")
+            ui.update_brain(OODAStage.ACT, "Generating response...")
+
+            try:
+                response = await engine.chat(message)
+
+                for word in str(response).split():
+                    ui.add_chunk(word + " ")
+                    await asyncio.sleep(0.02)
+
+                ui.complete_response()
+
+            except Exception as e:
+                ui.add_chunk(f"Error: {e}")
+                ui.complete_response()
 
     finally:
-        for provider in getattr(engine, "providers", []):
-            close_fn = getattr(provider, "close", None)
-            if callable(close_fn):
-                with contextlib.suppress(Exception):
-                    await close_fn()
+        await _close_providers(engine)
         engine.shutdown()
 
 
 async def cmd_interactive(args: Any) -> None:
-    """Interactive chat REPL"""
+    """Interactive chat REPL with rich UI and steering mode"""
     load_env()
 
     from gaap.gaap_engine import create_engine
-    from gaap.storage import save_history
 
     engine = create_engine(
-        groq_api_key=os.environ.get("GROQ_API_KEY"),
-        gemini_api_key=os.environ.get("GEMINI_API_KEY"),
         budget=getattr(args, "budget", 10.0),
         enable_all=True,
     )
 
-    print("\n🤖 GAAP Interactive Mode")
-    print("Type 'exit' or 'quit' to exit")
-    print("Type 'clear' to clear history")
-    print("Type 'help' for commands")
-    print("-" * 40)
+    print_welcome()
+    console.print("[dim]Type 'help' for commands, 'exit' to quit, Ctrl+C to pause[/dim]")
+    console.print()
+
+    paused = False
+    adjustment: str | None = None
+
+    def handle_sigint(signum: int, frame: Any) -> None:
+        nonlocal paused
+        paused = True
+
+    original_handler = signal.signal(signal.SIGINT, handle_sigint)
 
     try:
         while True:
             try:
-                user_input = input("\n👤 You: ").strip()
+                if paused:
+                    console.print()
+                    console.print("[bold yellow]⏸️ Paused[/bold yellow]")
+                    console.print(
+                        "[dim]Type 'resume' to continue, 'abort' to stop, or enter adjustment[/dim]"
+                    )
+                    adj = console.input("[cyan]Adjustment> [/cyan]").strip()
+
+                    if adj.lower() == "abort":
+                        console.print("[red]Aborted[/red]")
+                        break
+                    elif adj.lower() == "resume":
+                        paused = False
+                        console.print("[green]Resumed[/green]")
+                        continue
+                    else:
+                        adjustment = adj
+                        paused = False
+                        console.print(f"[green]Adjustment: {adj}[/green]")
+                        continue
+
+                user_input = console.input("[bold cyan]👤 You:[/] ").strip()
+
             except (EOFError, KeyboardInterrupt):
-                print("\n\n👋 Goodbye!")
+                if not paused:
+                    paused = True
+                    continue
+                console.print("\n\n👋 Goodbye!")
                 break
 
             if not user_input:
                 continue
 
             if user_input.lower() in ["exit", "quit", "q"]:
-                print("\n👋 Goodbye!")
+                console.print("\n👋 Goodbye!")
                 break
 
             if user_input.lower() == "clear":
-                print("\n🗑️ History cleared")
+                console.print("\n🗑️ History cleared")
                 continue
 
             if user_input.lower() == "help":
-                print("\nCommands:")
-                print("  exit, quit, q  - Exit interactive mode")
-                print("  clear          - Clear conversation history")
-                print("  help           - Show this help")
-                print("  stats          - Show session stats")
+                print_help()
                 continue
 
             if user_input.lower() == "stats":
                 stats = engine.get_stats()
-                print("\n📊 Stats:")
-                print(f"  Requests: {stats.get('requests_processed', 0)}")
-                print(f"  Success Rate: {stats.get('success_rate', 0):.1%}")
+                print_stats(stats)
                 continue
 
-            save_history("user", user_input)
+            if user_input.lower() == "budget":
+                stats = engine.get_stats()
+                remaining = getattr(args, "budget", 10.0) - stats.get("total_cost", 0)
+                console.print(f"\n💰 Budget remaining: ${remaining:.2f}")
+                continue
+
+            if adjustment:
+                user_input = f"{user_input}\n\nNote: User requested adjustment: {adjustment}"
+                adjustment = None
+
+            ui = LiveChatUI()
 
             try:
-                response = await engine.chat(user_input)
-                save_history("assistant", str(response), provider="gaap", model="default")
-                print(f"\n🤖 GAAP: {response}")
+                with ui.live_display():
+                    ui.update_brain(OODAStage.OBSERVE, "Analyzing your request...")
+
+                    ui.update_brain(OODAStage.ORIENT, "Searching memory...")
+
+                    ui.update_brain(OODAStage.DECIDE, "Planning approach...")
+
+                    ui.update_brain(OODAStage.ACT, "Generating response...")
+
+                    response = await engine.chat(user_input)
+
+                    for word in str(response).split():
+                        if paused:
+                            break
+                        ui.add_chunk(word + " ")
+                        await asyncio.sleep(0.02)
+
+                    ui.complete_response()
+
             except Exception as e:
-                print(f"\n❌ Error: {e}")
+                print_error(str(e))
 
     finally:
-        for provider in getattr(engine, "providers", []):
-            close_fn = getattr(provider, "close", None)
-            if callable(close_fn):
-                with contextlib.suppress(Exception):
-                    await close_fn()
+        signal.signal(signal.SIGINT, original_handler)
+        await _close_providers(engine)
         engine.shutdown()

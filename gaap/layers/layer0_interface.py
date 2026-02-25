@@ -130,6 +130,15 @@ class StructuredIntent:
     # المetadata
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    # NEW: Metacognition fields
+    confidence_assessment: dict[str, Any] | None = None
+    knowledge_gaps: list[str] = field(default_factory=list)
+    research_required: bool = False
+    research_topics: list[str] = field(default_factory=list)
+    epistemic_humility_score: float = 0.0
+    novelty_score: float = 0.0
+    caution_mode: bool = False
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "request_id": self.request_id,
@@ -140,6 +149,9 @@ class StructuredIntent:
             "explicit_goals": self.explicit_goals,
             "constraints": self.constraints,
             "recommended_critics": self.recommended_critics,
+            "research_required": self.research_required,
+            "knowledge_gaps": self.knowledge_gaps,
+            "caution_mode": self.caution_mode,
         }
 
 
@@ -181,6 +193,8 @@ class Layer0Interface(BaseLayer):
         firewall_strictness: str = "high",
         enable_behavioral_analysis: bool = True,
         provider: BaseProvider | None = None,
+        episodic_store: Any | None = None,
+        enable_metacognition: bool = True,
     ) -> None:
         """
         Initialize Layer 0 interface.
@@ -189,6 +203,8 @@ class Layer0Interface(BaseLayer):
             firewall_strictness: Security strictness level (low/medium/high)
             enable_behavioral_analysis: Enable behavioral analysis flag
             provider: LLM Provider for intent analysis
+            episodic_store: Episodic memory store for confidence assessment
+            enable_metacognition: Enable metacognition and confidence assessment
         """
         super().__init__(LayerType.INTERFACE)
 
@@ -197,12 +213,26 @@ class Layer0Interface(BaseLayer):
         self.provider = provider
 
         self._enable_behavioral = enable_behavioral_analysis
+        self._enable_metacognition = enable_metacognition
         self._logger = get_logger("gaap.layer0")
 
         # Statistics
         self._requests_processed = 0
         self._requests_blocked = 0
         self._intent_distribution: dict[str, int] = {}
+
+        # NEW: Metacognition components
+        self._knowledge_map: "KnowledgeMap | None" = None
+        self._confidence_scorer: "ConfidenceScorer | None" = None
+        if enable_metacognition:
+            from gaap.core.confidence_scorer import ConfidenceScorer
+            from gaap.core.knowledge_map import KnowledgeMap
+
+            self._knowledge_map = KnowledgeMap()
+            self._confidence_scorer = ConfidenceScorer(
+                episodic_store=episodic_store,
+                knowledge_map=self._knowledge_map,
+            )
 
     async def _analyze_intent_llm(self, text: str) -> dict[str, Any]:
         """Analyze intent using LLM provider."""
@@ -249,13 +279,15 @@ Return ONLY valid JSON.
                 Message(role=MessageRole.SYSTEM, content=system_prompt.strip()),
                 Message(role=MessageRole.USER, content=text),
             ]
-            raw = await self.provider.generate_response(messages=messages)
+            model = getattr(self.provider, "default_model", None) or "llama-3.3-70b-versatile"
+            response = await self.provider.chat_completion(messages=messages, model=model)
+            raw = response.choices[0].message.content if response.choices else ""
             # extract json block
             matches = re.findall(r"```(?:json)?\s*({.*})\s*```", raw, re.DOTALL)
             if matches:
-                return json.loads(matches[0])
+                return json.loads(matches[0])  # type: ignore[no-any-return]
             else:
-                return json.loads(raw)
+                return json.loads(raw)  # type: ignore[no-any-return]
         except Exception as e:
             self._logger.error(f"Failed to analyze intent via LLM: {e}")
             return default_res
@@ -364,14 +396,49 @@ Return ONLY valid JSON.
 
         structured.metadata["complexity"] = complexity.name
 
-        # 5. Determine routing
-        routing_target, routing_reason = self._determine_routing(
-            structured.intent_type, complexity, structured.confidence, text
-        )
+        # 5. NEW: Metacognition - Confidence Assessment
+        if self._enable_metacognition and self._confidence_scorer:
+            assessment = await self._confidence_scorer.assess(text, structured.intent_type.name)
+
+            structured.confidence_assessment = assessment.to_dict()
+            structured.knowledge_gaps = assessment.knowledge_gaps
+            structured.novelty_score = assessment.novelty_score
+            structured.epistemic_humility_score = assessment.epistemic_humility
+
+            if assessment.needs_research():
+                structured.research_required = True
+                structured.research_topics = assessment.research_topics
+                self._logger.info(
+                    f"Research required for task: {assessment.confidence.score:.0%} confidence, "
+                    f"gaps: {assessment.knowledge_gaps[:3]}"
+                )
+            elif assessment.needs_caution():
+                structured.caution_mode = True
+                structured.metadata["twin_verification"] = "increased"
+                self._logger.info(
+                    f"Caution mode enabled: {assessment.confidence.score:.0%} confidence"
+                )
+
+        # 6. Determine routing (enhanced with confidence)
+        if structured.research_required:
+            routing_target = RoutingTarget.TACTICAL
+            routing_reason = (
+                f"Low confidence ({structured.confidence_assessment['confidence']['score']:.0%}) - research required"
+                if structured.confidence_assessment
+                else "Research required"
+            )
+        else:
+            routing_target, routing_reason = self._determine_routing(
+                structured.intent_type, complexity, structured.confidence, text
+            )
+
+        if structured.caution_mode:
+            routing_reason += " (caution mode)"
+
         structured.routing_target = routing_target
         structured.routing_reason = routing_reason
 
-        # 6. Recommend critics
+        # 7. Recommend critics
         structured.recommended_critics = self._recommend_critics(
             structured.intent_type, structured.implicit_requirements, structured.constraints
         )

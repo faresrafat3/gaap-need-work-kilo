@@ -1,4 +1,12 @@
-# GAAP Engine - OODA Loop Implementation
+# GAAP Engine - OODA Loop Implementation (Evolution 2026)
+"""
+Enhanced OODA Loop with:
+- Constitutional Gatekeeper: Blocks INVARIANT violations
+- Dynamic Few-Shot Injection: Fetches examples from VectorMemory
+- Lessons Injection: Passes lessons to task context
+- Enhanced Back-propagation: AXIOM_VIOLATION triggers replanning
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -22,13 +30,14 @@ from gaap.providers.unified_gaap_provider import UnifiedGAAPProvider
 from gaap.routing.fallback import FallbackManager
 from gaap.routing.router import RoutingStrategy, SmartRouter
 from gaap.security.firewall import AuditTrail, PromptFirewall
-from gaap.security.dlp import DLPScanner  # v2 Feature
-from gaap.core.observer import create_observer  # v2 Feature
+from gaap.security.dlp import DLPScanner
+from gaap.core.observer import create_observer
 from gaap.core.observability import Observability
 from gaap.core.governance import SOPGatekeeper
+from gaap.core.exceptions import AxiomViolationError
 
 if TYPE_CHECKING:
-    from gaap.core.axioms import AxiomValidator
+    from gaap.core.axioms import AxiomValidator, AxiomCheckResult
     from gaap.core.observer import EnvironmentState
 
 
@@ -444,7 +453,15 @@ class GAAPEngine:
     async def _orient_replan(
         self, ooda: OODAState, state: EnvironmentState, graph: TaskGraph, response: GAAPResponse
     ) -> None:
-        """OODA Phase: Orient - إعادة التخطيط"""
+        """
+        OODA Phase: Orient - Enhanced Back-propagation
+
+        Evolution 2026:
+        - Handles L3_CRITICAL_FAILURE (existing)
+        - Handles AXIOM_VIOLATION (new) - strategic replanning
+        - Handles RESOURCE_EXHAUSTED (existing)
+        - Handles GOAL_DRIFT (new) - realignment
+        """
         ooda.current_phase = OODAPhase.ORIENT
 
         trigger = state.replan_trigger
@@ -466,9 +483,35 @@ class GAAPEngine:
                     f"[OODA] Replanned: new spec, new graph with {new_graph.total_tasks} tasks"
                 )
 
+        elif trigger == ReplanTrigger.AXIOM_VIOLATION:
+            self._logger.warning(f"[OODA] Constitutional violations detected - adjusting strategy")
+
+            if response.architecture_spec and response.intent:
+                violated_axioms = set(v.get("axiom", "unknown") for v in ooda.axiom_violations)
+
+                self._logger.info(
+                    f"[OODA] Violated axioms: {violated_axioms} - requesting alternative approach"
+                )
+
+                response.intent.metadata["avoid_axiom_violations"] = list(violated_axioms)
+
+                new_spec = await self.layer1.process(response.intent)
+                response.architecture_spec = new_spec
+
+                new_graph = await self.layer2.process(new_spec)
+                response.task_graph = new_graph
+
+                ooda.axiom_violations.clear()
+
         elif trigger == ReplanTrigger.RESOURCE_EXHAUSTED:
             gc.collect()
             await asyncio.sleep(3)
+
+        elif trigger == ReplanTrigger.GOAL_DRIFT:
+            self._logger.warning("[OODA] Goal drift detected - realigning")
+            if response.intent:
+                response.architecture_spec = await self.layer1.process(response.intent)
+                response.task_graph = await self.layer2.process(response.architecture_spec)
 
         ooda.needs_replanning = False
 
@@ -506,35 +549,149 @@ class GAAPEngine:
     async def _act_phase(
         self, task: AtomicTask, ooda: OODAState, response: GAAPResponse
     ) -> ExecutionResult:
-        """OODA Phase: Act"""
+        """
+        OODA Phase: Act - Execute with Constitutional Enforcement
+
+        Evolution 2026:
+        - Fetches few-shot examples from VectorMemory
+        - Injects lessons learned into task context
+        - Blocks execution on INVARIANT axiom violations
+        - Triggers replanning on repeated violations
+        """
         ooda.current_phase = OODAPhase.ACT
 
         self._logger.info(f"[OODA] Executing task {task.id}")
 
         self._memory_guard.check(context=f"before task {task.id}")
 
+        enriched_task = await self._enrich_task_context(task, ooda)
+
         result: ExecutionResult
 
         if self.healing_system:
-            result = await self._execute_with_healing(task)
+            result = await self._execute_with_healing(enriched_task)
         else:
-            result = await self.layer3.process(task)
+            result = await self.layer3.process(enriched_task)
 
-        if result.success and self.axiom_validator:
-            axiom_results = self.axiom_validator.validate(
-                code=result.output if isinstance(result.output, str) else None,
-                task_id=task.id,
-            )
-
-            violations = [r for r in axiom_results if not r.passed]
-            for violation in violations:
-                ooda.record_axiom_violation(violation.to_dict())
-                self._logger.warning(
-                    f"[OODA] Axiom violation: {violation.axiom_name} - {violation.message}"
-                )
+        if self.axiom_validator:
+            result = self._enforce_axioms(result, task, ooda, response)
 
         response.execution_results.append(result)
         ooda.in_progress_tasks.discard(task.id)
+
+        return result
+
+    async def _enrich_task_context(self, task: AtomicTask, ooda: OODAState) -> AtomicTask:
+        """
+        Enrich task context with few-shot examples and lessons.
+
+        Dynamic Few-Shot Injection (Spec 2.3):
+        - Fetches relevant examples from VectorMemory
+        - Injects lessons from previous iterations
+        """
+        enriched_metadata = dict(task.metadata) if task.metadata else {}
+
+        if self.memory:
+            try:
+                from gaap.memory import LessonStore
+
+                lesson_store = LessonStore()
+                lessons = lesson_store.retrieve_lessons(task.description, k=3)
+                if lessons:
+                    enriched_metadata["relevant_lessons"] = [
+                        lesson.content if hasattr(lesson, "content") else str(lesson)
+                        for lesson in lessons
+                    ]
+                    self._logger.info(f"[OODA] Injected {len(lessons)} lessons for task {task.id}")
+            except Exception as e:
+                self._logger.warning(f"[OODA] Failed to enrich task context: {e}")
+
+        if ooda.lessons_learned:
+            enriched_metadata["session_lessons"] = ooda.lessons_learned[-5:]
+
+        return AtomicTask(
+            id=task.id,
+            name=task.name,
+            description=task.description,
+            category=task.category,
+            type=task.type,
+            priority=task.priority,
+            complexity=task.complexity,
+            constraints=task.constraints,
+            acceptance_criteria=task.acceptance_criteria,
+            dependencies=task.dependencies,
+            dependency_type=task.dependency_type,
+            estimated_tokens=task.estimated_tokens,
+            estimated_time_minutes=task.estimated_time_minutes,
+            estimated_cost_usd=task.estimated_cost_usd,
+            status=task.status,
+            result=task.result,
+            assigned_agent=task.assigned_agent,
+            retry_count=task.retry_count,
+            metadata=enriched_metadata,
+        )
+
+    def _enforce_axioms(
+        self,
+        result: ExecutionResult,
+        task: AtomicTask,
+        ooda: OODAState,
+        response: GAAPResponse,
+    ) -> ExecutionResult:
+        """
+        Constitutional Gatekeeper (Spec 2.2)
+
+        Enforces axiom validation:
+        - INVARIANT level violations BLOCK execution
+        - GUIDELINE violations trigger warnings
+        - Repeated violations trigger replanning
+        """
+        if not self.axiom_validator or not result.success:
+            return result
+
+        axiom_results = self.axiom_validator.validate(
+            code=result.output if isinstance(result.output, str) else None,
+            task_id=task.id,
+        )
+
+        violations = [r for r in axiom_results if not r.passed]
+
+        if not violations:
+            return result
+
+        from gaap.core.axioms import AxiomLevel
+
+        invariant_violations = []
+        for violation in violations:
+            ooda.record_axiom_violation(violation.to_dict())
+
+            axiom_info = self.axiom_validator.axioms.get(violation.axiom_name)
+            is_invariant = axiom_info and axiom_info.level == AxiomLevel.INVARIANT
+
+            self._logger.warning(
+                f"[OODA] Axiom violation: {violation.axiom_name} "
+                f"(level={'INVARIANT' if is_invariant else 'GUIDELINE'}) - {violation.message}"
+            )
+
+            if is_invariant:
+                invariant_violations.append(violation)
+
+        if invariant_violations:
+            response.axiom_violation_count += len(invariant_violations)
+
+            if len(ooda.axiom_violations) >= 3:
+                self._logger.error(
+                    f"[OODA] Multiple axiom violations detected - triggering replanning"
+                )
+                ooda.trigger_replan(ReplanTrigger.AXIOM_VIOLATION)
+
+            return ExecutionResult(
+                task_id=task.id,
+                success=False,
+                output=result.output,
+                error=f"Constitutional violation: {invariant_violations[0].message}",
+                quality_score=0.0,
+            )
 
         return result
 

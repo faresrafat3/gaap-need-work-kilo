@@ -106,8 +106,9 @@ class DreamProcessor:
                 self._logger.debug(f"Failed to process {log_file}: {e}")
 
         for lesson in lessons:
-            self._lesson_store.add_lesson(
+            self._lesson_store.store_lesson(
                 lesson=lesson,
+                context="dream_processor",
                 category="learned",
                 success=False,
             )
@@ -151,8 +152,9 @@ class DreamProcessor:
             if len(items) >= 3:
                 principle = self._synthesize_principle(items)
                 if principle:
-                    self._lesson_store.add_lesson(
+                    self._lesson_store.store_lesson(
                         lesson=f"PRINCIPLE: {principle}",
+                        context="dream_consolidation",
                         category=category,
                         success=True,
                     )

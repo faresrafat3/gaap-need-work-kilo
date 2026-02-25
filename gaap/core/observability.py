@@ -224,7 +224,7 @@ class Tracer:
 
             return noop_span()
 
-        return self._tracer.start_as_current_span(name, attributes=attributes, kind=kind)
+        return self._tracer.start_as_current_span(name, attributes=attributes, kind=kind)  # type: ignore[no-any-return]
 
     def record_exception(self, span: Any, exception: Exception) -> None:
         """Record an exception in a span"""

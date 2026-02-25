@@ -8,13 +8,13 @@ from gaap.cli.commands import (
     cmd_chat,
     cmd_config,
     cmd_doctor,
+    cmd_feedback,
     cmd_history,
     cmd_interactive,
     cmd_models,
     cmd_providers,
     cmd_status,
     cmd_version,
-
 )
 
 
@@ -110,7 +110,7 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("doctor", help="Run diagnostics")
 
     # --- New Sovereign Commands (v2.1) ---
-    
+
     # Research command
     research_p = subparsers.add_parser("research", help="Run Deep Research (STORM Augmented)")
     research_p.add_argument("query", help="Research query or topic")
@@ -124,6 +124,63 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("dream", help="Trigger Memory Consolidation (REM Sleep)")
     subparsers.add_parser("audit", help="Run Constitutional Integrity Audit")
 
+    # Feedback command
+    feedback_p = subparsers.add_parser("feedback", help="Submit feedback on agent performance")
+    feedback_p.add_argument("--last-task", action="store_true", help="Rate the most recent task")
+    feedback_p.add_argument("--task-id", help="Specific task ID to rate")
+    feedback_p.add_argument(
+        "--rating", type=int, choices=range(1, 6), default=3, help="Rating (1-5)"
+    )
+    feedback_p.add_argument("--comment", help="Feedback comment")
+    feedback_p.add_argument("--category", default="general", help="Feedback category")
+
+    # Feedback subcommands
+    feedback_p.add_argument(
+        "action", nargs="?", default="submit", choices=["submit", "list", "stats"]
+    )
+    feedback_p.add_argument("--limit", type=int, default=20, help="Limit for list")
+
+    # Dashboard command
+    dashboard_p = subparsers.add_parser("dashboard", aliases=["dash"], help="Launch TUI dashboard")
+    dashboard_p.add_argument("--budget", type=float, default=100.0, help="Budget limit")
+
+    # Debt command (Technical Debt Agent)
+    debt_p = subparsers.add_parser("debt", help="Technical debt management")
+    debt_p.add_argument(
+        "action",
+        nargs="?",
+        default="scan",
+        choices=["scan", "report", "list", "propose", "stats", "proposals"],
+    )
+    debt_p.add_argument("path", nargs="?", help="Path to scan")
+    debt_p.add_argument("--id", help="Debt item ID for proposal")
+    debt_p.add_argument("--limit", type=int, default=20, help="Limit results")
+    debt_p.add_argument("--type", help="Filter by debt type")
+    debt_p.add_argument("--status", help="Filter by proposal status")
+    debt_p.add_argument(
+        "--preset",
+        default="default",
+        choices=["default", "conservative", "aggressive", "development"],
+    )
+    debt_p.add_argument("--no-llm", action="store_true", help="Disable LLM for proposals")
+
+    # Learn command (Knowledge Ingestion)
+    learn_p = subparsers.add_parser("learn", help="Learn a library from repository")
+    learn_p.add_argument("source", help="Repository URL or local path")
+    learn_p.add_argument("--name", help="Library name override")
+    learn_p.add_argument("--description", help="Library description")
+    learn_p.add_argument("--preset", default="default", choices=["default", "fast", "deep"])
+
+    # Knowledge command
+    knowledge_p = subparsers.add_parser("knowledge", help="Manage learned libraries")
+    knowledge_p.add_argument(
+        "action",
+        nargs="?",
+        default="list",
+        choices=["list", "show", "delete", "context"],
+    )
+    knowledge_p.add_argument("library", nargs="?", help="Library name")
+    knowledge_p.add_argument("--max-tokens", type=int, default=4000, help="Max tokens for context")
 
     return parser
 
@@ -159,16 +216,41 @@ def main() -> None:
     elif args.command == "research":
         # Dynamic execution using the sovereign engine
         from gaap.cli.commands import cmd_research
+
         asyncio.run(cmd_research(args))
     elif args.command == "debug":
         from gaap.cli.commands import cmd_debug
+
         asyncio.run(cmd_debug(args))
     elif args.command == "dream":
         from gaap.cli.commands import cmd_dream
+
         cmd_dream(args)
     elif args.command == "audit":
         from gaap.cli.commands import cmd_audit
+
         cmd_audit(args)
+    elif args.command == "feedback":
+        cmd_feedback(args)
+    elif args.command in ["dashboard", "dash"]:
+        from gaap.cli.dashboard import cmd_dashboard
+
+        asyncio.run(cmd_dashboard(args))
+
+    elif args.command == "debt":
+        from gaap.cli.commands.debt import cmd_debt
+
+        cmd_debt(args)
+
+    elif args.command == "learn":
+        from gaap.cli.commands.learn import cmd_learn
+
+        cmd_learn(args)
+
+    elif args.command == "knowledge":
+        from gaap.cli.commands.learn import cmd_knowledge
+
+        cmd_knowledge(args)
 
     else:
         parser.print_help()
