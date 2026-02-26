@@ -452,11 +452,23 @@ class ConfigManager:
         tactical_decomposer = TacticalDecomposerConfig(**config_dict.get("tactical_decomposer", {}))
         execution = ExecutionConfig(**config_dict.get("execution", {}))
 
-        # معالجة لجنة الجودة
+        # معالجة لجنة الجودة - استخدام الافتراضي إذا كانت فارغة
         quality_dict = config_dict.get("quality_panel", {})
         critics_list = []
         for c in quality_dict.get("critics", []):
             critics_list.append(CriticConfig(**c))
+
+        # استخدام النقاد الافتراضيين إذا كانت القائمة فارغة
+        if not critics_list:
+            critics_list = [
+                CriticConfig(name="logic", weight=0.35),
+                CriticConfig(name="security", weight=0.25),
+                CriticConfig(name="performance", weight=0.20),
+                CriticConfig(name="style", weight=0.10),
+                CriticConfig(name="compliance", weight=0.05),
+                CriticConfig(name="ethics", weight=0.05),
+            ]
+
         quality_panel = QualityPanelConfig(critics=critics_list)
         if "min_approval_score" in quality_dict:
             quality_panel.min_approval_score = quality_dict["min_approval_score"]
@@ -494,6 +506,7 @@ class ConfigManager:
 
     def _validate_config(self, config: GAAPConfig) -> None:
         """التحقق من صحة التكوين"""
+        warnings: list[str] = []
         errors: list[str] = []
 
         # التحقق من البيئة
@@ -507,34 +520,67 @@ class ConfigManager:
         # التحقق من مستوى السجل
         valid_log_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
         if config.system.log_level.upper() not in valid_log_levels:
-            errors.append(
-                f"Invalid log_level: {config.system.log_level}. Must be one of: {valid_log_levels}"
-            )
+            warnings.append(f"Invalid log_level: {config.system.log_level}, defaulting to INFO")
+            config.system.log_level = "INFO"
 
-        # التحقق من الميزانية
+        # التحقق من الميزانية - استخدام الافتراضي إذا كانت القيم غير صالحة
         if config.budget.monthly_limit <= 0:
-            errors.append("budget.monthly_limit must be positive")
+            warnings.append("budget.monthly_limit must be positive, using default 5000.0")
+            config.budget.monthly_limit = 5000.0
         if config.budget.daily_limit <= 0:
-            errors.append("budget.daily_limit must be positive")
+            warnings.append("budget.daily_limit must be positive, using default 200.0")
+            config.budget.daily_limit = 200.0
         if config.budget.daily_limit > config.budget.monthly_limit:
-            errors.append("budget.daily_limit cannot exceed budget.monthly_limit")
+            warnings.append("budget.daily_limit cannot exceed budget.monthly_limit, adjusting")
+            config.budget.daily_limit = config.budget.monthly_limit
 
         # التحقق من عتبات التنبيه
-        if not all(0 <= t <= 1 for t in config.budget.alert_thresholds):
-            errors.append("budget.alert_thresholds must be between 0 and 1")
+        if config.budget.alert_thresholds:
+            if not all(0 <= t <= 1 for t in config.budget.alert_thresholds):
+                warnings.append("budget.alert_thresholds must be between 0 and 1, using defaults")
+                config.budget.alert_thresholds = [0.5, 0.8, 0.95]
 
-        # التحقق من صلاحيات النقاد
-        total_weight = sum(c.weight for c in config.quality_panel.critics if c.enabled)
+        # التحقق من صلاحيات النقاد - تطبيع أو استخدام الافتراضي
+        enabled_critics = [c for c in config.quality_panel.critics if c.enabled]
+        if not enabled_critics:
+            warnings.append("No enabled critics found, using defaults")
+            config.quality_panel.critics = [
+                CriticConfig(name="logic", weight=0.35),
+                CriticConfig(name="security", weight=0.25),
+                CriticConfig(name="performance", weight=0.20),
+                CriticConfig(name="style", weight=0.10),
+                CriticConfig(name="compliance", weight=0.05),
+                CriticConfig(name="ethics", weight=0.05),
+            ]
+            enabled_critics = config.quality_panel.critics
+
+        total_weight = sum(c.weight for c in enabled_critics)
         if abs(total_weight - 1.0) > 0.01:
-            errors.append(f"quality_panel critics weights must sum to 1.0, got {total_weight}")
+            if total_weight > 0:
+                warnings.append(
+                    f"quality_panel critics weights sum to {total_weight:.2f}, normalizing to 1.0"
+                )
+                # تطبيع الأوزان
+                for c in enabled_critics:
+                    c.weight = c.weight / total_weight
+            else:
+                warnings.append("quality_panel critics weights sum to 0, using defaults")
+                config.quality_panel.critics = [
+                    CriticConfig(name="logic", weight=0.35),
+                    CriticConfig(name="security", weight=0.25),
+                    CriticConfig(name="performance", weight=0.20),
+                    CriticConfig(name="style", weight=0.10),
+                    CriticConfig(name="compliance", weight=0.05),
+                    CriticConfig(name="ethics", weight=0.05),
+                ]
 
-        # التحقق من نوع الـ sandbox
+        # التحقق من نوع الـ sandbox - استخدام الافتراضي إذا كان غير صالح
         valid_sandbox_types = {"gvisor", "docker", "process"}
         if config.security.sandbox_type not in valid_sandbox_types:
-            errors.append(
-                f"Invalid sandbox_type: {config.security.sandbox_type}. "
-                f"Must be one of: {valid_sandbox_types}"
+            warnings.append(
+                f"Invalid sandbox_type: {config.security.sandbox_type}, defaulting to gvisor"
             )
+            config.security.sandbox_type = "gvisor"
 
         if errors:
             raise ConfigurationError(

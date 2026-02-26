@@ -357,8 +357,8 @@ class TestConfigValidation:
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps(config_data))
 
-        with pytest.raises(ConfigurationError):
-            ConfigManager(config_path=str(config_file))
+        cm = ConfigManager(config_path=str(config_file))
+        assert cm.config.system.log_level == "INFO"
 
     def test_negative_budget(self, tmp_path):
         config_data = {
@@ -368,8 +368,8 @@ class TestConfigValidation:
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps(config_data))
 
-        with pytest.raises(ConfigurationError):
-            ConfigManager(config_path=str(config_file))
+        cm = ConfigManager(config_path=str(config_file))
+        assert cm.config.budget.monthly_limit == 5000.0
 
     def test_daily_exceeds_monthly(self, tmp_path):
         config_data = {
@@ -379,8 +379,8 @@ class TestConfigValidation:
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps(config_data))
 
-        with pytest.raises(ConfigurationError):
-            ConfigManager(config_path=str(config_file))
+        cm = ConfigManager(config_path=str(config_file))
+        assert cm.config.budget.daily_limit == 100
 
     def test_invalid_alert_thresholds(self, tmp_path):
         config_data = {
@@ -390,8 +390,8 @@ class TestConfigValidation:
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps(config_data))
 
-        with pytest.raises(ConfigurationError):
-            ConfigManager(config_path=str(config_file))
+        cm = ConfigManager(config_path=str(config_file))
+        assert cm.config.budget.alert_thresholds == [0.5, 0.8, 0.95]
 
     def test_invalid_critic_weights(self, tmp_path):
         config_data = {
@@ -405,8 +405,9 @@ class TestConfigValidation:
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps(config_data))
 
-        with pytest.raises(ConfigurationError):
-            ConfigManager(config_path=str(config_file))
+        cm = ConfigManager(config_path=str(config_file))
+        weights = [c.weight for c in cm.config.quality_panel.critics]
+        assert sum(weights) == 1.0
 
     def test_invalid_sandbox_type(self, tmp_path):
         config_data = {
@@ -416,8 +417,8 @@ class TestConfigValidation:
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps(config_data))
 
-        with pytest.raises(ConfigurationError):
-            ConfigManager(config_path=str(config_file))
+        cm = ConfigManager(config_path=str(config_file))
+        assert cm.config.security.sandbox_type == "gvisor"
 
 
 class TestConfigFromEnv:
