@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from gaap.core.config import get_config, get_config_manager
 from gaap.core.events import EventEmitter, EventType
@@ -674,6 +674,14 @@ class BudgetLimitsRequest(BaseModel):
     auto_throttle_at: float | None = Field(None, ge=0, le=1)
     hard_stop_at: float | None = Field(None, ge=0, le=1)
     cost_optimization_mode: str | None = None
+
+    @model_validator(mode="after")
+    def validate_budget_thresholds(self):
+        """Ensure hard_stop_at >= auto_throttle_at"""
+        if self.hard_stop_at is not None and self.auto_throttle_at is not None:
+            if self.hard_stop_at < self.auto_throttle_at:
+                raise ValueError("hard_stop_at must be greater than or equal to auto_throttle_at")
+        return self
 
 
 class BudgetLimitsResponse(BaseModel):
