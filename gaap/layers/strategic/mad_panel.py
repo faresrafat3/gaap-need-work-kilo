@@ -13,6 +13,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -110,7 +111,13 @@ class MADArchitecturePanel:
 
         evaluations = []
         for critic_type in self.ARCH_CRITICS:
-            result = await self._evaluate_with_llm(spec, intent, critic_type)
+            try:
+                result = await asyncio.wait_for(
+                    self._evaluate_with_llm(spec, intent, critic_type), timeout=30.0
+                )
+            except asyncio.TimeoutError:
+                self._logger.warning(f"LLM evaluation timeout for {critic_type}")
+                result = self._get_fallback_eval(spec, intent, critic_type)
             evaluations.append(
                 CriticEvaluation(
                     critic=result["critic"],

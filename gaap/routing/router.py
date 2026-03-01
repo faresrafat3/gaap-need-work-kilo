@@ -28,6 +28,7 @@ Usage:
 """
 
 # Router
+import asyncio
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -51,35 +52,48 @@ from gaap.providers.base_provider import BaseProvider
 # =============================================================================
 
 
-@dataclass
 class KeyState:
-    """Track state of a single API key for rate-limit awareness"""
+    """Track state of a single API key for rate-limit awareness (thread-safe)"""
 
-    key_index: int
-    last_used: float = 0.0
-    requests_this_minute: int = 0
-    requests_today: int = 0
-    minute_window_start: float = 0.0
-    day_start: float = 0.0
-    consecutive_errors: int = 0
-    is_exhausted: bool = False
+    def __init__(self, key_index: int) -> None:
+        self.key_index: int = key_index
+        self.last_used: float = 0.0
+        self.requests_this_minute: int = 0
+        self.requests_today: int = 0
+        self.minute_window_start: float = 0.0
+        self.day_start: float = 0.0
+        self.consecutive_errors: int = 0
+        self.is_exhausted: bool = False
+        self._lock: asyncio.Lock = asyncio.Lock()
 
-    def __post_init__(self) -> None:
         now = time.time()
         self.minute_window_start = now
         self.day_start = now
 
-    def reset_minute_if_needed(self) -> None:
+    async def _reset_minute_if_needed(self) -> None:
         now = time.time()
         if now - self.minute_window_start >= 60:
             self.requests_this_minute = 0
             self.minute_window_start = now
 
-    def is_available(self, rpm_limit: int = 10) -> bool:
-        self.reset_minute_if_needed()
-        if self.is_exhausted or self.consecutive_errors >= 5:
-            return False
-        return self.requests_this_minute < rpm_limit
+    async def is_available(self, rpm_limit: int = 10) -> bool:
+        async with self._lock:
+            await self._reset_minute_if_needed()
+            if self.is_exhausted or self.consecutive_errors >= 5:
+                return False
+            return self.requests_this_minute < rpm_limit
+
+    async def increment_request(self) -> None:
+        """Safely increment requests_this_minute and update last_used."""
+        async with self._lock:
+            await self._reset_minute_if_needed()
+            self.requests_this_minute += 1
+            self.last_used = time.time()
+
+    async def record_error(self) -> None:
+        """Safely increment consecutive_errors."""
+        async with self._lock:
+            self.consecutive_errors += 1
 
 
 # =============================================================================
@@ -704,11 +718,17 @@ class SmartRouter:
 
             # 1. فحص توفر المفاتيح (Rate Limit Awareness)
             states = self._provider_states.get(provider_name, [])
-            if states and not any(s.is_available() for s in states):
-                self._logger.debug(
-                    f"Router: Skipping provider {provider_name} (All keys exhausted)"
-                )
-                continue
+            if states:
+                key_available = False
+                for state in states:
+                    if await state.is_available():
+                        key_available = True
+                        break
+                if not key_available:
+                    self._logger.debug(
+                        f"Router: Skipping provider {provider_name} (All keys exhausted)"
+                    )
+                    continue
 
             # 2. فحص النماذج المتاحة
             for model in provider.get_available_models():

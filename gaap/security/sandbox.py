@@ -144,7 +144,7 @@ class DockerSandbox:
                 command=command,
                 environment=env or {},
                 volumes=volumes if volumes else None,
-                network=None if self.config.network_disabled else "bridge",
+                network_mode="none" if self.config.network_disabled else "bridge",
                 cpu_quota=int(self.config.cpu_limit * 100000),
                 mem_limit=f"{self.config.memory_limit_mb}m",
                 working_dir="/sandbox",

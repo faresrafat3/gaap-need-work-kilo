@@ -8,10 +8,14 @@ Provides endpoints for:
 - Semantic Index (vector search)
 """
 
+import logging
+import uuid
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from gaap.context import (
     CallGraph,
@@ -75,7 +79,9 @@ async def chunk_code(request: ChunkRequest) -> ChunkResponse:
             total_chunks=len(chunks),
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_id = str(uuid.uuid4())
+        logger.error(f"Context API error [{error_id}]: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error. Error ID: {error_id}")
 
 
 @router.post("/call-graph")
@@ -95,7 +101,9 @@ async def build_call_graph(request: CallGraphRequest) -> dict:
             "files": list(set(n.split("#")[0] for n in nodes)),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_id = str(uuid.uuid4())
+        logger.error(f"Context API error [{error_id}]: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error. Error ID: {error_id}")
 
 
 @router.post("/search")
@@ -117,4 +125,6 @@ async def semantic_search(request: SemanticSearchRequest) -> dict:
             ],
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_id = str(uuid.uuid4())
+        logger.error(f"Context API error [{error_id}]: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error. Error ID: {error_id}")

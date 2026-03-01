@@ -70,6 +70,10 @@ class DeepDiscoveryEngine:
         knowledge_graph: KnowledgeGraphBuilder | None = None,
         sqlite_store: SQLiteStore | None = None,
     ) -> None:
+        if llm_provider is None:
+            raise ValueError(
+                "llm_provider is required for DeepDiscoveryEngine. Pass a valid provider instance."
+            )
         self.config = config or DDEConfig()
         self._llm_provider = llm_provider
 

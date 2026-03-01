@@ -16,12 +16,14 @@ Smart Behaviors:
 """
 
 import logging
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum, auto
 from typing import Any
 
 from gaap.core.types import Task, TaskResult, Message, MessageRole
+from gaap.providers.base_provider import BaseProvider
 from gaap.swarm.reputation import ReputationStore
 from gaap.swarm.gisp_protocol import (
     TaskAuction,
@@ -130,11 +132,19 @@ class FractalAgent:
         self,
         fractal_id: str,
         domains: list[str],
-        provider: Any,  # BaseProvider
+        provider: BaseProvider,
         memory: Any,  # HierarchicalMemory
         reputation_store: ReputationStore,
         config: dict[str, Any] | None = None,
     ) -> None:
+        # Validate provider
+        if not isinstance(provider, BaseProvider):
+            raise TypeError(
+                f"Provider must be an instance of BaseProvider, got {type(provider).__name__}"
+            )
+        if not hasattr(provider, "chat_completion"):
+            raise ValueError("Provider must have chat_completion method")
+
         self.fractal_id = fractal_id
         self.domains = domains
         self._provider = provider
@@ -146,7 +156,7 @@ class FractalAgent:
         # State
         self._state = FractalState.IDLE
         self._current_task: Task | None = None
-        self._task_history: list[str] = []
+        self._task_history: deque[str] = deque(maxlen=10000)  # Last 10k tasks
 
         # Capabilities
         self._capabilities: dict[str, FractalCapability] = {}

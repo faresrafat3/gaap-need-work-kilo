@@ -6,11 +6,13 @@ Focus: Semantic retrieval using ChromaDB with fallback embedding.
 """
 
 import hashlib
+import json
 import logging
 import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger("gaap.memory.vector")
@@ -77,9 +79,13 @@ class VectorStore:
         self._fallback_store: dict[str, tuple[str, dict[str, Any]]] = {}
 
         if not CHROMADB_AVAILABLE:
-            logger.debug(
-                "ChromaDB not installed. Using in-memory fallback. Install with: pip install chromadb"
+            logger.warning(
+                "ChromaDB not installed. Using disk-based fallback. "
+                "Install chromadb for better performance: pip install chromadb"
             )
+            self._fallback_store_path = Path(".gaap/vector_fallback.json")
+            self._fallback_store_path.parent.mkdir(parents=True, exist_ok=True)
+            self._fallback_store = self._load_fallback_store()
             return
 
         os.makedirs(persist_dir, exist_ok=True)
@@ -122,6 +128,16 @@ class VectorStore:
     def available(self) -> bool:
         return self._available
 
+    def _load_fallback_store(self) -> dict:
+        if self._fallback_store_path.exists():
+            with open(self._fallback_store_path) as f:
+                return json.load(f)
+        return {}
+
+    def _save_fallback_store(self) -> None:
+        with open(self._fallback_store_path, "w") as f:
+            json.dump(self._fallback_store, f)
+
     def add(
         self,
         content: str,
@@ -147,6 +163,7 @@ class VectorStore:
                 return ""
         else:
             self._fallback_store[entry_id] = (content, meta)
+            self._save_fallback_store()
             return entry_id
 
     def search(
@@ -210,6 +227,7 @@ class VectorStore:
         else:
             if entry_id in self._fallback_store:
                 del self._fallback_store[entry_id]
+                self._save_fallback_store()
                 return True
             return False
 
@@ -230,6 +248,7 @@ class VectorStore:
                 logger.error(f"Error resetting VectorStore: {e}")
         else:
             self._fallback_store.clear()
+            self._save_fallback_store()
 
 
 _vector_store_instance: VectorStore | None = None

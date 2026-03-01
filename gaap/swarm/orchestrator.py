@@ -99,8 +99,8 @@ class SwarmMetrics:
     failed_tasks: int = 0
     total_auctions: int = 0
     successful_auctions: int = 0
-    avg_auction_duration_ms: float = 0.0
-    avg_task_duration_ms: float = 0.0
+    total_auction_duration_ms: float = 0.0
+    total_task_duration_ms: float = 0.0
     active_fractals: int = 0
     active_guilds: int = 0
 
@@ -116,8 +116,16 @@ class SwarmMetrics:
             "auction_success_rate": (
                 self.successful_auctions / self.total_auctions if self.total_auctions > 0 else 0.0
             ),
-            "avg_auction_ms": round(self.avg_auction_duration_ms, 2),
-            "avg_task_ms": round(self.avg_task_duration_ms, 2),
+            "avg_auction_ms": (
+                round(self.total_auction_duration_ms / self.total_auctions, 2)
+                if self.total_auctions > 0
+                else 0.0
+            ),
+            "avg_task_ms": (
+                round(self.total_task_duration_ms / self.total_tasks_processed, 2)
+                if self.total_tasks_processed > 0
+                else 0.0
+            ),
             "active_fractals": self.active_fractals,
             "active_guilds": self.active_guilds,
         }
@@ -372,10 +380,7 @@ class SwarmOrchestrator:
             duration = (datetime.now() - start_time).total_seconds() * 1000
 
             # Update metrics
-            n = self._metrics.total_tasks_processed
-            self._metrics.avg_task_duration_ms = (
-                self._metrics.avg_task_duration_ms * n + duration
-            ) / (n + 1)
+            self._metrics.total_task_duration_ms += duration
 
             return result
 

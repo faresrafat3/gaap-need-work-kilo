@@ -94,9 +94,12 @@ class SessionRepository(BaseRepository[Session]):
         pagination: PaginationParams | None = None,
     ) -> PaginatedResult[Session]:
         """Search sessions by title or description."""
+        # Escape special SQL LIKE characters
+        escaped_query = query.replace("%", "\\%").replace("_", "\\_")
+
         stmt = select(Session).where(
             Session.user_id == user_id,
-            Session.title.ilike(f"%{query}%"),
+            Session.title.ilike(f"%{escaped_query}%", escape="\\"),
         )
 
         count_stmt = select(func.count()).select_from(stmt.subquery())

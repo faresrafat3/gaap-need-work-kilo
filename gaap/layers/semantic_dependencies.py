@@ -97,7 +97,12 @@ class DependencyGraph:
         return self._adjacency.get(task_id, [])
 
     def get_ready_tasks(self, completed: set[str]) -> list[str]:
-        """Get tasks ready to execute (all dependencies satisfied)"""
+        """Get tasks ready to execute (all dependencies satisfied)."""
+        # Check for cycles first
+        cycles = self.detect_cycles()
+        if cycles:
+            raise ValueError(f"Circular dependencies detected: {cycles}")
+
         ready = []
         for task_id, task in self.tasks.items():
             if task_id in completed:

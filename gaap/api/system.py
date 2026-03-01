@@ -18,6 +18,7 @@ import platform
 import sys
 import time
 from datetime import datetime
+from enum import Enum
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -34,12 +35,13 @@ router = APIRouter(prefix="/api/system", tags=["system"])
 _start_time = time.time()
 
 
-class HealthStatus(str):
+class HealthStatus(str, Enum):
     """Health status values."""
 
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
+    UNKNOWN = "unknown"
 
 
 class ComponentHealth(BaseModel):

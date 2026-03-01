@@ -12,8 +12,9 @@ try:
 
     VECTOR_MEMORY_AVAILABLE = True
 except ImportError:
-    logger.debug(
-        "Vector memory (chromadb) not installed. Using in-memory fallback. Install with: pip install chromadb"
+    logger.warning(
+        "Vector memory (chromadb) not installed. Vector search features will be disabled. Install with: pip install chromadb | "
+        "ذاكرة المتجهات (chromadb) غير مثبتة. ميزات البحث بالمتجهات ستكون معطلة. ثبتها باستخدام: pip install chromadb"
     )
 
 

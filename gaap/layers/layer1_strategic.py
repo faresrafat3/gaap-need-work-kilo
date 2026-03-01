@@ -43,7 +43,7 @@ from gaap.core.types import LayerType, Message, MessageRole, TaskComplexity, Tas
 from gaap.layers.layer0_interface import IntentType, StructuredIntent
 from gaap.layers.strategic.mcts_engine import MCTSStrategic, create_mcts_for_priority
 from gaap.layers.strategic.mad_panel import MADArchitecturePanel
-from gaap.layers.strategic.tot_engine import ToTStrategic
+from gaap.layers.strategic.tot_engine import ToTStrategic, ToTNode
 
 try:
     from gaap.meta_learning.wisdom_distiller import WisdomDistiller, ProjectHeuristic

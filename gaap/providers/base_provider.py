@@ -75,7 +75,6 @@ T = TypeVar("T")
 from gaap.core.logging import get_standard_logger as get_logger
 
 
-@dataclass
 class RateLimitState:
     """
     Rate limit state tracking.
@@ -88,20 +87,27 @@ class RateLimitState:
         current_requests: Current request count in window
         current_tokens: Current token count in window
         window_start: Start time of current window
+        _lock: Async lock for thread safety
 
     Usage:
         >>> state = RateLimitState(requests_per_minute=60)
-        >>> if state.is_allowed(tokens=100):
-        ...     state.record_request(tokens=100)
+        >>> if await state.is_allowed(tokens=100):
+        ...     await state.record_request(tokens=100)
     """
 
-    requests_per_minute: int = DEFAULT_REQUESTS_PER_MINUTE
-    tokens_per_minute: int = DEFAULT_TOKENS_PER_MINUTE
-    current_requests: int = 0
-    current_tokens: int = 0
-    window_start: datetime = field(default_factory=datetime.now)
+    def __init__(
+        self,
+        requests_per_minute: int = DEFAULT_REQUESTS_PER_MINUTE,
+        tokens_per_minute: int = DEFAULT_TOKENS_PER_MINUTE,
+    ):
+        self.requests_per_minute = requests_per_minute
+        self.tokens_per_minute = tokens_per_minute
+        self.current_requests = 0
+        self.current_tokens = 0
+        self.window_start = datetime.now()
+        self._lock = asyncio.Lock()
 
-    def is_allowed(self, tokens: int = 0) -> bool:
+    async def is_allowed(self, tokens: int = 0) -> bool:
         """
         Check if request is allowed under rate limits.
 
@@ -114,19 +120,20 @@ class RateLimitState:
         Note:
             Automatically resets counters if window has expired
         """
-        now = datetime.now()
-        # Reset window if minute has passed
-        if (now - self.window_start).total_seconds() >= 60:
-            self.current_requests = 0
-            self.current_tokens = 0
-            self.window_start = now
+        async with self._lock:
+            now = datetime.now()
+            # Reset window if minute has passed
+            if (now - self.window_start).total_seconds() >= 60:
+                self.current_requests = 0
+                self.current_tokens = 0
+                self.window_start = now
 
-        return (
-            self.current_requests < self.requests_per_minute
-            and self.current_tokens + tokens < self.tokens_per_minute
-        )
+            return (
+                self.current_requests < self.requests_per_minute
+                and self.current_tokens + tokens < self.tokens_per_minute
+            )
 
-    def record_request(self, tokens: int) -> None:
+    async def record_request(self, tokens: int) -> None:
         """
         Record a request against rate limit.
 
@@ -136,8 +143,9 @@ class RateLimitState:
         Note:
             Call this after making a successful request
         """
-        self.current_requests += 1
-        self.current_tokens += tokens
+        async with self._lock:
+            self.current_requests += 1
+            self.current_tokens += tokens
 
 
 class RateLimiter:
@@ -176,7 +184,6 @@ class RateLimiter:
             requests_per_minute=requests_per_minute,
             tokens_per_minute=tokens_per_minute,
         )
-        self._lock = asyncio.Lock()
 
     async def acquire(self, tokens: int = 0) -> bool:
         """
@@ -193,11 +200,10 @@ class RateLimiter:
             ...     # Make API call
             ...     pass
         """
-        async with self._lock:
-            if self.state.is_allowed(tokens):
-                self.state.record_request(tokens)
-                return True
-            return False
+        if await self.state.is_allowed(tokens):
+            await self.state.record_request(tokens)
+            return True
+        return False
 
     async def wait_for_slot(self, tokens: int = 0, timeout: float = DEFAULT_TIMEOUT) -> bool:
         """

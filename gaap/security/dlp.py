@@ -91,11 +91,11 @@ class DLPScanner:
         LeakType.API_KEY: r"(?:sk-[a-zA-Z0-9]{32,}|AIza[a-zA-Z0-9_-]{35}|xox[baprs]-[a-zA-Z0-9-]+)",
         LeakType.AWS_KEY: r"AKIA[0-9A-Z]{16}",
         LeakType.GITHUB_TOKEN: r"ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{22,}",
-        LeakType.PRIVATE_KEY: r"-----BEGIN [A-Z ]+PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+PRIVATE KEY-----",
+        LeakType.PRIVATE_KEY: r"-----BEGIN ([A-Z ]+)PRIVATE KEY-----\r?\n(?:[A-Za-z0-9+/=]{64}\r?\n)*[A-Za-z0-9+/=]{1,64}\r?\n-----END \1PRIVATE KEY-----",
         LeakType.EMAIL: r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
         LeakType.PHONE: r"\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}",
         LeakType.SSN: r"\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b",
-        LeakType.CREDIT_CARD: r"\b(?:\d[ -]*?){13,16}\b",
+        LeakType.CREDIT_CARD: r"\b(?:\d{4}[-\s]?){3}\d{4}\b|\b\d{13,16}\b",
         LeakType.IP_ADDRESS: r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b",
         LeakType.FILE_PATH: r"(?:/home/|/Users/|/etc/|C:\\Users\\|~\\/)[a-zA-Z0-9_/.-]+",
         LeakType.INTERNAL_URL: r"(?:localhost|127\.0\.0\.1|192\.168\.|10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.)(?:[:/][a-zA-Z0-9._~:/?#\[\]@!$&'()*+,;=%-]*)?",
@@ -146,7 +146,10 @@ class DLPScanner:
     def _compile_patterns(self) -> None:
         for leak_type, pattern in self.PATTERNS.items():
             try:
-                self._compiled_patterns[leak_type] = re.compile(pattern, re.IGNORECASE)
+                flags = re.IGNORECASE
+                if leak_type == LeakType.PRIVATE_KEY:
+                    flags |= re.MULTILINE
+                self._compiled_patterns[leak_type] = re.compile(pattern, flags)
             except re.error as e:
                 logger.warning(f"Invalid pattern for {leak_type}: {e}")
 

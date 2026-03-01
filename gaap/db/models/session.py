@@ -51,7 +51,7 @@ class Session(Base):
     status = Column(String(20), default=SessionStatus.ACTIVE.value, nullable=False, index=True)
     priority = Column(String(20), default=SessionPriority.NORMAL.value, nullable=False)
     description = Column(Text, nullable=True)
-    metadata_ = Column("metadata", JSON, default=dict, nullable=False)
+    metadata = Column("metadata", JSON, default=dict, nullable=False)
     context = Column(JSON, default=dict, nullable=False)
     tags = Column(JSON, default=list, nullable=False)
     message_count = Column(Integer, default=0, nullable=False)

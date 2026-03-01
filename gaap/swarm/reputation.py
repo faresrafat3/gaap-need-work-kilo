@@ -439,6 +439,8 @@ class ReputationStore:
     def get_reputation_score(self, fractal_id: str) -> ReputationScore:
         """
         الحصول على ملخص سمعة كامل.
+
+        Applies time-decay to prevent stale reputations.
         """
         entry = self._entries.get(fractal_id)
 
@@ -452,9 +454,55 @@ class ReputationStore:
                 availability=0.5,
             )
 
-        domain_scores = {domain: exp.get_adjusted_score() for domain, exp in entry.domains.items()}
+        # Apply time decay to each domain before calculating scores
+        domain_scores = {}
+        for domain, exp in entry.domains.items():
+            # Calculate decay based on hours since last update
+            age_hours = (datetime.now() - exp.last_updated).total_seconds() / 3600
+            if age_hours > 0:
+                decay_factor = self.DECAY_FACTOR ** (age_hours / 24)  # Convert to daily decay
+                # Decay score toward neutral (0.5)
+                decayed_score = 0.5 + (exp.score - 0.5) * decay_factor
+                # Decay confidence
+                decayed_confidence = exp.confidence * decay_factor
+            else:
+                decayed_score = exp.score
+                decayed_confidence = exp.confidence
+
+            # Calculate adjusted score with decayed values
+            neutrality_pull = 1 - decayed_confidence
+            adjusted_score = decayed_score * (1 - neutrality_pull) + 0.5 * neutrality_pull
+            domain_scores[domain] = adjusted_score
 
         total_tasks = sum(d.total_tasks for d in entry.domains.values())
+
+        # Calculate weighted overall score with decayed domain scores
+        total_weight = 0.0
+        weighted_sum = 0.0
+        for domain, score in domain_scores.items():
+            exp = entry.domains[domain]
+            weight = exp.total_tasks + 1
+            weighted_sum += score * weight
+            total_weight += weight
+        overall_score = weighted_sum / total_weight if total_weight > 0 else 0.5
+
+        # Calculate reliability with decayed scores
+        scores = [
+            s
+            for s in domain_scores.values()
+            if entry.domains[d].total_tasks > 0
+            for d in [list(domain_scores.keys())[scores.index(s)]]
+        ]
+        active_scores = [
+            domain_scores[d] for d in entry.domains if entry.domains[d].total_tasks > 0
+        ]
+        if len(active_scores) >= 2:
+            mean = sum(active_scores) / len(active_scores)
+            variance = sum((s - mean) ** 2 for s in active_scores) / len(active_scores)
+            std_dev = math.sqrt(variance)
+            reliability = max(0.0, 1.0 - std_dev * 2)
+        else:
+            reliability = 0.5
 
         # Calculate availability
         total_auctions = self._auctions_total.get(fractal_id, 0)
@@ -463,10 +511,10 @@ class ReputationStore:
 
         return ReputationScore(
             fractal_id=fractal_id,
-            overall_score=entry.get_overall_score(),
+            overall_score=overall_score,
             domain_scores=domain_scores,
             total_tasks=total_tasks,
-            reliability=entry.get_reliability(),
+            reliability=reliability,
             availability=availability,
         )
 

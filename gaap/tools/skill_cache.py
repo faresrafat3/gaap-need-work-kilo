@@ -28,7 +28,6 @@ import hashlib
 import importlib.util
 import json
 import logging
-import sys
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -145,9 +144,6 @@ class SkillCache:
 
             for category in CATEGORIES:
                 (self.cache_path / category).mkdir(exist_ok=True)
-
-            if str(self.cache_path.absolute()) not in sys.path:
-                sys.path.insert(0, str(self.cache_path.absolute()))
 
             self._load_metadata_index()
             self._initialized = True

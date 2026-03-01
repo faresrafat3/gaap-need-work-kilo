@@ -1,6 +1,7 @@
 # CLI Main
 import argparse
 import asyncio
+import logging
 import os
 import sys
 
@@ -17,6 +18,12 @@ from gaap.cli.commands import (
     cmd_version,
     cmd_web,
 )
+
+
+logger = logging.getLogger(__name__)
+
+
+logger = logging.getLogger(__name__)
 
 
 def load_env() -> None:
@@ -42,7 +49,27 @@ def load_env() -> None:
         if path.exists() and path.is_file():
             try:
                 parse_lines(path.read_text(encoding="utf-8").splitlines())
-            except OSError:
+                logger.info(f"Loaded environment from {path}")
+            except OSError as e:
+                logger.warning(f"Failed to load {path}: {e}")
+                continue
+            key, value = raw.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+    paths = [
+        Path.home() / ".gaap_env",
+        Path.cwd() / ".gaap_env",
+    ]
+    for path in paths:
+        if path.exists() and path.is_file():
+            try:
+                parse_lines(path.read_text(encoding="utf-8").splitlines())
+                logger.info(f"Loaded environment from {path}")
+            except OSError as e:
+                logger.warning(f"Failed to load {path}: {e}")
                 continue
 
 

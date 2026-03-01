@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import ast
 import importlib.util
-import sys
 import uuid
 from collections import Counter
 from dataclasses import dataclass, field
@@ -108,9 +107,6 @@ class ToolSynthesizer:
     ):
         self.workspace_path = Path(workspace_path)
         self.workspace_path.mkdir(parents=True, exist_ok=True)
-
-        if str(self.workspace_path.absolute()) not in sys.path:
-            sys.path.append(str(self.workspace_path.absolute()))
 
         self.axiom_validator = AxiomValidator()
         self.dlp = DLPScanner()

@@ -144,34 +144,95 @@ class WebChatBridgeProvider(BaseProvider):
 
         Returns the account label to use for the next call.
         Falls back to self._account if pool is not available.
+
+        Validates account status:
+        - Checks if default account is valid (can_call)
+        - If invalid, iterates through pool to find a working account
+        - Tracks failed accounts to avoid immediate retry
+        - Raises ProviderResponseError if no valid accounts found
         """
         if not self._pool or not self._pool.accounts:
             return self._account
 
-        # Try smart selection
+        # Track failed accounts to avoid retrying them immediately
+        failed_accounts: set[str] = set()
+
+        # First, try the default account if it's in the pool
+        default_acct = self._pool.get_account(self._account)
+        if default_acct:
+            can_call, reason = default_acct.can_call()
+            if can_call:
+                self._logger.debug(f"Using default account '{self._account}'")
+                return self._account
+            else:
+                self._logger.debug(f"Default account '{self._account}' unavailable: {reason}")
+                failed_accounts.add(self._account)
+        else:
+            # Default account not in pool, will try to find another
+            self._logger.debug(
+                f"Default account '{self._account}' not in pool, seeking alternative"
+            )
+
+        # Try smart selection via should_call (considers all accounts)
         should, reason, acct_label = self._pool.should_call(
             label="",  # don't lock to specific account
             model=model,
         )
 
-        if should and acct_label:
+        if should and acct_label and acct_label not in failed_accounts:
             if acct_label != self._account:
                 self._logger.info(f"Account rotation: using '{acct_label}' ({reason})")
             return acct_label
 
-        # All accounts unavailable — log why
-        self._logger.warning(f"All accounts unavailable: {reason}")
+        # should_call didn't return a valid account, manually iterate through pool
+        for acct in self._pool.accounts:
+            if acct.label in failed_accounts:
+                continue
 
-        # Return the one with shortest wait time
+            can_call, reason = acct.can_call()
+            if can_call:
+                if acct.label != self._account:
+                    self._logger.info(
+                        f"Account rotation: switched from '{self._account}' to '{acct.label}' "
+                        f"(default unavailable)"
+                    )
+                return acct.label
+            else:
+                failed_accounts.add(acct.label)
+                self._logger.debug(f"Account '{acct.label}' unavailable: {reason}")
+
+        # All accounts are unavailable — gather detailed status for error
+        status_lines = []
         min_wait = float("inf")
         best_label = self._account
+
         for acct in self._pool.accounts:
+            can_call, reason = acct.can_call()
+            status_lines.append(f"  - {acct.label}: {reason}")
             wait = acct.rate_tracker.seconds_until_next_allowed
             if wait < min_wait:
                 min_wait = wait
                 best_label = acct.label
 
-        return best_label
+        self._logger.error(
+            f"All accounts unavailable for {self._webchat_provider}:\n" + "\n".join(status_lines)
+        )
+
+        # If there's an account that will be available soon, return it with a warning
+        if min_wait < float("inf") and min_wait <= 300:  # 5 minutes or less
+            self._logger.warning(f"Returning best account '{best_label}' with {min_wait:.0f}s wait")
+            return best_label
+
+        # No valid accounts available and none will be available soon
+        raise ProviderResponseError(
+            provider_name=self.name,
+            status_code=503,
+            response_body=(
+                f"No valid accounts available for {self._webchat_provider}. "
+                f"Tried {len(failed_accounts)} account(s). "
+                f"Details: {'; '.join(status_lines)}"
+            ),
+        )
 
     def _record_call_result(
         self,

@@ -20,10 +20,9 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
-from enum import Enum
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,17 +36,6 @@ from gaap.db.repositories import MessageRepository, PaginationParams, SessionRep
 logger = logging.getLogger("gaap.api.sessions")
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
-
-
-class SessionStatusEnum(str, Enum):
-    """Session status (matches database enum)."""
-
-    PENDING = "pending"
-    RUNNING = "running"
-    PAUSED = "paused"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
 
 
 class SessionPriorityEnum(str, Enum):
@@ -166,7 +154,7 @@ def _message_to_response(msg: Message) -> MessageResponse:
 
 @router.get("", response_model=SessionListResponse)
 async def list_sessions(
-    status: SessionStatusEnum | None = None,
+    status: SessionStatus | None = None,
     priority: SessionPriorityEnum | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -177,18 +165,8 @@ async def list_sessions(
         repo = SessionRepository(db)
         pagination = PaginationParams(page=(offset // limit) + 1, per_page=limit)
 
-        # Map API status to database status
-        db_status = None
-        if status:
-            status_map = {
-                SessionStatusEnum.PENDING: SessionStatus.ACTIVE,
-                SessionStatusEnum.RUNNING: SessionStatus.ACTIVE,
-                SessionStatusEnum.PAUSED: SessionStatus.PAUSED,
-                SessionStatusEnum.COMPLETED: SessionStatus.ARCHIVED,
-                SessionStatusEnum.FAILED: SessionStatus.ARCHIVED,
-                SessionStatusEnum.CANCELLED: SessionStatus.ARCHIVED,
-            }
-            db_status = status_map.get(status)
+        # Use database status directly
+        db_status = status
 
         result = await repo.find_many(
             pagination=pagination,

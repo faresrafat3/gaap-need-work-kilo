@@ -50,7 +50,9 @@ def _validate_and_normalize(data: dict[str, Any], critic_type: CriticType) -> di
     """Validate and normalize critic response data."""
 
     score = data.get("score", 70.0)
-    if isinstance(score, str):
+    if isinstance(score, (dict, list)):
+        score = 70.0
+    elif isinstance(score, str):
         try:
             score = float(score)
         except (ValueError, TypeError):
@@ -172,7 +174,9 @@ def parse_architecture_critic_response(
         raise CriticParseError(f"Failed to parse JSON: {e}. Response: {cleaned[:200]}") from e
 
     score = data.get("score", 70.0)
-    if isinstance(score, str):
+    if isinstance(score, (dict, list)):
+        score = 70.0
+    elif isinstance(score, str):
         try:
             score = float(score)
         except (ValueError, TypeError):

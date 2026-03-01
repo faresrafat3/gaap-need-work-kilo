@@ -14,7 +14,12 @@ Endpoints:
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+import os
+import threading
+import uuid
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -27,7 +32,568 @@ logger = logging.getLogger("gaap.api.budget")
 
 router = APIRouter(prefix="/api/budget", tags=["budget"])
 
-_budget_tracker: Any = None
+
+# =============================================================================
+# BudgetTracker - Tracks spending and enforces budget limits
+# =============================================================================
+
+
+@dataclass
+class UsageRecord:
+    """Single usage record."""
+
+    task_id: str
+    timestamp: datetime
+    provider: str
+    model: str
+    tokens_used: int
+    cost_usd: float
+    category: str = "general"
+
+
+@dataclass
+class BudgetAlertInternal:
+    """Internal budget alert representation."""
+
+    id: str
+    type: str
+    threshold: float
+    current_value: float
+    message: str
+    timestamp: datetime
+    acknowledged: bool = False
+
+
+class BudgetTracker:
+    """
+    Tracks API spending and enforces budget limits.
+
+    Supports both in-memory and Redis-backed storage.
+    Automatically reads limits from configuration.
+    """
+
+    def __init__(self, use_redis: bool = True):
+        self._lock = threading.RLock()
+        self._config = get_config()
+        self._alerts: list[BudgetAlertInternal] = []
+        self._alert_callbacks: list[Callable[[BudgetAlertInternal], None]] = []
+
+        # In-memory storage
+        self._usage_history: list[UsageRecord] = []
+        self._daily_spend: float = 0.0
+        self._monthly_spend: float = 0.0
+        self._last_reset_day: datetime = datetime.now()
+        self._last_reset_month: datetime = datetime.now()
+
+        # Redis storage (optional)
+        self._redis_client: Any = None
+        self._use_redis = False
+
+        if use_redis:
+            self._init_redis()
+
+        # Initialize spending from Redis if available
+        if self._use_redis:
+            self._load_from_redis()
+
+        logger.info(f"BudgetTracker initialized (redis={self._use_redis})")
+
+    def _init_redis(self) -> None:
+        """Initialize Redis connection if available."""
+        redis_url = os.environ.get("REDIS_URL") or os.environ.get("GAAP_REDIS_URL")
+        if not redis_url:
+            return
+
+        try:
+            import redis
+
+            self._redis_client = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
+            self._use_redis = True
+            logger.info("BudgetTracker: Redis storage enabled")
+        except Exception as e:
+            logger.warning(f"BudgetTracker: Redis unavailable, using memory: {e}")
+            self._use_redis = False
+
+    def _get_redis_key(self, key: str) -> str:
+        """Generate Redis key with namespace."""
+        return f"gaap:budget:{key}"
+
+    def _load_from_redis(self) -> None:
+        """Load current spending from Redis."""
+        if not self._use_redis or not self._redis_client:
+            return
+
+        try:
+            daily = self._redis_client.get(self._get_redis_key("daily_spend"))
+            monthly = self._redis_client.get(self._get_redis_key("monthly_spend"))
+
+            if daily:
+                self._daily_spend = float(daily)
+            if monthly:
+                self._monthly_spend = float(monthly)
+
+            logger.debug(
+                f"Loaded from Redis: daily={self._daily_spend}, monthly={self._monthly_spend}"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to load from Redis: {e}")
+
+    def _save_to_redis(self) -> None:
+        """Save current spending to Redis."""
+        if not self._use_redis or not self._redis_client:
+            return
+
+        try:
+            pipe = self._redis_client.pipeline()
+            pipe.set(self._get_redis_key("daily_spend"), str(self._daily_spend))
+            pipe.set(self._get_redis_key("monthly_spend"), str(self._monthly_spend))
+
+            # Set expiration to end of day/month
+            now = datetime.now()
+            end_of_day = (now + timedelta(days=1)).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            end_of_month = (now.replace(day=28) + timedelta(days=4)).replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )
+
+            pipe.expireat(self._get_redis_key("daily_spend"), int(end_of_day.timestamp()))
+            pipe.expireat(self._get_redis_key("monthly_spend"), int(end_of_month.timestamp()))
+
+            pipe.execute()
+        except Exception as e:
+            logger.warning(f"Failed to save to Redis: {e}")
+
+    def _check_and_reset_periods(self) -> None:
+        """Check if daily/monthly periods have passed and reset if needed."""
+        now = datetime.now()
+
+        # Check daily reset
+        if now.date() != self._last_reset_day.date():
+            self._daily_spend = 0.0
+            self._last_reset_day = now
+            logger.info("Daily budget period reset")
+
+        # Check monthly reset
+        if now.month != self._last_reset_month.month or now.year != self._last_reset_month.year:
+            self._monthly_spend = 0.0
+            self._last_reset_month = now
+            logger.info("Monthly budget period reset")
+
+    def record_usage(
+        self,
+        task_id: str,
+        provider: str,
+        model: str,
+        tokens_used: int,
+        cost_usd: float,
+        category: str = "general",
+    ) -> dict[str, Any]:
+        """
+        Record API usage and update spending.
+
+        Returns:
+            Dict with status and any alerts triggered
+        """
+        with self._lock:
+            self._check_and_reset_periods()
+
+            record = UsageRecord(
+                task_id=task_id,
+                timestamp=datetime.now(),
+                provider=provider,
+                model=model,
+                tokens_used=tokens_used,
+                cost_usd=cost_usd,
+                category=category,
+            )
+
+            self._usage_history.append(record)
+            self._daily_spend += cost_usd
+            self._monthly_spend += cost_usd
+
+            # Trim history if too large (keep last 10000)
+            if len(self._usage_history) > 10000:
+                self._usage_history = self._usage_history[-10000:]
+
+            # Save to Redis if enabled
+            if self._use_redis:
+                self._save_to_redis()
+                self._add_usage_to_redis(record)
+
+            # Check limits and emit alerts
+            alerts_triggered = self._check_limits()
+
+            # Emit budget update event
+            try:
+                emitter = EventEmitter.get_instance()
+                emitter.emit(
+                    EventType.BUDGET_UPDATE,
+                    {
+                        "daily_spend": self._daily_spend,
+                        "monthly_spend": self._monthly_spend,
+                        "task_id": task_id,
+                        "cost": cost_usd,
+                    },
+                    source="budget_tracker",
+                )
+            except Exception as e:
+                logger.debug(f"Failed to emit budget update event: {e}")
+
+            return {
+                "success": True,
+                "daily_spend": self._daily_spend,
+                "monthly_spend": self._monthly_spend,
+                "alerts_triggered": alerts_triggered,
+            }
+
+    def _add_usage_to_redis(self, record: UsageRecord) -> None:
+        """Add usage record to Redis list."""
+        if not self._use_redis or not self._redis_client:
+            return
+
+        try:
+            key = self._get_redis_key("usage_history")
+            data = {
+                "task_id": record.task_id,
+                "timestamp": record.timestamp.isoformat(),
+                "provider": record.provider,
+                "model": record.model,
+                "tokens": record.tokens_used,
+                "cost": record.cost_usd,
+                "category": record.category,
+            }
+            self._redis_client.lpush(key, str(data))
+            self._redis_client.ltrim(key, 0, 9999)  # Keep last 10000
+
+            # Set expiration
+            now = datetime.now()
+            end_of_month = (now.replace(day=28) + timedelta(days=4)).replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )
+            self._redis_client.expireat(key, int(end_of_month.timestamp()))
+        except Exception as e:
+            logger.warning(f"Failed to add usage to Redis: {e}")
+
+    def _check_limits(self) -> list[dict[str, Any]]:
+        """Check budget limits and generate alerts."""
+        alerts = []
+        config = self._config.budget
+
+        monthly_pct = (
+            (self._monthly_spend / config.monthly_limit * 100) if config.monthly_limit > 0 else 0
+        )
+        daily_pct = (self._daily_spend / config.daily_limit * 100) if config.daily_limit > 0 else 0
+
+        # Check thresholds
+        for threshold in config.alert_thresholds:
+            pct = threshold * 100
+            if monthly_pct >= pct:
+                alert = BudgetAlertInternal(
+                    id=f"threshold-{int(pct)}-{datetime.now().strftime('%Y%m%d')}",
+                    type="threshold_exceeded",
+                    threshold=pct,
+                    current_value=monthly_pct,
+                    message=f"Monthly budget exceeded {pct:.0f}% ({self._monthly_spend:.2f}/{config.monthly_limit:.2f})",
+                    timestamp=datetime.now(),
+                )
+                self._add_alert(alert)
+                alerts.append({"type": "threshold", "percentage": pct})
+
+        # Check throttling threshold
+        if monthly_pct >= config.auto_throttle_at * 100:
+            alert = BudgetAlertInternal(
+                id=f"throttle-{datetime.now().strftime('%Y%m%d')}",
+                type="throttling_active",
+                threshold=config.auto_throttle_at * 100,
+                current_value=monthly_pct,
+                message=f"Budget throttling activated at {monthly_pct:.1f}%",
+                timestamp=datetime.now(),
+            )
+            self._add_alert(alert)
+            alerts.append({"type": "throttle"})
+
+        # Check hard stop
+        if monthly_pct >= config.hard_stop_at * 100:
+            alert = BudgetAlertInternal(
+                id=f"hardstop-{datetime.now().strftime('%Y%m%d')}",
+                type="hard_stop",
+                threshold=config.hard_stop_at * 100,
+                current_value=monthly_pct,
+                message=f"Budget hard stop reached at {monthly_pct:.1f}%",
+                timestamp=datetime.now(),
+            )
+            self._add_alert(alert)
+            alerts.append({"type": "hard_stop"})
+
+        return alerts
+
+    def _add_alert(self, alert: BudgetAlertInternal) -> None:
+        """Add alert if not already exists for today."""
+        # Check if alert already exists
+        for existing in self._alerts:
+            if existing.id == alert.id and not existing.acknowledged:
+                return
+
+        self._alerts.append(alert)
+
+        # Emit alert event
+        try:
+            emitter = EventEmitter.get_instance()
+            emitter.emit(
+                EventType.BUDGET_ALERT,
+                {
+                    "alert_id": alert.id,
+                    "type": alert.type,
+                    "message": alert.message,
+                    "threshold": alert.threshold,
+                    "current_value": alert.current_value,
+                },
+                source="budget_tracker",
+            )
+        except Exception as e:
+            logger.debug(f"Failed to emit budget alert event: {e}")
+
+        # Notify callbacks
+        for callback in self._alert_callbacks:
+            try:
+                callback(alert)
+            except Exception as e:
+                logger.warning(f"Alert callback failed: {e}")
+
+    def check_limits(self, estimated_cost: float = 0.0) -> dict[str, Any]:
+        """
+        Check if a request is within budget limits.
+
+        Returns:
+            Dict with allowed status and reason if blocked
+        """
+        with self._lock:
+            self._check_and_reset_periods()
+            config = self._config.budget
+
+            # Check per-task limit
+            if estimated_cost > config.per_task_limit:
+                return {
+                    "allowed": False,
+                    "reason": f"Estimated cost ${estimated_cost:.2f} exceeds per-task limit ${config.per_task_limit:.2f}",
+                    "throttling": False,
+                    "hard_stop": False,
+                }
+
+            # Check daily limit
+            if self._daily_spend + estimated_cost > config.daily_limit:
+                return {
+                    "allowed": False,
+                    "reason": f"Daily budget exceeded (${self._daily_spend:.2f}/${config.daily_limit:.2f})",
+                    "throttling": False,
+                    "hard_stop": True,
+                }
+
+            # Check monthly hard stop
+            monthly_pct = (
+                (self._monthly_spend / config.monthly_limit * 100)
+                if config.monthly_limit > 0
+                else 0
+            )
+            hard_stop = monthly_pct >= config.hard_stop_at * 100
+
+            if hard_stop:
+                return {
+                    "allowed": False,
+                    "reason": f"Monthly budget hard stop reached ({monthly_pct:.1f}%)",
+                    "throttling": False,
+                    "hard_stop": True,
+                }
+
+            # Check throttling
+            throttling = monthly_pct >= config.auto_throttle_at * 100
+
+            return {
+                "allowed": True,
+                "reason": None,
+                "throttling": throttling,
+                "hard_stop": False,
+                "daily_percentage": (self._daily_spend / config.daily_limit * 100)
+                if config.daily_limit > 0
+                else 0,
+                "monthly_percentage": monthly_pct,
+            }
+
+    def get_daily_spend(self) -> float:
+        """Get current daily spending."""
+        with self._lock:
+            self._check_and_reset_periods()
+            return self._daily_spend
+
+    def get_monthly_spend(self) -> float:
+        """Get current monthly spending."""
+        with self._lock:
+            self._check_and_reset_periods()
+            return self._monthly_spend
+
+    def get_usage_history(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Get usage history for a date range."""
+        with self._lock:
+            # Try Redis first if available
+            if self._use_redis:
+                return self._get_usage_from_redis(start_date, end_date, limit)
+
+            # Use in-memory storage
+            results = []
+            for record in reversed(self._usage_history):
+                if start_date <= record.timestamp <= end_date:
+                    results.append(
+                        {
+                            "task_id": record.task_id,
+                            "timestamp": record.timestamp.isoformat(),
+                            "provider": record.provider,
+                            "model": record.model,
+                            "tokens": record.tokens_used,
+                            "cost": record.cost_usd,
+                            "category": record.category,
+                        }
+                    )
+                    if len(results) >= limit:
+                        break
+            return results
+
+    def _get_usage_from_redis(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Get usage history from Redis."""
+        if not self._use_redis or not self._redis_client:
+            return []
+
+        try:
+            key = self._get_redis_key("usage_history")
+            items = self._redis_client.lrange(key, 0, limit * 2)  # Get extra for filtering
+
+            results = []
+            for item in items:
+                try:
+                    data = eval(item)  # Safe since we control the data format
+                    ts = datetime.fromisoformat(data["timestamp"])
+                    if start_date <= ts <= end_date:
+                        results.append(data)
+                        if len(results) >= limit:
+                            break
+                except Exception:
+                    continue
+            return results
+        except Exception as e:
+            logger.warning(f"Failed to get usage from Redis: {e}")
+            return []
+
+    def get_usage_summary(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> list[dict[str, Any]]:
+        """Get usage summary grouped by provider/model."""
+        history = self.get_usage_history(start_date, end_date, limit=10000)
+
+        # Group by provider/model
+        groups: dict[tuple[str, str], dict[str, Any]] = {}
+        total_cost = 0.0
+
+        for item in history:
+            key = (item["provider"], item["model"])
+            if key not in groups:
+                groups[key] = {
+                    "provider": item["provider"],
+                    "model": item["model"],
+                    "requests": 0,
+                    "tokens": 0,
+                    "cost": 0.0,
+                }
+            groups[key]["requests"] += 1
+            groups[key]["tokens"] += item["tokens"]
+            groups[key]["cost"] += item["cost"]
+            total_cost += item["cost"]
+
+        # Calculate percentages
+        results = []
+        for group in groups.values():
+            group["percentage"] = (group["cost"] / total_cost * 100) if total_cost > 0 else 0
+            results.append(group)
+
+        # Sort by cost descending
+        results.sort(key=lambda x: x["cost"], reverse=True)
+        return results
+
+    def get_alerts(self, include_acknowledged: bool = False) -> list[dict[str, Any]]:
+        """Get current alerts."""
+        with self._lock:
+            results = []
+            for alert in self._alerts:
+                if include_acknowledged or not alert.acknowledged:
+                    results.append(
+                        {
+                            "id": alert.id,
+                            "type": alert.type,
+                            "threshold": alert.threshold,
+                            "current_value": alert.current_value,
+                            "message": alert.message,
+                            "timestamp": alert.timestamp.isoformat(),
+                            "acknowledged": alert.acknowledged,
+                        }
+                    )
+            return results
+
+    def acknowledge_alert(self, alert_id: str) -> bool:
+        """Acknowledge an alert."""
+        with self._lock:
+            for alert in self._alerts:
+                if alert.id == alert_id:
+                    alert.acknowledged = True
+                    logger.info(f"Alert {alert_id} acknowledged")
+                    return True
+            return False
+
+    def on_alert(self, callback: Callable[[BudgetAlertInternal], None]) -> None:
+        """Register alert callback."""
+        self._alert_callbacks.append(callback)
+
+    def reset_spending(self) -> None:
+        """Reset all spending (for testing)."""
+        with self._lock:
+            self._daily_spend = 0.0
+            self._monthly_spend = 0.0
+            self._usage_history.clear()
+            if self._use_redis:
+                try:
+                    self._redis_client.delete(self._get_redis_key("daily_spend"))
+                    self._redis_client.delete(self._get_redis_key("monthly_spend"))
+                    self._redis_client.delete(self._get_redis_key("usage_history"))
+                except Exception as e:
+                    logger.warning(f"Failed to reset Redis: {e}")
+            logger.info("Budget spending reset")
+
+
+# =============================================================================
+# Global Budget Tracker Instance
+# =============================================================================
+
+_budget_tracker: BudgetTracker | None = None
+_budget_tracker_lock = threading.Lock()
+
+
+def _init_budget_tracker() -> BudgetTracker:
+    """Initialize the global budget tracker instance."""
+    global _budget_tracker
+    with _budget_tracker_lock:
+        if _budget_tracker is None:
+            _budget_tracker = BudgetTracker(use_redis=True)
+    return _budget_tracker
 
 
 class BudgetStatus(BaseModel):
@@ -118,8 +684,11 @@ class BudgetLimitsResponse(BaseModel):
     error: str | None = None
 
 
-def get_budget_tracker() -> Any:
+def get_budget_tracker() -> BudgetTracker:
     """Get the budget tracker instance."""
+    global _budget_tracker
+    if _budget_tracker is None:
+        return _init_budget_tracker()
     return _budget_tracker
 
 

@@ -316,7 +316,7 @@ class CodeAuditor:
                 input=code,
                 capture_output=True,
                 text=True,
-                timeout=10,
+                timeout=60,
             )
 
             if result.stdout:
@@ -364,7 +364,7 @@ class CodeAuditor:
                 input=code,
                 capture_output=True,
                 text=True,
-                timeout=15,
+                timeout=60,
             )
 
             if result.stdout:
@@ -431,7 +431,7 @@ class CodeAuditor:
                 ["mypy", "--output=json", temp_path],
                 capture_output=True,
                 text=True,
-                timeout=15,
+                timeout=60,
             )
 
             import os

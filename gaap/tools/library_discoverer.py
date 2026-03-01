@@ -194,23 +194,48 @@ class LibraryDiscoverer:
                 await asyncio.sleep(min_interval - elapsed)
             self._last_github_request = time.time()
 
+    async def _fetch_with_retry(
+        self, url: str, headers: dict[str, str] | None = None, max_retries: int = 3
+    ) -> aiohttp.ClientResponse:
+        for attempt in range(max_retries):
+            try:
+                session = await self._get_session()
+                async with session.get(url, headers=headers, timeout=10) as response:
+                    if response.status == 200:
+                        return response
+                    elif response.status in (403, 404):
+                        return response
+                    else:
+                        raise aiohttp.ClientError(f"HTTP {response.status}")
+            except asyncio.TimeoutError as e:
+                if attempt == max_retries - 1:
+                    raise
+                self._logger.warning(f"Request timeout (attempt {attempt + 1}): {url}")
+                await asyncio.sleep(2**attempt)
+            except aiohttp.ClientError as e:
+                if attempt == max_retries - 1:
+                    raise
+                self._logger.warning(f"Request failed (attempt {attempt + 1}): {e}")
+                await asyncio.sleep(2**attempt)
+        raise aiohttp.ClientError(f"Max retries exceeded for {url}")
+
     async def _fetch_json(
         self, url: str, headers: dict[str, str] | None = None, source: str = ""
     ) -> dict[str, Any] | None:
         try:
             await self._rate_limit_wait(source)
-            session = await self._get_session()
-            async with session.get(url, headers=headers) as response:
-                if response.status == 200:
-                    return await response.json()
-                elif response.status == 403:
-                    self._logger.warning(f"Rate limited by {source}: {url}")
-                    return None
-                elif response.status == 404:
-                    return None
-                else:
-                    self._logger.error(f"HTTP {response.status} from {source}: {url}")
-                    return None
+            response = await self._fetch_with_retry(url, headers=headers)
+
+            if response.status == 200:
+                return await response.json()
+            elif response.status == 403:
+                self._logger.warning(f"Rate limited by {source}: {url}")
+                return None
+            elif response.status == 404:
+                return None
+            else:
+                self._logger.error(f"HTTP {response.status} from {source}: {url}")
+                return None
         except asyncio.TimeoutError:
             self._logger.error(f"Timeout fetching {url}")
             return None
@@ -229,19 +254,19 @@ class LibraryDiscoverer:
         libraries: list[LibraryInfo] = []
         try:
             url = f"https://pypi.org/search/?q={query}&page=1"
-            session = await self._get_session()
             await self._rate_limit_wait("pypi")
 
-            async with session.get(url) as response:
-                if response.status != 200:
-                    return SearchResult(
-                        query=query,
-                        libraries=[],
-                        source="pypi",
-                        error=f"HTTP {response.status}",
-                    )
+            response = await self._fetch_with_retry(url)
 
-                html = await response.text()
+            if response.status != 200:
+                return SearchResult(
+                    query=query,
+                    libraries=[],
+                    source="pypi",
+                    error=f"HTTP {response.status}",
+                )
+
+            html = await response.text()
 
             import re
 
@@ -294,24 +319,24 @@ class LibraryDiscoverer:
             }
 
             await self._rate_limit_wait("github")
-            session = await self._get_session()
             url = f"{GITHUB_SEARCH_API}?q={params['q']}&sort={params['sort']}&order={params['order']}&per_page={params['per_page']}"
 
-            async with session.get(url, headers=headers) as response:
-                if response.status == 403:
-                    return SearchResult(
-                        query=query,
-                        source="github",
-                        error="Rate limited",
-                    )
-                if response.status != 200:
-                    return SearchResult(
-                        query=query,
-                        source="github",
-                        error=f"HTTP {response.status}",
-                    )
+            response = await self._fetch_with_retry(url, headers=headers)
 
-                data = await response.json()
+            if response.status == 403:
+                return SearchResult(
+                    query=query,
+                    source="github",
+                    error="Rate limited",
+                )
+            if response.status != 200:
+                return SearchResult(
+                    query=query,
+                    source="github",
+                    error=f"HTTP {response.status}",
+                )
+
+            data = await response.json()
 
             items = data.get("items", [])
 

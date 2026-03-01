@@ -6,6 +6,7 @@ import os
 import re
 import secrets
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum, auto
@@ -142,7 +143,7 @@ class PromptFirewall:
     def __init__(self, strictness: str = "high"):
         self.strictness = strictness
         self._logger = logging.getLogger("gaap.security.firewall")
-        self._scan_history: list[FirewallResult] = []
+        self._scan_history: deque[FirewallResult] = deque(maxlen=1000)
         self._blocked_count = 0
 
     def scan(self, input_text: str, context: dict[str, Any] | None = None) -> FirewallResult:

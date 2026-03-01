@@ -12,6 +12,19 @@ from gaap.core.exceptions import (
     SyntaxAxiomError,
 )
 
+BANNED_PACKAGES: set[str] = {
+    "pickle",  # Arbitrary code execution
+    "marshal",  # Similar risks to pickle
+    "shelve",  # Uses pickle internally
+    "subprocess",  # Shell/command injection
+    "os",  # System access (already in known but should be restricted)
+}
+
+
+def is_package_banned(package_name: str) -> bool:
+    """Check if a package is banned for security reasons."""
+    return package_name in BANNED_PACKAGES
+
 
 class AxiomLevel(Enum):
     """مستويات البديهيات"""
@@ -96,7 +109,6 @@ KNOWN_PACKAGES: set[str] = {
     "asyncio",
     "json",
     "logging",
-    "os",
     "re",
     "sys",
     "time",
@@ -116,7 +128,6 @@ KNOWN_PACKAGES: set[str] = {
     "copy",
     "io",
     "tempfile",
-    "subprocess",
     "threading",
     "multiprocessing",
     "queue",
@@ -142,8 +153,6 @@ KNOWN_PACKAGES: set[str] = {
     "gc",
     "inspect",
     "dis",
-    "pickle",
-    "shelve",
     "dbm",
     "sqlite3",
     "bisect",

@@ -2,6 +2,7 @@
 import asyncio
 import random
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -75,14 +76,32 @@ class ProviderHealth:
         self.circuit_open_since = datetime.now()
 
     def should_try_circuit(self, timeout_seconds: int) -> bool:
-        """هل يجب محاولة اختبار الدائرة؟"""
+        """Check if circuit should be tested (and auto-close if timeout passed)."""
         if not self.circuit_open or self.circuit_open_since is None:
             return True
 
         elapsed = (datetime.now() - self.circuit_open_since).total_seconds()
-        return elapsed >= timeout_seconds
+        should_try = elapsed >= timeout_seconds
+
+        # Auto-close circuit if timeout passed
+        if should_try:
+            self.circuit_open = False
+            self.circuit_open_since = None
+
+        return should_try
+
+    def try_close_circuit(self) -> bool:
+        """Attempt to close the circuit. Returns True if circuit was closed."""
+        if not self.circuit_open:
+            return False
+
+        self.circuit_open = False
+        self.circuit_open_since = None
+        return True
 
 
+# =============================================================================
+# Fallback Chain
 # =============================================================================
 # Fallback Chain
 # =============================================================================
@@ -144,7 +163,7 @@ class FallbackManager:
         self._chains: dict[str, FallbackChain] = {}
 
         # إحصائيات
-        self._fallback_events: list[dict[str, Any]] = []
+        self._fallback_events: deque[dict[str, Any]] = deque(maxlen=1000)
         self._total_fallbacks = 0
         self._successful_recoveries = 0
 
@@ -393,10 +412,6 @@ class FallbackManager:
         }
 
         self._fallback_events.append(event)
-
-        # تقليم السجلات
-        if len(self._fallback_events) > 1000:
-            self._fallback_events = self._fallback_events[-1000:]
 
     def get_health_status(self) -> dict[str, Any]:
         """الحصول على حالة الصحة"""

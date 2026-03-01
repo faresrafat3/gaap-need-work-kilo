@@ -835,17 +835,18 @@ def audit_codebase_for_secrets(
     ]
     exclude_patterns = exclude_patterns or default_excludes
 
-    # Common secret patterns
-    patterns = [
-        (r'api[_-]?key\s*=\s*["\']([a-zA-Z0-9_-]{20,})["\']', "api_key"),
-        (r'api[_-]?secret\s*=\s*["\']([a-zA-Z0-9_-]{20,})["\']', "api_secret"),
-        (r'token\s*=\s*["\']([a-zA-Z0-9_-]{20,})["\']', "token"),
-        (r'password\s*=\s*["\']([^"\']{8,})["\']', "password"),
-        (r'private[_-]?key\s*=\s*["\']([^"\']{20,})["\']', "private_key"),
-        (r"(sk-[a-zA-Z0-9]{20,})", "sk_token"),
-        (r"(AIza[0-9A-Za-z_-]{35,})", "gemini_key"),
-        (r"(ghp_[a-zA-Z0-9]{36,})", "github_token"),
+    # Map SUSPICIOUS_PATTERNS to names for reporting
+    pattern_names = [
+        "api_key",
+        "api_secret",
+        "token",
+        "password",
+        "private_key",
+        "sk_token",
+        "gemini_key",
+        "github_token",
     ]
+    patterns = list(zip(SUSPICIOUS_PATTERNS, pattern_names))
 
     # Scan Python files
     for file_path in path.rglob("*.py"):

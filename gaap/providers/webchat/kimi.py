@@ -77,16 +77,43 @@ class KimiWebChat(WebChatProvider):
 
     @staticmethod
     def _extract_user_id_from_jwt(token: str) -> str:
-        """Extract 'sub' (user ID) from JWT payload without verification."""
+        """Extract 'sub' (user ID) from JWT payload WITHOUT verification.
+
+        SECURITY WARNING: This function decodes the JWT without verifying the signature.
+        It is used here because:
+        1. The token is obtained directly from browser automation after HTTPS login
+        2. We do not have Kimi's secret/public key to verify the signature
+        3. This is ONLY for extracting user_id from internally-captured tokens
+
+        DO NOT use this for tokens received from untrusted sources.
+        For production use with external tokens, implement proper JWT verification:
+
+            import jwt
+            payload = jwt.decode(token, secret_key, algorithms=["HS256"])
+            return payload.get("sub", "")
+        """
+        logger.warning("Extracting JWT payload without signature verification - security risk!")
         try:
             parts = token.split(".")
-            if len(parts) < 2:
-                return ""
+            if len(parts) != 3:
+                raise ValueError(f"Invalid JWT format: expected 3 parts, got {len(parts)}")
+            # Add padding if needed for base64 decoding
             payload_b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
-            payload = json.loads(base64.urlsafe_b64decode(payload_b64))
-            return str(payload.get("sub", ""))
+            payload_bytes = base64.urlsafe_b64decode(payload_b64)
+            payload = json.loads(payload_bytes)
+            user_id = payload.get("sub")
+            if not user_id:
+                logger.warning("JWT payload missing 'sub' claim (user_id)")
+                return ""
+            return str(user_id)
+        except json.JSONDecodeError as e:
+            logger.error(f"JWT payload is not valid JSON: {e}")
+            return ""
+        except base64.binascii.Error as e:
+            logger.error(f"JWT payload base64 decoding failed: {e}")
+            return ""
         except Exception as e:
-            logger.debug(f"JWT parsing failed: {e}")
+            logger.error(f"JWT parsing failed: {e}")
             return ""
 
     async def _capture_auth(self, page: Any, nodriver_module: Any, timeout: int) -> WebChatAuth:

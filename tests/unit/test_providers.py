@@ -123,24 +123,31 @@ class TestRateLimitState:
         assert state.current_requests == 0
         assert state.current_tokens == 0
 
-    def test_is_allowed_within_limits(self):
+    @pytest.mark.asyncio
+    async def test_is_allowed_within_limits(self):
         state = RateLimitState(requests_per_minute=10, tokens_per_minute=1000)
-        assert state.is_allowed(tokens=100) is True
+        result = await state.is_allowed(tokens=100)
+        assert result is True
 
-    def test_is_allowed_at_request_limit(self):
+    @pytest.mark.asyncio
+    async def test_is_allowed_at_request_limit(self):
         state = RateLimitState(requests_per_minute=5, tokens_per_minute=1000)
         for _ in range(5):
-            state.record_request(tokens=50)
-        assert state.is_allowed(tokens=100) is False
+            await state.record_request(tokens=50)
+        result = await state.is_allowed(tokens=100)
+        assert result is False
 
-    def test_is_allowed_at_token_limit(self):
+    @pytest.mark.asyncio
+    async def test_is_allowed_at_token_limit(self):
         state = RateLimitState(requests_per_minute=10, tokens_per_minute=500)
-        state.record_request(tokens=400)
-        assert state.is_allowed(tokens=200) is False
+        await state.record_request(tokens=400)
+        result = await state.is_allowed(tokens=200)
+        assert result is False
 
-    def test_record_request(self):
+    @pytest.mark.asyncio
+    async def test_record_request(self):
         state = RateLimitState(requests_per_minute=60)
-        state.record_request(tokens=100)
+        await state.record_request(tokens=100)
         assert state.current_requests == 1
         assert state.current_tokens == 100
 

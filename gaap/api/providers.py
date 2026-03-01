@@ -26,7 +26,8 @@ from pydantic import BaseModel
 
 from gaap.core.observability import observability
 from gaap.providers.base_provider import ProviderFactory
-from gaap.routing.router import SmartRouter
+from gaap.providers.unified_gaap_provider import UnifiedGAAPProvider
+from gaap.routing.router import SmartRouter, RoutingStrategy
 
 logger = logging.getLogger("gaap.api.providers")
 
@@ -76,7 +77,10 @@ def get_router() -> SmartRouter:
     """Get or create the SmartRouter instance."""
     global _router_instance
     if _router_instance is None:
-        _router_instance = SmartRouter()
+        _router_instance = SmartRouter(
+            providers=[UnifiedGAAPProvider()],
+            strategy=RoutingStrategy.SMART,
+        )
     return _router_instance
 
 

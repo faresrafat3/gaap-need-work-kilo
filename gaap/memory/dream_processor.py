@@ -55,9 +55,19 @@ class DreamProcessor:
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         if not VECTOR_MEMORY_AVAILABLE:
-            raise ImportError("Vector memory not available. Install chromadb.")
+            logger.warning(
+                "Vector memory not available. DreamProcessor will use fallback mode. "
+                "Install chromadb for full functionality: pip install chromadb"
+            )
+            self._fallback_mode = True
+            self._fallback_lessons: list[dict[str, Any]] = []
+        else:
+            self._fallback_mode = False
 
-        self._lesson_store = lesson_store or LessonStore()
+        if self._fallback_mode:
+            self._lesson_store = None
+        else:
+            self._lesson_store = lesson_store or LessonStore()
         self._logger = logger
 
     async def process_daily_logs(self, days: int = 1) -> DreamResult:
@@ -106,12 +116,22 @@ class DreamProcessor:
                 self._logger.debug(f"Failed to process {log_file}: {e}")
 
         for lesson in lessons:
-            self._lesson_store.store_lesson(
-                lesson=lesson,
-                context="dream_processor",
-                category="learned",
-                success=False,
-            )
+            if self._fallback_mode:
+                self._fallback_lessons.append(
+                    {
+                        "lesson": lesson,
+                        "context": "dream_processor",
+                        "category": "learned",
+                        "success": False,
+                    }
+                )
+            else:
+                self._lesson_store.store_lesson(
+                    lesson=lesson,
+                    context="dream_processor",
+                    category="learned",
+                    success=False,
+                )
 
         processing_time = (time.time() - start_time) * 1000
 
@@ -135,6 +155,39 @@ class DreamProcessor:
         This is a higher-level synthesis that combines multiple
         related lessons into general principles.
         """
+        if self._fallback_mode:
+            all_lessons = self._fallback_lessons
+            if len(all_lessons) < 5:
+                return {"consolidated": 0, "reason": "Not enough lessons to consolidate"}
+
+            categories: dict[str, list[str]] = {}
+            for result in all_lessons:
+                cat = result.get("category", "general")
+                if cat not in categories:
+                    categories[cat] = []
+                categories[cat].append(result["lesson"])
+
+            consolidated = 0
+            for category, items in categories.items():
+                if len(items) >= 3:
+                    principle = self._synthesize_principle(items)
+                    if principle:
+                        self._fallback_lessons.append(
+                            {
+                                "lesson": f"PRINCIPLE: {principle}",
+                                "context": "dream_consolidation",
+                                "category": category,
+                                "success": True,
+                            }
+                        )
+                        consolidated += 1
+
+            return {
+                "consolidated": consolidated,
+                "categories_processed": len(categories),
+                "fallback_mode": True,
+            }
+
         all_lessons = self._lesson_store.search("", n=100)
 
         if len(all_lessons) < 5:

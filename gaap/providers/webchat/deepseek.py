@@ -15,6 +15,7 @@ import base64
 import json
 import logging
 import os
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -54,6 +55,14 @@ class DeepSeekWebChat(WebChatProvider):
     }
 
     _MAX_RESPONSE_BYTES = 512 * 1024
+
+    def __init__(self, account: str = "default") -> None:
+        super().__init__(account)
+        if not shutil.which("node"):
+            raise RuntimeError(
+                "Node.js is required for DeepSeek PoW solver. "
+                "Please install Node.js: https://nodejs.org/"
+            )
 
     async def _capture_auth(self, page: Any, nodriver_module: Any, timeout: int) -> WebChatAuth:
         """Capture Bearer token from chat.deepseek.com requests."""

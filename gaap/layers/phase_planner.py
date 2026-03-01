@@ -16,6 +16,7 @@ Modes:
 - full: Complete reanalysis
 """
 
+import asyncio
 import json
 import time
 from dataclasses import dataclass, field
@@ -100,10 +101,13 @@ class PhaseDiscoveryEngine:
             mode = await self._infer_discovery_mode(context)
 
         if self._provider and mode == "deep":
-            phases = await self._llm_discover_phases(context)
-            if phases:
-                self._llm_discoveries += 1
-                return phases
+            try:
+                phases = await asyncio.wait_for(self._llm_discover_phases(context), timeout=30.0)
+                if phases:
+                    self._llm_discoveries += 1
+                    return phases
+            except asyncio.TimeoutError:
+                self._logger.warning("Phase discovery LLM call timed out after 30s")
 
         phases = self._fallback_discover_phases(context)
         self._fallback_discoveries += 1

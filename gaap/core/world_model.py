@@ -12,6 +12,7 @@ Usage:
         # Choose safer alternative
 """
 
+import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
@@ -112,7 +113,13 @@ class WorldModel:
         base_risk = self._calculate_base_risk(action, similar_outcomes)
 
         if self._enable_llm:
-            llm_prediction = await self._llm_predict(action, context, similar_outcomes)
+            try:
+                llm_prediction = await asyncio.wait_for(
+                    self._llm_predict(action, context, similar_outcomes), timeout=10.0
+                )
+            except Exception as e:
+                self._logger.warning(f"LLM prediction failed: {e}, using heuristic fallback")
+                llm_prediction = self._heuristic_predict(action, context, similar_outcomes)
             risk_level = (base_risk + llm_prediction.get("risk", base_risk)) / 2
             issues = llm_prediction.get("issues", [])
             suggestions = llm_prediction.get("suggestions", [])
@@ -297,6 +304,25 @@ Parameters: {action.parameters}{context_str}{similar_str}"""
                 break
 
         return suggestions
+
+    def _heuristic_predict(
+        self,
+        action: Action,
+        context: dict[str, Any] | None,
+        similar_outcomes: list[str],
+    ) -> dict[str, Any]:
+        """Heuristic fallback prediction when LLM fails"""
+        risk = self._calculate_base_risk(action, similar_outcomes)
+        issues = self._rule_based_issues(action)
+        suggestions = self._rule_based_suggestions(action, similar_outcomes)
+
+        return {
+            "risk": risk,
+            "issues": issues,
+            "suggestions": suggestions,
+            "confidence": 0.6 if similar_outcomes else 0.3,
+            "reasoning": "Heuristic prediction (LLM failed)",
+        }
 
     def get_stats(self) -> dict[str, Any]:
         """Get prediction statistics"""

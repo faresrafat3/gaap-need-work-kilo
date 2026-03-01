@@ -583,6 +583,7 @@ class TestEventEmitterEdgeCases:
     def test_history_large_data(self):
         """Test history with large data payloads"""
         emitter = EventEmitter()
+        emitter.clear_history()
         large_data = {"data": "x" * 10000}
 
         event = emitter.emit(EventType.CONFIG_CHANGED, large_data)

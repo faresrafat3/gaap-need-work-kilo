@@ -20,6 +20,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from gaap.providers.webchat_bridge import create_kimi_provider
 from gaap.research import (
     DDEConfig,
     DeepDiscoveryEngine,
@@ -38,7 +39,8 @@ def get_engine() -> DeepDiscoveryEngine:
     """Get or create engine instance."""
     global _engine
     if _engine is None:
-        _engine = DeepDiscoveryEngine()
+        provider = create_kimi_provider(timeout=120)
+        _engine = DeepDiscoveryEngine(llm_provider=provider)
     return _engine
 
 

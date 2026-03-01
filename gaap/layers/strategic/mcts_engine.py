@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
@@ -540,6 +541,7 @@ class MCTSStrategic:
         intent: Any,
         context: dict[str, Any] | None = None,
         root_content: str = "Root Decision",
+        timeout_seconds: float = 30.0,
     ) -> tuple[MCTSNode, dict[str, Any]]:
         """
         Perform MCTS search.
@@ -565,7 +567,12 @@ class MCTSStrategic:
             "llm_calls": 0,
         }
 
+        start_time = time.time()
         for i in range(self.config.iterations):
+            # Check timeout
+            if time.time() - start_time >= timeout_seconds:
+                self._logger.warning(f"MCTS search timeout after {i} iterations")
+                break
             self._stats["iterations"] = i + 1
 
             # Phase 1: Selection
@@ -591,6 +598,7 @@ class MCTSStrategic:
         self._stats["final_value"] = result_node.average_value
         self._stats["total_visits"] = self._root.visits
         self._stats["tree_depth"] = self._get_tree_depth(self._root)
+        self._stats["timeout_reached"] = time.time() - start_time >= timeout_seconds
 
         return result_node, self._stats
 

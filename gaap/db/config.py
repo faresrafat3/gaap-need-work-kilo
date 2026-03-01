@@ -11,6 +11,12 @@ from pathlib import Path
 from typing import Final
 
 
+class ConfigurationError(Exception):
+    """Raised when a required configuration is missing or invalid."""
+
+    pass
+
+
 @dataclass(frozen=True)
 class DatabaseSettings:
     """Database configuration settings.
@@ -28,8 +34,8 @@ class DatabaseSettings:
 
     database_url: str
     async_database_url: str
-    pool_size: int = 10
-    max_overflow: int = 20
+    pool_size: int = 5
+    max_overflow: int = 5
     pool_pre_ping: bool = True
     pool_recycle: int = 3600
     echo: bool = False
@@ -64,7 +70,12 @@ def _get_database_url() -> tuple[str, str]:
     pg_host = os.getenv("POSTGRES_HOST", "localhost")
     pg_port = os.getenv("POSTGRES_PORT", "5432")
     pg_user = os.getenv("POSTGRES_USER", "gaap")
-    pg_pass = os.getenv("POSTGRES_PASSWORD", "gaap")
+    pg_pass = os.getenv("POSTGRES_PASSWORD")
+    if not pg_pass:
+        raise ConfigurationError(
+            "POSTGRES_PASSWORD must be set. "
+            "Use a strong password: export POSTGRES_PASSWORD=your_secure_password"
+        )
     pg_db = os.getenv("POSTGRES_DB", "gaap")
 
     # Use PostgreSQL if configured
@@ -95,8 +106,9 @@ def get_db_settings() -> DatabaseSettings:
         POSTGRES_DB: PostgreSQL database name
         USE_POSTGRES: Set to 'true' to use PostgreSQL
         GAAP_DB_PATH: SQLite database path
-        DB_POOL_SIZE: Connection pool size (default: 10)
-        DB_MAX_OVERFLOW: Max pool overflow (default: 20)
+        DB_POOL_SIZE: Connection pool size (default: 5)
+        DB_MAX_OVERFLOW: Max pool overflow (default: 5)
+                          With 4 workers, total connections = 4 * (5+5) = 40
         DB_POOL_PRE_PING: Enable health checks (default: true)
         DB_POOL_RECYCLE: Connection recycle seconds (default: 3600)
         DB_ECHO: Enable SQL logging (default: false)
@@ -119,8 +131,8 @@ def get_db_settings() -> DatabaseSettings:
     return DatabaseSettings(
         database_url=sync_url,
         async_database_url=async_url,
-        pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
-        max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "20")),
+        pool_size=int(os.getenv("DB_POOL_SIZE", "5")),
+        max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "5")),
         pool_pre_ping=os.getenv("DB_POOL_PRE_PING", "true").lower() == "true",
         pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "3600")),
         echo=os.getenv("DB_ECHO", "false").lower() == "true",

@@ -9,10 +9,14 @@ Provides endpoints for:
 - Axiom compliance
 """
 
+import logging
+import uuid
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from gaap.validators import (
     ASTGuard,
@@ -67,7 +71,11 @@ async def validate_ast(request: CodeValidationRequest) -> ValidationResponse:
             },
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_id = str(uuid.uuid4())
+        logger.error(f"AST validation error [{error_id}]: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Internal validation error. Error ID: {error_id}"
+        )
 
 
 @router.post("/performance", response_model=ValidationResponse)
@@ -90,7 +98,11 @@ async def validate_performance(request: CodeValidationRequest) -> ValidationResp
             warnings=[issue.get("message", "") for issue in report.issues],
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_id = str(uuid.uuid4())
+        logger.error(f"Performance validation error [{error_id}]: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Internal validation error. Error ID: {error_id}"
+        )
 
 
 @router.post("/axiom", response_model=ValidationResponse)
@@ -120,7 +132,11 @@ async def validate_axiom(request: CodeValidationRequest) -> ValidationResponse:
             },
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_id = str(uuid.uuid4())
+        logger.error(f"Axiom validation error [{error_id}]: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Internal validation error. Error ID: {error_id}"
+        )
 
 
 @router.post("/behavioral", response_model=ValidationResponse)
@@ -140,4 +156,8 @@ async def validate_behavioral(request: CodeValidationRequest) -> ValidationRespo
             warnings=report.execution_errors,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_id = str(uuid.uuid4())
+        logger.error(f"Behavioral validation error [{error_id}]: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Internal validation error. Error ID: {error_id}"
+        )

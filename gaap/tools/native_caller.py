@@ -128,7 +128,14 @@ class NativeToolCaller:
         return self.TOOL_CALL_PROMPT.format(tools="\n".join(desc))
 
     def execute_call(self, call: ToolCall) -> ToolResult:
-        pass
+        if call.name not in self._tools:
+            return ToolResult(
+                call_id=call.call_id,
+                name=call.name,
+                output="",
+                success=False,
+                error=f"Unknown tool: {call.name}",
+            )
 
         try:
             res = self._default_execute(call.name, call.arguments)

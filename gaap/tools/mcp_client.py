@@ -134,42 +134,32 @@ class MCPClient:
 
             full_command = shutil.which(command) or command
 
-            process = await asyncio.create_subprocess_exec(
-                full_command,
-                *config.args,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env={**dict(os.environ), **config.env},
-            )
+            try:
+                process = await asyncio.wait_for(
+                    asyncio.create_subprocess_exec(
+                        full_command,
+                        *config.args,
+                        stdin=asyncio.subprocess.PIPE,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                        env={**dict(os.environ), **config.env},
+                    ),
+                    timeout=30.0,
+                )
+            except asyncio.TimeoutError:
+                raise TimeoutError("MCP server process creation timed out")
 
             connection.process = process
 
-            await self._send_request(
-                connection,
-                "initialize",
-                {
-                    "protocolVersion": "2024-11-05",
-                    "capabilities": {},
-                    "clientInfo": {"name": "gaap", "version": "1.0.0"},
-                },
-            )
-
-            await self._send_request(connection, "notifications/initialized", {})
-
-            tools_result = await self._send_request(connection, "tools/list", {})
-            if tools_result and "tools" in tools_result:
-                for tool_data in tools_result["tools"]:
-                    connection.tools.append(
-                        MCPTool(
-                            name=tool_data.get("name", ""),
-                            description=tool_data.get("description", ""),
-                            input_schema=tool_data.get("inputSchema", {}),
-                            server_name=name,
-                        )
-                    )
-
-            connection.state = MCPConnectionState.CONNECTED
+            try:
+                await asyncio.wait_for(
+                    self._initialize_connection(connection),
+                    timeout=60.0,
+                )
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
+                raise TimeoutError("MCP server connection initialization timed out")
             self._logger.info(
                 f"Connected to MCP server '{name}' with {len(connection.tools)} tools"
             )
@@ -180,6 +170,34 @@ class MCPClient:
             connection.error = str(e)
             self._logger.error(f"Failed to connect to MCP server '{name}': {e}")
             return False
+
+    async def _initialize_connection(self, connection: MCPConnection) -> None:
+        """Initialize MCP connection: send init request and list tools"""
+        await self._send_request(
+            connection,
+            "initialize",
+            {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "gaap", "version": "1.0.0"},
+            },
+        )
+
+        await self._send_request(connection, "notifications/initialized", {})
+
+        tools_result = await self._send_request(connection, "tools/list", {})
+        if tools_result and "tools" in tools_result:
+            for tool_data in tools_result["tools"]:
+                connection.tools.append(
+                    MCPTool(
+                        name=tool_data.get("name", ""),
+                        description=tool_data.get("description", ""),
+                        input_schema=tool_data.get("inputSchema", {}),
+                        server_name=connection.config.name,
+                    )
+                )
+
+        connection.state = MCPConnectionState.CONNECTED
 
     async def disconnect(self, name: str) -> None:
         """Disconnect from an MCP server"""

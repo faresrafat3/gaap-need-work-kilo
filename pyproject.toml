@@ -164,7 +164,7 @@ show_column_numbers = true
 pretty = true
 
 [[tool.mypy.overrides]]
-module = ["aiohttp.*", "httpx.*", "yaml.*", "orjson.*", "structlog.*", "g4f.*", "chromadb.*"]
+module = ["aiohttp.*", "httpx.*", "yaml.*", "orjson.*", "structlog.*", "g4f.*", "chromadb.*", "redis.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

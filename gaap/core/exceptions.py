@@ -1,3 +1,4 @@
+import os
 import traceback
 from datetime import datetime
 from typing import Any
@@ -41,8 +42,9 @@ class GAAPException(Exception):
         self.timestamp = datetime.now()
         self.traceback = traceback.format_exc() if cause else None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, include_traceback: bool = False) -> dict[str, Any]:
         """تحويل الاستثناء إلى قاموس للتسجيل والاستجابة"""
+        is_development = os.getenv("GAAP_ENVIRONMENT", "production") == "development"
         return {
             "error_code": self.error_code,
             "error_category": self.error_category,
@@ -54,7 +56,9 @@ class GAAPException(Exception):
             "timestamp": self.timestamp.isoformat(),
             "context": self.context,
             "cause": str(self.cause) if self.cause else None,
-            "traceback": self.traceback,
+            "traceback": self.traceback
+            if (include_traceback and is_development)
+            else "[hidden in production]",
         }
 
     def __str__(self) -> str:

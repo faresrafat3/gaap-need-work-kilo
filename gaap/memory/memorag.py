@@ -57,8 +57,10 @@ class KnowledgeGraph:
     رسم معرفي للعلاقات بين المفاهيم
     """
 
-    def __init__(self) -> None:
-        self.nodes: dict[str, KnowledgeNode] = {}
+    def __init__(self, max_nodes: int = 10000, max_edges: int = 50000) -> None:
+        self._max_nodes = max_nodes
+        self._max_edges = max_edges
+        self.nodes: OrderedDict[str, KnowledgeNode] = OrderedDict()
         self.edges: list[KnowledgeEdge] = []
         self._adjacency: dict[str, set[str]] = {}
         self._reverse_adjacency: dict[str, set[str]] = {}
@@ -73,6 +75,10 @@ class KnowledgeGraph:
         metadata: dict[str, Any] | None = None,
     ) -> KnowledgeNode:
         """إضافة عقدة"""
+        # Remove oldest node if at capacity (LRU cleanup)
+        if len(self.nodes) >= self._max_nodes:
+            self._remove_oldest_node()
+
         node = KnowledgeNode(
             id=node_id,
             content=content,
@@ -81,11 +87,34 @@ class KnowledgeGraph:
             metadata=metadata or {},
         )
         self.nodes[node_id] = node
+        self.nodes.move_to_end(node_id)
         if node_id not in self._adjacency:
             self._adjacency[node_id] = set()
         if node_id not in self._reverse_adjacency:
             self._reverse_adjacency[node_id] = set()
         return node
+
+    def _remove_oldest_node(self) -> None:
+        """Remove oldest node and clean up related edges (LRU eviction)."""
+        if not self.nodes:
+            return
+        oldest_key = next(iter(self.nodes))
+        del self.nodes[oldest_key]
+
+        # Clean up related edges
+        self.edges = [
+            e for e in self.edges if e.source_id != oldest_key and e.target_id != oldest_key
+        ]
+
+        # Clean up adjacency data
+        self._adjacency.pop(oldest_key, None)
+        self._reverse_adjacency.pop(oldest_key, None)
+
+        # Clean up references from other adjacency sets
+        for adj_set in self._adjacency.values():
+            adj_set.discard(oldest_key)
+        for rev_set in self._reverse_adjacency.values():
+            rev_set.discard(oldest_key)
 
     def retrieve_hybrid(self, query: str, n_results: int = 5) -> list[RetrievalResult]:
         """
@@ -131,6 +160,10 @@ class KnowledgeGraph:
         if source_id not in self.nodes or target_id not in self.nodes:
             self._logger.warning("Cannot add edge: node not found")
             return None
+
+        # Enforce max edges limit
+        if len(self.edges) >= self._max_edges:
+            self.edges.pop(0)
 
         edge = KnowledgeEdge(
             source_id=source_id,
@@ -181,7 +214,7 @@ class KnowledgeGraph:
         if source_id not in self.nodes or target_id not in self.nodes:
             return []
 
-        from collections import deque
+        from collections import deque, OrderedDict
 
         queue = deque([(source_id, [source_id])])
         visited = {source_id}

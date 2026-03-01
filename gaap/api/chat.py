@@ -60,6 +60,37 @@ class CachedProvider:
 
 
 _provider_cache: dict[str, CachedProvider] = {}
+_cleanup_task: asyncio.Task | None = None
+_cleanup_task_started: bool = False
+
+
+async def _start_cache_cleanup_task() -> None:
+    """Background task to periodically clean up expired cache entries."""
+    global _cleanup_task
+    logger.info("Starting provider cache cleanup background task")
+    try:
+        while True:
+            await asyncio.sleep(300)  # Run every 5 minutes (300 seconds)
+            try:
+                _cleanup_expired_cache()
+                logger.debug("Cache cleanup completed")
+            except Exception as e:
+                logger.error(f"Error during cache cleanup: {e}")
+    except asyncio.CancelledError:
+        logger.info("Cache cleanup task cancelled")
+        raise
+    except Exception as e:
+        logger.error(f"Cache cleanup task crashed: {e}")
+        raise
+
+
+def _start_cleanup_if_needed() -> None:
+    """Start the cleanup task if not already running."""
+    global _cleanup_task_started, _cleanup_task
+    if not _cleanup_task_started:
+        _cleanup_task_started = True
+        _cleanup_task = asyncio.create_task(_start_cache_cleanup_task())
+        logger.info("Provider cache cleanup task started")
 
 
 def _cleanup_expired_cache() -> None:
@@ -82,8 +113,7 @@ def get_provider(provider_name: str = "kimi") -> WebChatBridgeProvider:
             f"Invalid provider name length: {len(provider_name) if provider_name else 0}"
         )
 
-    if len(_provider_cache) > 10 or (hash(str(time.time())) % 10 == 0):
-        _cleanup_expired_cache()
+    _start_cleanup_if_needed()
 
     now = time.time()
 
