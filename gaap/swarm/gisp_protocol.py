@@ -24,11 +24,11 @@ Architecture:
          │                           │
 """
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from typing import Any, Literal
-import uuid
 
 
 class MessageType(Enum):

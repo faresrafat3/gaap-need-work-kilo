@@ -1,6 +1,5 @@
 # Self Healer
 import asyncio
-import logging
 import random
 import re
 import time
@@ -9,7 +8,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from gaap.core.exceptions import (
     ProviderError,
@@ -23,8 +22,8 @@ from gaap.core.types import (
 )
 
 if TYPE_CHECKING:
-    from gaap.healing.reflexion import ReflexionEngine
     from gaap.healing.healing_config import HealingConfig
+    from gaap.healing.reflexion import ReflexionEngine
     from gaap.meta_learning.failure_store import FailureStore
 
 # =============================================================================
@@ -33,7 +32,6 @@ if TYPE_CHECKING:
 
 
 from gaap.core.logging import get_standard_logger as get_logger
-
 
 # =============================================================================
 # Enums

@@ -128,8 +128,8 @@ except ImportError:
 try:
     from .search_tool import (
         APICategory,
-        APISearchTool,
         APIInfo,
+        APISearchTool,
         DeprecationStatus,
         EndpointInfo,
         create_api_search_tool,

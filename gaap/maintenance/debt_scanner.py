@@ -76,9 +76,11 @@ class DebtItem:
             snippet=data.get("snippet"),
             interest_score=data.get("interest_score", 0.0),
             metadata=data.get("metadata", {}),
-            discovered_at=datetime.fromisoformat(data["discovered_at"])
-            if "discovered_at" in data
-            else datetime.now(),
+            discovered_at=(
+                datetime.fromisoformat(data["discovered_at"])
+                if "discovered_at" in data
+                else datetime.now()
+            ),
         )
 
     def __hash__(self) -> int:

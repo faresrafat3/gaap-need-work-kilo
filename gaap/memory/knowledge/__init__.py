@@ -12,7 +12,7 @@ Components:
 Reference: docs/evolution_plan_2026/25_MEMORY_AUDIT_SPEC.md
 """
 
-from .graph_builder import KnowledgeGraphBuilder, MemoryNode, MemoryEdge
+from .graph_builder import KnowledgeGraphBuilder, MemoryEdge, MemoryNode
 from .relation_extractor import RelationExtractor, RelationType
 
 __all__ = [

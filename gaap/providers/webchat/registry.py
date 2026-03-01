@@ -9,6 +9,7 @@ import logging
 import time
 from typing import Any
 
+from .aistudio import AIStudioWebChat
 from .base import WebChatProvider, list_accounts
 from .copilot import CopilotWebChat
 from .deepseek import DeepSeekWebChat
@@ -32,6 +33,8 @@ def get_provider(provider_name: str, account: str = "default") -> WebChatProvide
             _providers[key] = DeepSeekWebChat(account=account)
         elif provider_name == "copilot":
             _providers[key] = CopilotWebChat(account=account)
+        elif provider_name == "aistudio":
+            _providers[key] = AIStudioWebChat(account=account)
         else:
             raise ValueError(f"Unknown webchat provider: {provider_name}")
     return _providers[key]
@@ -99,7 +102,6 @@ def webchat_call(
                                     acct_obj.rate_tracker.set_hard_cooldown(cd_sec, cd_reason)
                         except Exception as e:
                             logger.debug(f"Hard cooldown detection failed: {e}")
-                            pass
 
                         fallback = pool.best_account(model)
                         if fallback and fallback.label != acct_label:
@@ -119,7 +121,6 @@ def webchat_call(
                                     return result2
                                 except Exception as e:
                                     logger.debug(f"Fallback call failed: {e}")
-                                    pass
                         raise
     except ImportError:
         pass

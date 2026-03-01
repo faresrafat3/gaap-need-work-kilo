@@ -251,7 +251,7 @@ class ToolRegistry:
         """Export tools in provider-specific format."""
         provider_lower = provider.lower()
 
-        if provider_lower in ("openai", "groq", "deepseek"):
+        if provider_lower in ("openai", "kimi", "deepseek"):
             return self.to_openai_tools()
         elif provider_lower == "anthropic":
             return self.to_anthropic_tools()

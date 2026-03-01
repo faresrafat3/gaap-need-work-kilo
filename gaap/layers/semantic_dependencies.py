@@ -16,7 +16,6 @@ Depth Levels:
 - exhaustive: Full codebase analysis with LLM
 """
 
-import asyncio
 import json
 import re
 import time

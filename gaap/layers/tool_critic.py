@@ -19,19 +19,18 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any, Callable, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from gaap.core.logging import get_standard_logger as get_logger
 from gaap.core.types import Message, MessageRole
 
 if TYPE_CHECKING:
-    from gaap.layers.evidence_critic import EvidenceBasedEvaluation, EvidenceStrength
+    from gaap.layers.evidence_critic import EvidenceBasedEvaluation
 
 logger = get_logger("gaap.layers.tool_critic")
 

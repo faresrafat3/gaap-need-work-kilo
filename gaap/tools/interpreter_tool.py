@@ -26,7 +26,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable
+from typing import Any
 
 from gaap.core.logging import get_standard_logger as get_logger
 

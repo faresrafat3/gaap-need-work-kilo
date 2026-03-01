@@ -9,15 +9,15 @@ Implements: docs/evolution_plan_2026/28_KNOWLEDGE_INGESTION.md
 
 import json
 import logging
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from collections import Counter
 
+from gaap.knowledge.ast_parser import ClassInfo, FunctionInfo, ParsedFile
 from gaap.knowledge.knowledge_config import KnowledgeConfig
-from gaap.knowledge.ast_parser import ParsedFile, ClassInfo, FunctionInfo
-from gaap.knowledge.usage_miner import UsageExample, UsagePattern, MiningResult
+from gaap.knowledge.usage_miner import MiningResult
 
 logger = logging.getLogger("gaap.knowledge.cheatsheet")
 
@@ -357,7 +357,16 @@ class CheatSheetGenerator:
                 }
             )
 
-        class_data.sort(key=lambda x: (-(x["public_methods"] if isinstance(x["public_methods"], int) else int(x["public_methods"]) if isinstance(x["public_methods"], str) else 0), x["name"]))
+        class_data.sort(
+            key=lambda x: (
+                -(
+                    x["public_methods"]
+                    if isinstance(x["public_methods"], int)
+                    else int(x["public_methods"]) if isinstance(x["public_methods"], str) else 0
+                ),
+                x["name"],
+            )
+        )
 
         return class_data[: self._config.top_functions_count]
 

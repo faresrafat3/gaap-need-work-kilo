@@ -1,6 +1,5 @@
 # Axiom Validator - Constitutional Gatekeeper
 import ast
-import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -402,9 +401,9 @@ class AxiomValidator:
             r"open\(.*['\"]a['\"]\)",
             r"write_file\(",
             r"os\.remove\(",
-            r"shutil\.rmtree\("
+            r"shutil\.rmtree\(",
         ]
-        
+
         if code:
             for pattern in write_patterns:
                 if re.search(pattern, code):
@@ -412,9 +411,9 @@ class AxiomValidator:
                         axiom_name="read_only_diagnostic",
                         passed=False,
                         message="Write operation detected in diagnostic task",
-                        severity="critical"
+                        severity="critical",
                     )
-        
+
         return AxiomCheckResult(axiom_name="read_only_diagnostic", passed=True)
 
     def _extract_imports(self, code: str) -> list[str]:

@@ -14,15 +14,14 @@ Instead of just writing lessons passively, actively retrieves
 and injects them to prevent repeating past mistakes.
 """
 
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Literal
+from typing import Any
 
 from gaap.core.logging import get_standard_logger as get_logger
 from gaap.core.types import Message, MessageRole
-from gaap.layers.layer3_config import Layer3Config, LessonInjectionConfig
 from gaap.layers.layer2_tactical import AtomicTask, TaskCategory
+from gaap.layers.layer3_config import Layer3Config
 
 logger = get_logger("gaap.layer3.lesson_injector")
 
@@ -72,9 +71,11 @@ class Lesson:
             task_type=data.get("task_type", "general"),
             success=data.get("success", False),
             relevance_score=data.get("relevance_score", 0.0),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if data.get("created_at")
-            else datetime.now(),
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if data.get("created_at")
+                else datetime.now()
+            ),
             source_task_id=data.get("source_task_id", ""),
             source_error=data.get("source_error", ""),
             metadata=data.get("metadata", {}),
@@ -208,9 +209,11 @@ class ActiveLessonInjector:
                     category=result.get("category", "general"),
                     context=result.get("context", ""),
                     relevance_score=result.get("score", 0.0),
-                    created_at=datetime.fromisoformat(result["created_at"])
-                    if result.get("created_at")
-                    else datetime.now(),
+                    created_at=(
+                        datetime.fromisoformat(result["created_at"])
+                        if result.get("created_at")
+                        else datetime.now()
+                    ),
                 )
 
                 if config.include_failures_only and lesson.success:

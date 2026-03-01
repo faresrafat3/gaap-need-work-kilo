@@ -26,9 +26,8 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Any
 
-from gaap.storage.atomic import atomic_write
-
 from gaap.memory.hierarchical import EpisodicMemory, EpisodicMemoryStore
+from gaap.storage.atomic import atomic_write
 
 logger = logging.getLogger("gaap.meta_learning.wisdom")
 
@@ -113,12 +112,16 @@ class ProjectHeuristic:
             source_episodes=data.get("source_episodes", []),
             examples=data.get("examples", []),
             counter_examples=data.get("counter_examples", []),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if "created_at" in data
-            else datetime.now(),
-            last_validated=datetime.fromisoformat(data["last_validated"])
-            if data.get("last_validated")
-            else None,
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if "created_at" in data
+                else datetime.now()
+            ),
+            last_validated=(
+                datetime.fromisoformat(data["last_validated"])
+                if data.get("last_validated")
+                else None
+            ),
             success_rate=data.get("success_rate", 0.0),
             applicability_score=data.get("applicability_score", 0.5),
             metadata=data.get("metadata", {}),

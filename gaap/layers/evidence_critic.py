@@ -19,13 +19,10 @@ Usage:
     spec, evaluations = await panel.evaluate_with_evidence(spec, intent)
 """
 
-import asyncio
 import json
-import time
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum, auto
-from typing import Any, Optional
+from enum import Enum
+from typing import Any
 
 from gaap.core.logging import get_standard_logger as get_logger
 from gaap.core.types import Message, MessageRole

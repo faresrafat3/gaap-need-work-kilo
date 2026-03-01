@@ -1,54 +1,102 @@
 version: '3.8'
 
 services:
-  gaap-web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: gaap-web
-    ports:
-      - "8501:8501"
-    volumes:
-      - ./gaap:/app/gaap:ro
-      - gaap_data:/home/gaap/.gaap
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: gaap-postgres
     environment:
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
-    restart: unless-stopped
+      POSTGRES_USER: ${POSTGRES_USER:-gaap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gaap}
+      POSTGRES_DB: ${POSTGRES_DB:-gaap}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gaap}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gaap-network
+    restart: unless-stopped
 
-  gaap-api:
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: gaap-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - gaap-network
+    restart: unless-stopped
+
+  # Python Backend
+  gaap-backend:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: gaap-api
+      dockerfile: Dockerfile.backend
+    container_name: gaap-backend
     ports:
       - "8000:8000"
-    volumes:
-      - ./gaap:/app/gaap:ro
-      - gaap_data:/home/gaap/.gaap
     environment:
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
-    command: ["uvicorn", "gaap.api.fastapi_app:app", "--host", "0.0.0.0", "--port", "8000"]
-    restart: unless-stopped
+      - ENVIRONMENT=production
+      - LOG_LEVEL=info
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-gaap}:${POSTGRES_PASSWORD:-gaap}@postgres:5432/${POSTGRES_DB:-gaap}
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - gaap-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - gaap-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Next.js Frontend
+  gaap-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: gaap-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - PYTHON_API_URL=http://gaap-backend:8000
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      - NODE_ENV=production
+    depends_on:
+      gaap-backend:
+        condition: service_healthy
+    networks:
+      - gaap-network
+    restart: unless-stopped
 
 volumes:
-  gaap_data:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  gaap-data:
+    driver: local
 
 networks:
-  default:
-    name: gaap-network
+  gaap-network:
+    driver: bridge

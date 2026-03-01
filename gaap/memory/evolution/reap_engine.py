@@ -15,7 +15,7 @@ Reference: docs/evolution_plan_2026/01_MEMORY_AND_DREAMING.md
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Protocol, runtime_checkable
 
 logger = logging.getLogger("gaap.memory.evolution.reap")

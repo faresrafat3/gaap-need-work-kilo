@@ -21,7 +21,6 @@ Usage:
     wisdom = learner.get_wisdom_for_task("code generation")
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -44,10 +43,8 @@ from gaap.meta_learning.failure_store import (
     CorrectiveAction,
     FailedTrace,
     FailureStore,
-    FailureType,
 )
 from gaap.meta_learning.wisdom_distiller import (
-    DistillationResult,
     ProjectHeuristic,
     WisdomDistiller,
 )
@@ -386,9 +383,9 @@ class MetaLearner:
             "failures": self.failures.get_stats(),
             "axiom_bridge": self.axiom_bridge.get_stats(),
             "confidence": self.confidence_calc.get_stats(),
-            "last_dream_cycle": self._last_dream_cycle.isoformat()
-            if self._last_dream_cycle
-            else None,
+            "last_dream_cycle": (
+                self._last_dream_cycle.isoformat() if self._last_dream_cycle else None
+            ),
             "dream_cycles_run": len(self._dream_cycle_history),
         }
 

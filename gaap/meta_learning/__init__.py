@@ -17,17 +17,6 @@ Usage:
     await learner.run_dream_cycle()
 """
 
-from gaap.meta_learning.failure_store import (
-    CorrectiveAction,
-    FailedTrace,
-    FailureStore,
-    FailureType,
-)
-from gaap.meta_learning.wisdom_distiller import (
-    DistillationResult,
-    ProjectHeuristic,
-    WisdomDistiller,
-)
 from gaap.meta_learning.axiom_bridge import (
     AxiomBridge,
     AxiomProposal,
@@ -37,9 +26,20 @@ from gaap.meta_learning.confidence import (
     ConfidenceCalculator,
     ConfidenceFactors,
 )
+from gaap.meta_learning.failure_store import (
+    CorrectiveAction,
+    FailedTrace,
+    FailureStore,
+    FailureType,
+)
 from gaap.meta_learning.meta_learner import (
     DreamCycleResult,
     MetaLearner,
+)
+from gaap.meta_learning.wisdom_distiller import (
+    DistillationResult,
+    ProjectHeuristic,
+    WisdomDistiller,
 )
 
 __all__ = [

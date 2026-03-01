@@ -24,6 +24,7 @@ Module Structure:
   - registry.py: Provider factory, webchat_call(), CLI
 """
 
+from .aistudio import AIStudioWebChat
 from .base import (
     WEBCHAT_CACHE_DIR,
     WebChatAuth,
@@ -50,6 +51,7 @@ __all__ = [
     "GLMWebChat",
     "KimiWebChat",
     "DeepSeekWebChat",
+    "AIStudioWebChat",
     "CopilotWebChat",
     "save_auth",
     "load_auth",

@@ -10,29 +10,27 @@ Implements: docs/evolution_plan_2026/17_DEEP_RESEARCH_AGENT_SPEC.md
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 import time
-from datetime import datetime
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from .types import (
-    Source,
-    Hypothesis,
-    AssociativeTriple,
-    ResearchFinding,
-    ResearchResult,
-    ResearchMetrics,
-    ExecutionStep,
-    HypothesisStatus,
-)
 from .config import DDEConfig
-from .web_fetcher import WebFetcher
 from .content_extractor import ContentExtractor
-from .source_auditor import SourceAuditor
-from .synthesizer import Synthesizer
 from .deep_dive import DeepDive
 from .knowledge_integrator import KnowledgeIntegrator
+from .source_auditor import SourceAuditor
+from .synthesizer import Synthesizer
+from .types import (
+    AssociativeTriple,
+    ExecutionStep,
+    Hypothesis,
+    HypothesisStatus,
+    ResearchFinding,
+    ResearchMetrics,
+    ResearchResult,
+    Source,
+)
+from .web_fetcher import WebFetcher
 
 if TYPE_CHECKING:
     from gaap.core.base import BaseProvider

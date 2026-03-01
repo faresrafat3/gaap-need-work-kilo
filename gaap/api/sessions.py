@@ -1,8 +1,8 @@
 """
 Sessions API - Session Management Endpoints
-===========================================
+============================================
 
-Provides REST API for managing execution sessions.
+Provides REST API for managing chat sessions using PostgreSQL database.
 
 Endpoints:
 - GET /api/sessions - List all sessions
@@ -23,21 +23,24 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from gaap.core.events import EventEmitter, EventType
-from gaap.storage.sqlite_store import SQLiteStore, SQLiteConfig
+from gaap.db import get_session as get_db_session
+from gaap.db.models import Session as SessionModel
+from gaap.db.models import SessionPriority, SessionStatus
+from gaap.db.models.message import Message
+from gaap.db.repositories import MessageRepository, PaginationParams, SessionRepository
 
 logger = logging.getLogger("gaap.api.sessions")
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
-_store: SQLiteStore | None = None
 
-
-class SessionStatus(str, Enum):
-    """Session status."""
+class SessionStatusEnum(str, Enum):
+    """Session status (matches database enum)."""
 
     PENDING = "pending"
     RUNNING = "running"
@@ -47,8 +50,8 @@ class SessionStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class SessionPriority(str, Enum):
-    """Session priority."""
+class SessionPriorityEnum(str, Enum):
+    """Session priority (matches database enum)."""
 
     LOW = "low"
     NORMAL = "normal"
@@ -61,7 +64,7 @@ class SessionCreateRequest(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=200)
     description: str = ""
-    priority: SessionPriority = SessionPriority.NORMAL
+    priority: SessionPriorityEnum = SessionPriorityEnum.NORMAL
     tags: list[str] = []
     config: dict[str, Any] = {}
     metadata: dict[str, Any] = {}
@@ -72,10 +75,22 @@ class SessionUpdateRequest(BaseModel):
 
     name: str | None = None
     description: str | None = None
-    priority: SessionPriority | None = None
+    priority: SessionPriorityEnum | None = None
     tags: list[str] | None = None
     config: dict[str, Any] | None = None
     metadata: dict[str, Any] | None = None
+
+
+class MessageResponse(BaseModel):
+    """Message in session export."""
+
+    id: str
+    role: str
+    content: str
+    created_at: str
+    tokens: int = 0
+    provider: str | None = None
+    model: str | None = None
 
 
 class SessionResponse(BaseModel):
@@ -83,22 +98,18 @@ class SessionResponse(BaseModel):
 
     id: str
     name: str
-    description: str
-    status: SessionStatus
-    priority: SessionPriority
+    description: str | None
+    status: str
+    priority: str
     tags: list[str]
     config: dict[str, Any]
     metadata: dict[str, Any]
     created_at: str
-    updated_at: str | None = None
-    started_at: str | None = None
-    completed_at: str | None = None
-    progress: float = 0.0
-    tasks_total: int = 0
-    tasks_completed: int = 0
-    tasks_failed: int = 0
-    cost_usd: float = 0.0
-    tokens_used: int = 0
+    updated_at: str
+    last_message_at: str | None
+    message_count: int
+    total_tokens: int
+    total_cost: float
 
 
 class SessionListResponse(BaseModel):
@@ -106,107 +117,132 @@ class SessionListResponse(BaseModel):
 
     sessions: list[SessionResponse]
     total: int
+    page: int = 1
+    per_page: int = 50
 
 
 class SessionExportResponse(BaseModel):
     """Export session data."""
 
     session: SessionResponse
-    tasks: list[dict[str, Any]]
-    logs: list[dict[str, Any]]
-    metrics: dict[str, Any]
+    messages: list[MessageResponse]
+    stats: dict[str, Any]
 
 
-def get_store() -> SQLiteStore:
-    """Get or create the store instance."""
-    global _store
-    if _store is None:
-        _store = SQLiteStore(config=SQLiteConfig(db_path=".gaap/gaap.db"))
-    return _store
-
-
-def _session_to_response(data: dict[str, Any]) -> SessionResponse:
-    """Convert session data to response."""
-    session_data = data.get("data", data)
+def _session_to_response(session: SessionModel | None) -> SessionResponse:
+    """Convert database session to response model."""
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
     return SessionResponse(
-        id=data.get("id", session_data.get("id", "")),
-        name=session_data.get("name", ""),
-        description=session_data.get("description", ""),
-        status=SessionStatus(session_data.get("status", "pending")),
-        priority=SessionPriority(session_data.get("priority", "normal")),
-        tags=session_data.get("tags", []),
-        config=session_data.get("config", {}),
-        metadata=session_data.get("metadata", {}),
-        created_at=data.get("created_at", session_data.get("created_at", "")),
-        updated_at=data.get("updated_at"),
-        started_at=session_data.get("started_at"),
-        completed_at=session_data.get("completed_at"),
-        progress=session_data.get("progress", 0.0),
-        tasks_total=session_data.get("tasks_total", 0),
-        tasks_completed=session_data.get("tasks_completed", 0),
-        tasks_failed=session_data.get("tasks_failed", 0),
-        cost_usd=session_data.get("cost_usd", 0.0),
-        tokens_used=session_data.get("tokens_used", 0),
+        id=session.id,
+        name=session.title or "Untitled",
+        description=session.description,
+        status=session.status,
+        priority=session.priority,
+        tags=session.tags or [],
+        config=session.config or {},
+        metadata=session.metadata or {},
+        created_at=session.created_at.isoformat() if session.created_at else "",
+        updated_at=session.updated_at.isoformat() if session.updated_at else "",
+        last_message_at=session.last_message_at.isoformat() if session.last_message_at else None,
+        message_count=session.message_count or 0,
+        total_tokens=session.total_tokens or 0,
+        total_cost=session.total_cost or 0.0,
+    )
+
+
+def _message_to_response(msg: Message) -> MessageResponse:
+    """Convert database message to response model."""
+    return MessageResponse(
+        id=msg.id,
+        role=msg.role,
+        content=msg.content,
+        created_at=msg.created_at.isoformat() if msg.created_at else "",
+        tokens=msg.total_tokens or 0,
+        provider=msg.provider,
+        model=msg.model,
     )
 
 
 @router.get("", response_model=SessionListResponse)
 async def list_sessions(
-    status: SessionStatus | None = None,
-    priority: SessionPriority | None = None,
+    status: SessionStatusEnum | None = None,
+    priority: SessionPriorityEnum | None = None,
     limit: int = 50,
     offset: int = 0,
+    db: AsyncSession = Depends(get_db_session),
 ) -> SessionListResponse:
     """List all sessions with optional filtering."""
     try:
-        store = get_store()
+        repo = SessionRepository(db)
+        pagination = PaginationParams(page=(offset // limit) + 1, per_page=limit)
 
-        where = {}
+        # Map API status to database status
+        db_status = None
         if status:
-            where["status"] = status.value
-        if priority:
-            where["priority"] = priority.value
+            status_map = {
+                SessionStatusEnum.PENDING: SessionStatus.ACTIVE,
+                SessionStatusEnum.RUNNING: SessionStatus.ACTIVE,
+                SessionStatusEnum.PAUSED: SessionStatus.PAUSED,
+                SessionStatusEnum.COMPLETED: SessionStatus.ARCHIVED,
+                SessionStatusEnum.FAILED: SessionStatus.ARCHIVED,
+                SessionStatusEnum.CANCELLED: SessionStatus.ARCHIVED,
+            }
+            db_status = status_map.get(status)
 
-        sessions_data = store.query("sessions", where=where, limit=limit, offset=offset)
-        total = store.count("sessions", where=where) if where else store.count("sessions")
+        result = await repo.find_many(
+            pagination=pagination,
+            **({"status": db_status.value} if db_status else {}),
+        )
 
-        sessions = [_session_to_response(s) for s in sessions_data]
+        sessions = [_session_to_response(s) for s in result.items]
 
-        return SessionListResponse(sessions=sessions, total=total)
+        return SessionListResponse(
+            sessions=sessions,
+            total=result.total,
+            page=result.page,
+            per_page=result.per_page,
+        )
     except Exception as e:
         logger.error(f"Failed to list sessions: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to list sessions: {e}")
 
 
 @router.post("", response_model=SessionResponse, status_code=201)
-async def create_session(request: SessionCreateRequest) -> SessionResponse:
+async def create_session(
+    request: SessionCreateRequest,
+    db: AsyncSession = Depends(get_db_session),
+) -> SessionResponse:
     """Create a new session."""
     try:
-        store = get_store()
+        repo = SessionRepository(db)
 
         session_id = uuid.uuid4().hex[:12]
-        now = datetime.now().isoformat()
+        now = datetime.now()
 
-        session_data = {
-            "name": request.name,
-            "description": request.description,
-            "status": SessionStatus.PENDING.value,
-            "priority": request.priority.value,
-            "tags": request.tags,
-            "config": request.config,
-            "metadata": request.metadata,
-            "created_at": now,
-            "started_at": None,
-            "completed_at": None,
-            "progress": 0.0,
-            "tasks_total": 0,
-            "tasks_completed": 0,
-            "tasks_failed": 0,
-            "cost_usd": 0.0,
-            "tokens_used": 0,
+        # Map priority
+        priority_map = {
+            SessionPriorityEnum.LOW: SessionPriority.LOW,
+            SessionPriorityEnum.NORMAL: SessionPriority.NORMAL,
+            SessionPriorityEnum.HIGH: SessionPriority.HIGH,
+            SessionPriorityEnum.CRITICAL: SessionPriority.CRITICAL,
         }
+        db_priority = priority_map.get(request.priority, SessionPriority.NORMAL)
 
-        store.insert("sessions", session_data, item_id=session_id)
+        session = await repo.create(
+            id=session_id,
+            title=request.name,
+            description=request.description or None,
+            status=SessionStatus.ACTIVE.value,
+            priority=db_priority.value,
+            tags=request.tags,
+            config=request.config,
+            metadata=request.metadata,
+            created_at=now,
+            updated_at=now,
+        )
+
+        await db.commit()
 
         emitter = EventEmitter.get_instance()
         emitter.emit(
@@ -217,67 +253,76 @@ async def create_session(request: SessionCreateRequest) -> SessionResponse:
 
         logger.info(f"Created session {session_id}: {request.name}")
 
-        return SessionResponse(
-            id=session_id,
-            name=request.name,
-            description=request.description,
-            status=SessionStatus.PENDING,
-            priority=request.priority,
-            tags=request.tags,
-            config=request.config,
-            metadata=request.metadata,
-            created_at=now,
-            progress=0.0,
-        )
+        return _session_to_response(session)
     except Exception as e:
+        await db.rollback()
         logger.error(f"Failed to create session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to create session: {e}")
 
 
 @router.get("/{session_id}", response_model=SessionResponse)
-async def get_session(session_id: str) -> SessionResponse:
+async def get_session_detail(
+    session_id: str,
+    db: AsyncSession = Depends(get_db_session),
+) -> SessionResponse:
     """Get session details."""
     try:
-        store = get_store()
-        data = store.get("sessions", session_id)
+        repo = SessionRepository(db)
+        session = await repo.get(session_id)
 
-        if not data:
+        if not session:
             raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
-        return _session_to_response(data)
+        return _session_to_response(session)
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to get session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to get session: {e}")
 
 
 @router.put("/{session_id}", response_model=SessionResponse)
-async def update_session(session_id: str, request: SessionUpdateRequest) -> SessionResponse:
+async def update_session(
+    session_id: str,
+    request: SessionUpdateRequest,
+    db: AsyncSession = Depends(get_db_session),
+) -> SessionResponse:
     """Update session."""
     try:
-        store = get_store()
-        data = store.get("sessions", session_id)
+        repo = SessionRepository(db)
+        session = await repo.get(session_id)
 
-        if not data:
+        if not session:
             raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
-        session_data = data.get("data", {})
+        update_data: dict[str, Any] = {"updated_at": datetime.now()}
 
         if request.name is not None:
-            session_data["name"] = request.name
+            update_data["title"] = request.name
         if request.description is not None:
-            session_data["description"] = request.description
+            update_data["description"] = request.description
         if request.priority is not None:
-            session_data["priority"] = request.priority.value
+            priority_map = {
+                SessionPriorityEnum.LOW: SessionPriority.LOW.value,
+                SessionPriorityEnum.NORMAL: SessionPriority.NORMAL.value,
+                SessionPriorityEnum.HIGH: SessionPriority.HIGH.value,
+                SessionPriorityEnum.CRITICAL: SessionPriority.CRITICAL.value,
+            }
+            update_data["priority"] = priority_map.get(
+                request.priority, SessionPriority.NORMAL.value
+            )
         if request.tags is not None:
-            session_data["tags"] = request.tags
+            update_data["tags"] = request.tags
         if request.config is not None:
-            session_data["config"] = request.config
+            update_data["config"] = request.config
         if request.metadata is not None:
-            session_data["metadata"] = request.metadata
+            update_data["metadata"] = request.metadata
 
-        store.update("sessions", session_id, session_data)
+        updated = await repo.update(session_id, **update_data)
+        await db.commit()
+
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to update session")
 
         emitter = EventEmitter.get_instance()
         emitter.emit(
@@ -288,54 +333,68 @@ async def update_session(session_id: str, request: SessionUpdateRequest) -> Sess
 
         logger.info(f"Updated session {session_id}")
 
-        data = store.get("sessions", session_id)
-        return _session_to_response(data)
+        return _session_to_response(updated)
     except HTTPException:
         raise
     except Exception as e:
+        await db.rollback()
         logger.error(f"Failed to update session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to update session: {e}")
 
 
 @router.delete("/{session_id}")
-async def delete_session(session_id: str) -> dict[str, Any]:
+async def delete_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
     """Delete a session."""
     try:
-        store = get_store()
+        repo = SessionRepository(db)
+        session = await repo.get(session_id)
 
-        if not store.get("sessions", session_id):
+        if not session:
             raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
-        store.delete("sessions", session_id)
+        # Soft delete - mark as deleted status
+        await repo.update(session_id, status=SessionStatus.ARCHIVED.value)
+        await db.commit()
 
-        logger.info(f"Deleted session {session_id}")
+        logger.info(f"Deleted (archived) session {session_id}")
 
         return {"success": True, "message": f"Session {session_id} deleted"}
     except HTTPException:
         raise
     except Exception as e:
+        await db.rollback()
         logger.error(f"Failed to delete session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to delete session: {e}")
 
 
 @router.post("/{session_id}/pause", response_model=SessionResponse)
-async def pause_session(session_id: str) -> SessionResponse:
+async def pause_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db_session),
+) -> SessionResponse:
     """Pause a running session."""
     try:
-        store = get_store()
-        data = store.get("sessions", session_id)
+        repo = SessionRepository(db)
+        session = await repo.get(session_id)
 
-        if not data:
+        if not session:
             raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
-        session_data = data.get("data", {})
-        current_status = SessionStatus(session_data.get("status", "pending"))
+        if session.status != SessionStatus.ACTIVE.value:
+            raise HTTPException(status_code=400, detail="Can only pause active sessions")
 
-        if current_status != SessionStatus.RUNNING:
-            raise HTTPException(status_code=400, detail="Can only pause running sessions")
+        updated = await repo.update(
+            session_id,
+            status=SessionStatus.PAUSED.value,
+            updated_at=datetime.now(),
+        )
+        await db.commit()
 
-        session_data["status"] = SessionStatus.PAUSED.value
-        store.update("sessions", session_id, session_data)
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to pause session")
 
         emitter = EventEmitter.get_instance()
         emitter.emit(
@@ -346,36 +405,40 @@ async def pause_session(session_id: str) -> SessionResponse:
 
         logger.info(f"Paused session {session_id}")
 
-        data = store.get("sessions", session_id)
-        return _session_to_response(data)
+        return _session_to_response(updated)
     except HTTPException:
         raise
     except Exception as e:
+        await db.rollback()
         logger.error(f"Failed to pause session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to pause session: {e}")
 
 
 @router.post("/{session_id}/resume", response_model=SessionResponse)
-async def resume_session(session_id: str) -> SessionResponse:
+async def resume_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db_session),
+) -> SessionResponse:
     """Resume a paused session."""
     try:
-        store = get_store()
-        data = store.get("sessions", session_id)
+        repo = SessionRepository(db)
+        session = await repo.get(session_id)
 
-        if not data:
+        if not session:
             raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
-        session_data = data.get("data", {})
-        current_status = SessionStatus(session_data.get("status", "pending"))
-
-        if current_status != SessionStatus.PAUSED:
+        if session.status != SessionStatus.PAUSED.value:
             raise HTTPException(status_code=400, detail="Can only resume paused sessions")
 
-        session_data["status"] = SessionStatus.RUNNING.value
-        if not session_data.get("started_at"):
-            session_data["started_at"] = datetime.now().isoformat()
+        updated = await repo.update(
+            session_id,
+            status=SessionStatus.ACTIVE.value,
+            updated_at=datetime.now(),
+        )
+        await db.commit()
 
-        store.update("sessions", session_id, session_data)
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to resume session")
 
         emitter = EventEmitter.get_instance()
         emitter.emit(
@@ -386,78 +449,75 @@ async def resume_session(session_id: str) -> SessionResponse:
 
         logger.info(f"Resumed session {session_id}")
 
-        data = store.get("sessions", session_id)
-        return _session_to_response(data)
+        return _session_to_response(updated)
     except HTTPException:
         raise
     except Exception as e:
+        await db.rollback()
         logger.error(f"Failed to resume session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to resume session: {e}")
 
 
 @router.post("/{session_id}/export", response_model=SessionExportResponse)
-async def export_session(session_id: str) -> SessionExportResponse:
-    """Export session data including tasks and logs."""
+async def export_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db_session),
+) -> SessionExportResponse:
+    """Export session data including messages."""
     try:
-        store = get_store()
-        data = store.get("sessions", session_id)
+        session_repo = SessionRepository(db)
+        message_repo = MessageRepository(db)
 
-        if not data:
+        session = await session_repo.get(session_id)
+        if not session:
             raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
-        session = _session_to_response(data)
+        # Get messages
+        messages_result = await message_repo.get_by_session(session_id)
+        messages = [_message_to_response(m) for m in messages_result.items]
 
-        tasks = store.query("tasks", where={"session_id": session_id}, limit=1000)
-
-        logs = store.query("logs", where={"session_id": session_id}, limit=1000)
-
-        metrics = {
-            "total_cost": session.cost_usd,
-            "total_tokens": session.tokens_used,
-            "tasks_total": session.tasks_total,
-            "tasks_completed": session.tasks_completed,
-            "tasks_failed": session.tasks_failed,
-            "success_rate": (
-                session.tasks_completed / session.tasks_total if session.tasks_total > 0 else 0.0
-            ),
-        }
+        # Calculate stats
+        stats = await message_repo.get_token_stats(session_id)
 
         logger.info(f"Exported session {session_id}")
 
         return SessionExportResponse(
-            session=session,
-            tasks=tasks,
-            logs=logs,
-            metrics=metrics,
+            session=_session_to_response(session),
+            messages=messages,
+            stats=stats,
         )
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to export session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to export session: {e}")
 
 
 @router.post("/{session_id}/cancel", response_model=SessionResponse)
-async def cancel_session(session_id: str) -> SessionResponse:
+async def cancel_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db_session),
+) -> SessionResponse:
     """Cancel a session."""
     try:
-        store = get_store()
-        data = store.get("sessions", session_id)
+        repo = SessionRepository(db)
+        session = await repo.get(session_id)
 
-        if not data:
+        if not session:
             raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
-        session_data = data.get("data", {})
-        current_status = SessionStatus(session_data.get("status", "pending"))
+        if session.status == SessionStatus.ARCHIVED.value:
+            raise HTTPException(status_code=400, detail="Cannot cancel archived sessions")
 
-        if current_status in [SessionStatus.COMPLETED, SessionStatus.CANCELLED]:
-            raise HTTPException(
-                status_code=400, detail="Cannot cancel completed or already cancelled sessions"
-            )
+        updated = await repo.update(
+            session_id,
+            status=SessionStatus.ARCHIVED.value,
+            updated_at=datetime.now(),
+        )
+        await db.commit()
 
-        session_data["status"] = SessionStatus.CANCELLED.value
-        session_data["completed_at"] = datetime.now().isoformat()
-        store.update("sessions", session_id, session_data)
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to cancel session")
 
         emitter = EventEmitter.get_instance()
         emitter.emit(
@@ -468,13 +528,13 @@ async def cancel_session(session_id: str) -> SessionResponse:
 
         logger.info(f"Cancelled session {session_id}")
 
-        data = store.get("sessions", session_id)
-        return _session_to_response(data)
+        return _session_to_response(updated)
     except HTTPException:
         raise
     except Exception as e:
+        await db.rollback()
         logger.error(f"Failed to cancel session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to cancel session: {e}")
 
 
 def register_routes(app: Any) -> None:

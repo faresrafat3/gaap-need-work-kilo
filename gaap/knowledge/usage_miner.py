@@ -16,8 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from gaap.knowledge.ast_parser import ASTParser
 from gaap.knowledge.knowledge_config import KnowledgeConfig
-from gaap.knowledge.ast_parser import ASTParser, ParsedFile
 
 logger = logging.getLogger("gaap.knowledge.miner")
 
@@ -66,9 +66,11 @@ class UsageExample:
             imports=data.get("imports", []),
             tags=data.get("tags", []),
             confidence=data.get("confidence", 0.5),
-            extracted_at=datetime.fromisoformat(data["extracted_at"])
-            if "extracted_at" in data
-            else datetime.now(),
+            extracted_at=(
+                datetime.fromisoformat(data["extracted_at"])
+                if "extracted_at" in data
+                else datetime.now()
+            ),
         )
 
 

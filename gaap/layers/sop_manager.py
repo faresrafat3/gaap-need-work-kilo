@@ -12,7 +12,6 @@ Inspired by MetaGPT: https://github.com/geekan/MetaGPT
 
 from __future__ import annotations
 
-import json
 import logging
 import uuid
 from dataclasses import dataclass, field
@@ -231,9 +230,11 @@ class SOP:
             artifacts_produced=data.get("artifacts_produced", []),
             quality_gates=[QualityGate.from_dict(qg) for qg in data.get("quality_gates", [])],
             version=data.get("version", "1.0.0"),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if "created_at" in data
-            else datetime.now(),
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if "created_at" in data
+                else datetime.now()
+            ),
             metadata=data.get("metadata", {}),
         )
 

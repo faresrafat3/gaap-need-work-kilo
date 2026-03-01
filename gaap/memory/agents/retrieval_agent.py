@@ -12,7 +12,6 @@ Intelligent retrieval agent that:
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum, auto
 from typing import Any, Protocol, runtime_checkable
 
@@ -415,9 +414,11 @@ Respond in JSON:
                     suggestions=parsed.get("suggestions", suggestions),
                     original_query=query,
                     confidence=0.5,
-                    detected_domain=parsed.get("suggestions", [{}])[0].get("domain")
-                    if parsed.get("suggestions")
-                    else None,
+                    detected_domain=(
+                        parsed.get("suggestions", [{}])[0].get("domain")
+                        if parsed.get("suggestions")
+                        else None
+                    ),
                     context_used=context_str,
                 )
             except Exception as e:

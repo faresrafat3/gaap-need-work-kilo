@@ -21,11 +21,10 @@ Usage:
 import asyncio
 import json
 import logging
-import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from types import TracebackType
-from typing import Any, AsyncGenerator, Callable
+from typing import Any, AsyncGenerator
 
 logger = logging.getLogger("gaap.providers.async_session")
 

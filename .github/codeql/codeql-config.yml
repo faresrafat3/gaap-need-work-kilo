@@ -1,0 +1,100 @@
+# =============================================================================
+# CodeQL Configuration for GAAP
+# =============================================================================
+# This configuration file customizes CodeQL analysis for the GAAP project
+#
+# Documentation: https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning
+# =============================================================================
+
+name: "GAAP CodeQL Configuration"
+
+# =============================================================================
+# Queries to Run
+# =============================================================================
+queries:
+  # Use security-extended query pack for comprehensive security analysis
+  - uses: security-extended
+  # Include quality queries for code maintainability
+  - uses: security-and-quality
+
+# =============================================================================
+# Paths to Include/Exclude
+# =============================================================================
+paths:
+  - gaap
+  - scripts
+  - tests
+
+paths-ignore:
+  # Virtual environments
+  - '**/.venv/**'
+  - '**/venv/**'
+  # Build artifacts
+  - '**/build/**'
+  - '**/dist/**'
+  - '**/.eggs/**'
+  - '**/*.egg-info/**'
+  # Cache directories
+  - '**/__pycache__/**'
+  - '**/.pytest_cache/**'
+  - '**/.mypy_cache/**'
+  - '**/.ruff_cache/**'
+  # Coverage reports
+  - '**/.coverage'
+  - '**/htmlcov/**'
+  # Node modules (frontend)
+  - '**/node_modules/**'
+  - 'frontend/.next/**'
+  # Frontend build
+  - 'frontend/dist/**'
+  - 'frontend/build/**'
+  # Documentation
+  - 'docs/**'
+  # Third-party code
+  - '**/third_party/**'
+  - '**/vendor/**'
+
+# =============================================================================
+# Query Filters
+# =============================================================================
+query-filters:
+  # Exclude certain query results that are false positives for our codebase
+  - exclude:
+      # Python specific exclusions
+      id: py/unsafe-deserialization
+      # We use pickle in controlled ways with input validation
+
+  - exclude:
+      id: py/exec-used
+      # We have legitimate uses in testing and tooling
+
+  - exclude:
+      id: py/eval-used
+      # We have legitimate uses in testing and tooling
+
+  - exclude:
+      id: py/debug-enabled
+      # Debug mode is controlled via environment variables
+
+  - exclude:
+      id: py/hardcoded-credentials
+      # We use environment variable patterns that may trigger this
+      # Our custom security audit catches real issues
+
+# =============================================================================
+# Python Specific Configuration
+# =============================================================================
+languages:
+  python:
+    # Python version for analysis
+    python_version: "3.10"
+
+# =============================================================================
+# Scanning Options
+# =============================================================================
+scanning:
+  # Enable extended analysis
+  extended: true
+
+  # Enable experimental queries (may have false positives)
+  experimental: false

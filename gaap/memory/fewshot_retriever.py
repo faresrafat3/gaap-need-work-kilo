@@ -217,9 +217,11 @@ class Trajectory:
             success_metrics=SuccessMetrics.from_dict(data.get("success_metrics", {})),
             success_level=SuccessLevel[data.get("success_level", "PARTIAL")],
             signature_name=data.get("signature_name"),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if "created_at" in data
-            else datetime.now(),
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if "created_at" in data
+                else datetime.now()
+            ),
             metadata=data.get("metadata", {}),
         )
 

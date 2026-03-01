@@ -17,12 +17,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from gaap.research import (
-    DeepDiscoveryEngine,
     DDEConfig,
+    DeepDiscoveryEngine,
     ResearchResult,
 )
 

@@ -30,7 +30,7 @@ Usage:
         tokens_used=2500,
         cost_usd=0.05,
         model="llama-3.3-70b",
-        provider="groq",
+provider="kimi",
         lessons=["Use iterative approach"]
     )
     memory.record_episode(episode)
@@ -41,15 +41,15 @@ Usage:
 
 # Hierarchical Memory
 import hashlib
-
-from gaap.storage.atomic import atomic_write
 import logging
 import time
-from collections import deque, OrderedDict
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Generic, TypeVar
+
+from gaap.storage.atomic import atomic_write
 
 T = TypeVar("T")
 
@@ -478,7 +478,7 @@ class EpisodicMemoryStore:
         ...     tokens_used=2500,
         ...     cost_usd=0.05,
         ...     model="llama-3.3-70b",
-        ...     provider="groq",
+        ...     provider="kimi",
         ...     lessons=["Use iterative approach"]
         ... )
         >>> store.record(episode)
@@ -1393,7 +1393,6 @@ class HierarchicalMemory:
             >>> memory.decay()
         """
         # Remove weak memories
-        pass
 
     def get_stats(self) -> dict[str, Any]:
         """

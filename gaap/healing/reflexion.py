@@ -35,7 +35,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
-from typing import Any, Protocol, TYPE_CHECKING, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from gaap.healing.healing_config import ReflexionConfig
@@ -103,9 +103,9 @@ class Reflection:
             alternative_approaches=data.get("alternative_approaches", []),
             lessons_learned=data.get("lessons_learned", []),
             depth=ReflectionDepth[data.get("depth", "MODERATE")],
-            timestamp=datetime.fromisoformat(data["timestamp"])
-            if "timestamp" in data
-            else datetime.now(),
+            timestamp=(
+                datetime.fromisoformat(data["timestamp"]) if "timestamp" in data else datetime.now()
+            ),
         )
 
     def to_prompt_context(self) -> str:
@@ -345,9 +345,9 @@ Generate your analysis:
             template = self.REFLECTION_PROMPT
             return template.format(
                 task_description=task_description[:1000],
-                previous_output=previous_output[:1000]
-                if previous_output
-                else "No output generated",
+                previous_output=(
+                    previous_output[:1000] if previous_output else "No output generated"
+                ),
                 error_type=type(error).__name__,
                 error_message=str(error)[:500],
                 context=self._format_context(context),

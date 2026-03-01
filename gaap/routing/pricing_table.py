@@ -161,10 +161,10 @@ MODEL_PRICING: dict[str, ModelPricing] = {
         supports_vision=True,
         supports_tools=True,
     ),
-    # Groq Models (Fast Inference)
+    # Kimi Models (Fast Inference)
     "llama-3.3-70b-versatile": ModelPricing(
         model_id="llama-3.3-70b-versatile",
-        provider="groq",
+        provider="kimi",
         input_cost_per_1m=0.59,
         output_cost_per_1m=0.79,
         context_window=128000,
@@ -174,7 +174,7 @@ MODEL_PRICING: dict[str, ModelPricing] = {
     ),
     "llama-3.1-8b-instant": ModelPricing(
         model_id="llama-3.1-8b-instant",
-        provider="groq",
+        provider="kimi",
         input_cost_per_1m=0.05,
         output_cost_per_1m=0.08,
         context_window=128000,
@@ -184,7 +184,7 @@ MODEL_PRICING: dict[str, ModelPricing] = {
     ),
     "mixtral-8x7b-32768": ModelPricing(
         model_id="mixtral-8x7b-32768",
-        provider="groq",
+        provider="kimi",
         input_cost_per_1m=0.24,
         output_cost_per_1m=0.24,
         context_window=32768,

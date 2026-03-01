@@ -18,16 +18,15 @@ Usage:
     result = await bridge.execute(tool_call)
 """
 
-import asyncio
 import logging
 from typing import Any
 
 from gaap.providers.tool_calling import (
-    ToolRegistry,
-    ToolDefinition,
-    ToolCall,
-    ToolResult,
     ParameterSchema,
+    ToolCall,
+    ToolDefinition,
+    ToolRegistry,
+    ToolResult,
     create_tool_from_function,
 )
 

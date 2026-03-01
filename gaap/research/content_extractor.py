@@ -16,10 +16,10 @@ import re
 import time
 from datetime import date, datetime
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
-from .types import ExtractedContent, Source
 from .config import ContentExtractorConfig
+from .types import ExtractedContent
 
 logger = logging.getLogger("gaap.research.content_extractor")
 

@@ -34,17 +34,16 @@ Flow:
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum, auto
 from typing import Any
 import uuid
 
-from gaap.core.types import Task, TaskResult
+from gaap.core.types import Task
 from gaap.swarm.reputation import ReputationStore
 from gaap.swarm.gisp_protocol import (
     TaskAuction,
-    TaskBid,
     TaskAward,
     TaskResult as GISPResult,
     TaskDomain,
@@ -54,7 +53,6 @@ from gaap.swarm.gisp_protocol import (
 from gaap.swarm.auction import (
     TaskAuctioneer,
     AuctionConfig,
-    AuctionResult,
     AuctionState,
 )
 from gaap.swarm.fractal import FractalAgent, FractalState
@@ -290,9 +288,11 @@ class SwarmOrchestrator:
         auction = TaskAuction(
             task_id=task.id,
             task_description=task.description,
-            domain=TaskDomain(domain)
-            if domain in [d.value for d in TaskDomain]
-            else TaskDomain.GENERAL,
+            domain=(
+                TaskDomain(domain)
+                if domain in [d.value for d in TaskDomain]
+                else TaskDomain.GENERAL
+            ),
             priority=priority,
             complexity=complexity,
             timeout_seconds=int(self._config.default_auction_timeout),

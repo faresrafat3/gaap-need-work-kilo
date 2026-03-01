@@ -30,8 +30,8 @@ import time
 from typing import Any
 
 from datasets import load_dataset
-from gaap_system_glm5.benchmarks.detailed_logger import DetailedBenchmarkLogger, QuestionLog
-from gaap_system_glm5.providers.unified_provider import (
+from gaap.benchmarks.detailed_logger import DetailedBenchmarkLogger, QuestionLog
+from gaap.providers.unified_provider import (
     UnifiedProvider,
     check_lmarena_auth,
     invalidate_lmarena_cache,
@@ -237,7 +237,7 @@ def run_benchmark(
     # Initialize Unified Provider (Primary + Fallback)
     if model:
         # Single-model mode: create a chain with just the requested model
-        from gaap_system_glm5.providers.unified_provider import (
+        from gaap.providers.unified_provider import (
             BackendType,
             ModelSlot,
             build_default_chain,
@@ -728,7 +728,7 @@ def main():
 
     # ── WebChat provider commands ──
     if args.webchat_status:
-        from gaap_system_glm5.providers.webchat_providers import check_all_webchat_auth
+        from gaap.providers.webchat_providers import check_all_webchat_auth
 
         print("\n🌐 WebChat Provider Auth Status")
         print("=" * 60)
@@ -741,7 +741,7 @@ def main():
         return
 
     if args.webchat_login:
-        from gaap_system_glm5.providers.webchat_providers import get_provider
+        from gaap.providers.webchat_providers import get_provider
 
         pname = args.webchat_login
         account = args.webchat_account
@@ -753,7 +753,7 @@ def main():
         return
 
     if args.webchat_reset:
-        from gaap_system_glm5.providers.webchat_providers import invalidate_auth
+        from gaap.providers.webchat_providers import invalidate_auth
 
         pname = args.webchat_reset
         account = args.webchat_account
@@ -765,7 +765,7 @@ def main():
         return
 
     if args.webchat_test:
-        from gaap_system_glm5.providers.webchat_providers import get_provider
+        from gaap.providers.webchat_providers import get_provider
 
         pname = args.webchat_test
         account = args.webchat_account

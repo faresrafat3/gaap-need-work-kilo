@@ -22,7 +22,6 @@ from gaap.cli.tui import (
     print_stats,
     print_welcome,
 )
-from gaap.providers.streaming import TokenChunk
 
 console = Console()
 

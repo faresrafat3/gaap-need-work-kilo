@@ -15,13 +15,11 @@ Smart Behaviors:
 5. **Failure Prediction**: Can predict and decline unsuitable tasks
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum, auto
 from typing import Any
-import uuid
 
 from gaap.core.types import Task, TaskResult, Message, MessageRole
 from gaap.swarm.reputation import ReputationStore
@@ -468,9 +466,11 @@ class FractalAgent:
 
             return TaskResult(
                 success=True,
-                output=response.choices[0].message.content
-                if hasattr(response, "choices")
-                else str(response),
+                output=(
+                    response.choices[0].message.content
+                    if hasattr(response, "choices")
+                    else str(response)
+                ),
             )
         else:
             raise RuntimeError("Provider does not support chat_completion")

@@ -9,12 +9,18 @@ Layers:
     - Layer 2 (Tactical): Task decomposition, DAG construction
     - Layer 3 (Execution): Parallel execution, quality assurance
 
+Strategic Components:
+    - ToTStrategic: Tree of Thoughts explorer
+    - ToTNode: Tree node for thoughts
+    - ToTPath: Path through tree
+
 Usage:
     from gaap.layers import (
         Layer0Interface,
         Layer1Strategic,
         Layer2Tactical,
-        Layer3Execution
+        Layer3Execution,
+        ToTStrategic,
     )
 
     # Create layers
@@ -22,6 +28,10 @@ Usage:
     l1 = Layer1Strategic()
     l2 = Layer2Tactical()
     l3 = Layer3Execution()
+
+    # Use ToT engine directly
+    tot = ToTStrategic(max_depth=5, branching_factor=4)
+    spec, tree = await tot.explore(intent)
 """
 
 from .layer0_interface import (
@@ -34,7 +44,6 @@ from .layer1_strategic import (
     ArchitectureSpec,
     Layer1Strategic,
     StrategicPlanner,
-    ToTStrategic,
 )
 from .layer2_tactical import (
     AtomicTask,
@@ -62,14 +71,19 @@ from .mcts_logic import (
     create_mcts_for_priority,
 )
 from .sop_manager import (
+    SOP,
     ArtifactValidationResult,
     QualityGate,
     QualityGateStatus,
-    SOP,
     SOPManager,
     SOPStep,
     StepType,
     create_sop_manager,
+)
+from .strategic.tot_engine import (
+    ToTNode,
+    ToTPath,
+    ToTStrategic,
 )
 
 __all__ = [
@@ -79,9 +93,12 @@ __all__ = [
     # Layer 1
     "Layer1Strategic",
     "StrategicPlanner",
-    "ToTStrategic",
     "ArchitectureParadigm",
     "ArchitectureSpec",
+    # ToT Engine
+    "ToTStrategic",
+    "ToTNode",
+    "ToTPath",
     # MCTS
     "MCTSStrategic",
     "MCTSConfig",

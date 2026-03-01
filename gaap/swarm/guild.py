@@ -19,20 +19,17 @@ Guild Benefits:
 - Knowledge consolidation
 """
 
-import asyncio
 import logging
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from typing import Any
-import uuid
 
-from gaap.swarm.reputation import ReputationStore
 from gaap.swarm.gisp_protocol import (
     ConsensusVote,
-    GuildForm,
-    MemoryShare,
 )
+from gaap.swarm.reputation import ReputationStore
 
 
 class GuildState(Enum):

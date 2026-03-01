@@ -16,12 +16,11 @@ Implements: docs/evolution_plan_2026/28_KNOWLEDGE_INGESTION.md
 
 import asyncio
 import sys
-from pathlib import Path
 from typing import Any
 
 from gaap.knowledge import (
-    KnowledgeIngestion,
     KnowledgeConfig,
+    KnowledgeIngestion,
     create_knowledge_config,
 )
 

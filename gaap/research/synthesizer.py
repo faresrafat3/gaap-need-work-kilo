@@ -10,24 +10,23 @@ Implements: docs/evolution_plan_2026/17_DEEP_RESEARCH_AGENT_SPEC.md
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import logging
 import re
 import time
 from datetime import datetime
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from .config import SynthesizerConfig
 from .types import (
-    Source,
+    AssociativeTriple,
     Claim,
+    Contradiction,
     Hypothesis,
     HypothesisStatus,
-    Contradiction,
-    AssociativeTriple,
+    Source,
 )
-from .config import SynthesizerConfig
 
 if TYPE_CHECKING:
     from gaap.core.base import BaseProvider

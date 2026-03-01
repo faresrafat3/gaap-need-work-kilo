@@ -953,13 +953,17 @@ class AccountPool:
                 reasons.append(f"{acct.label}: {reason}")
         return False, f"All accounts unavailable: {'; '.join(reasons)}", None
 
-    def wait_for_availability(self, model: str = "", timeout: float = 60) -> AccountSlot | None:
+    async def wait_for_availability(
+        self, model: str = "", timeout: float = 60
+    ) -> AccountSlot | None:
         """
         Wait until an account becomes available.
 
         Useful for rate-limited scenarios.
         Returns the account when available, or None on timeout.
         """
+        import asyncio
+
         start = time.time()
         while time.time() - start < timeout:
             best = self.best_account(model)
@@ -976,7 +980,7 @@ class AccountPool:
             if min_wait == float("inf") or min_wait > timeout:
                 return None
 
-            time.sleep(min(min_wait + 0.1, 5.0))
+            await asyncio.sleep(min(min_wait + 0.1, 5.0))
 
         return None
 

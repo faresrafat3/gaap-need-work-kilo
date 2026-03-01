@@ -20,12 +20,15 @@ from gaap.layers.got_strategic import (
     GoTStrategic,
     create_got_strategic,
 )
-from gaap.layers.layer1_strategic import (
+from gaap.layers.strategic.types import (
     ArchitectureDecision,
     ArchitectureParadigm,
     ArchitectureSpec,
     DataStrategy,
     CommunicationPattern,
+)
+from gaap.layers.strategic.types import (
+    ArchitectureSpec as StrategicArchitectureSpec,
 )
 from gaap.layers.layer0_interface import StructuredIntent, IntentType, ImplicitRequirements
 from datetime import datetime

@@ -11,15 +11,14 @@ Implements: docs/evolution_plan_2026/17_DEEP_RESEARCH_AGENT_SPEC.md
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 import re
 import time
 import urllib.parse
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from .types import SearchResult, Source, SourceStatus
 from .config import WebFetcherConfig
+from .types import SearchResult
 
 if TYPE_CHECKING:
     from gaap.providers.async_session import AsyncSessionManager

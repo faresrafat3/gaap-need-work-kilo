@@ -103,13 +103,15 @@ class MemoryNode:
             node_type=NodeType[data.get("node_type", "CONCEPT")],
             importance=data.get("importance", 1.0),
             domain=data.get("domain", "general"),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if "created_at" in data
-            else datetime.now(),
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if "created_at" in data
+                else datetime.now()
+            ),
             access_count=data.get("access_count", 0),
-            last_accessed=datetime.fromisoformat(data["last_accessed"])
-            if data.get("last_accessed")
-            else None,
+            last_accessed=(
+                datetime.fromisoformat(data["last_accessed"]) if data.get("last_accessed") else None
+            ),
             metadata=data.get("metadata", {}),
         )
 
@@ -162,9 +164,11 @@ class MemoryEdge:
             weight=data.get("weight", 1.0),
             confidence=data.get("confidence", 1.0),
             evidence=data.get("evidence", []),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if "created_at" in data
-            else datetime.now(),
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if "created_at" in data
+                else datetime.now()
+            ),
         )
 
 

@@ -1,0 +1,254 @@
+# Global configuration
+global:
+  # How long to wait before sending an initial notification for a group of alerts
+  resolve_timeout: 5m
+  
+  # SMTP configuration for email notifications
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'alerts@gaap.local'
+  smtp_auth_username: '${SMTP_USERNAME}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+# Templates for notification messages
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route configuration - where alerts go
+route:
+  # Default receiver
+  receiver: 'default'
+  
+  # How long to wait before sending initial notification
+  group_wait: 30s
+  
+  # How long to wait before sending updated notification
+  group_interval: 5m
+  
+  # How long to wait before resolving an alert
+  repeat_interval: 4h
+  
+  # Group alerts by these labels
+  group_by: ['alertname', 'severity', 'team']
+  
+  # Continue processing after matching
+  continue: false
+  
+  # Routes for specific alerts
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      repeat_interval: 15m
+      continue: true
+    
+    # Warning alerts - standard notification
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 1m
+      repeat_interval: 2h
+      continue: true
+    
+    # Info alerts - low priority
+    - match:
+        severity: info
+      receiver: 'info-alerts'
+      group_wait: 5m
+      repeat_interval: 24h
+      continue: false
+    
+    # Provider-specific alerts
+    - match_re:
+        alertname: GAAPProvider.*
+      receiver: 'provider-team'
+      group_by: ['provider']
+      continue: true
+    
+    # Database alerts
+    - match_re:
+        alertname: GAAPDatabase.*
+      receiver: 'database-team'
+      continue: true
+    
+    # Business metrics alerts
+    - match_re:
+        alertname: GAAPBusiness.*
+      receiver: 'business-team'
+      continue: false
+
+# Inhibition rules - prevent alert storms
+inhibit_rules:
+  # If instance is down, don't alert on high latency for that instance
+  - source_match:
+      alertname: 'GAAPInstanceDown'
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['instance']
+  
+  # If memory is critical, don't warn about high CPU (likely related)
+  - source_match:
+      alertname: 'GAAPHighMemoryUsage'
+      severity: 'critical'
+    target_match:
+      alertname: 'GAAPHighCPUUsage'
+      severity: 'warning'
+    equal: ['instance']
+
+# Receiver configurations
+receivers:
+  # Default receiver (Slack + Email)
+  - name: 'default'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#gaap-alerts'
+        title: 'GAAP Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Summary:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Instance:* {{ .Labels.instance }}
+          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+        send_resolved: true
+    email_configs:
+      - to: 'team@gaap.local'
+        subject: 'GAAP Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Summary: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+        send_resolved: true
+
+  # Critical alerts - PagerDuty + SMS + Escalation
+  - name: 'critical-alerts'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
+        description: 'GAAP Critical: {{ .GroupLabels.alertname }}'
+        severity: critical
+        details:
+          summary: '{{ .Annotations.summary }}'
+          description: '{{ .Annotations.description }}'
+          runbook: '{{ .Annotations.runbook_url }}'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#gaap-critical'
+        title: 'CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          🚨 *CRITICAL ALERT* 🚨
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          *Instance:* {{ .Labels.instance }}
+          *Started:* {{ .StartsAt }}
+          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+        color: 'danger'
+        send_resolved: true
+    email_configs:
+      - to: 'oncall@gaap.local,platform-team@gaap.local'
+        subject: '🚨 GAAP CRITICAL: {{ .GroupLabels.alertname }}'
+        body: |
+          CRITICAL ALERT - Immediate attention required
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt }}
+          Runbook: {{ .Annotations.runbook_url }}
+          
+          ---
+          {{ end }}
+        send_resolved: true
+
+  # Warning alerts - Slack + Email
+  - name: 'warning-alerts'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#gaap-warnings'
+        title: 'Warning: {{ .GroupLabels.alertname }}'
+        text: |
+          ⚠️ *WARNING* ⚠️
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          *Instance:* {{ .Labels.instance }}
+          {{ end }}
+        color: 'warning'
+        send_resolved: true
+    email_configs:
+      - to: 'platform-team@gaap.local'
+        subject: 'GAAP Warning: {{ .GroupLabels.alertname }}'
+        send_resolved: true
+
+  # Info alerts - Slack only
+  - name: 'info-alerts'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#gaap-info'
+        title: 'Info: {{ .GroupLabels.alertname }}'
+        text: |
+          ℹ️ *Informational*
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          {{ end }}
+        color: '#808080'
+        send_resolved: false
+
+  # Provider team notifications
+  - name: 'provider-team'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#provider-alerts'
+        title: 'Provider Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Provider:* {{ .Labels.provider }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+    email_configs:
+      - to: 'provider-team@gaap.local'
+        subject: 'GAAP Provider Alert: {{ .GroupLabels.alertname }}'
+        send_resolved: true
+
+  # Database team notifications
+  - name: 'database-team'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#database-alerts'
+        title: 'Database Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+    email_configs:
+      - to: 'database-team@gaap.local'
+        subject: 'GAAP Database Alert: {{ .GroupLabels.alertname }}'
+        send_resolved: true
+
+  # Business team notifications
+  - name: 'business-team'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#business-metrics'
+        title: 'Business Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          {{ end }}
+        send_resolved: true

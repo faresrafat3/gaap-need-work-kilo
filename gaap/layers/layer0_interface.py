@@ -25,8 +25,9 @@ Usage:
     print(f"Route to: {intent.routing_target}")
 """
 
+import json
+
 # Layer 0: Interface Layer
-import logging
 import re
 import time
 from dataclasses import dataclass, field
@@ -34,18 +35,15 @@ from datetime import datetime
 from enum import Enum, auto
 from typing import Any
 
-from gaap.core.base import BaseLayer
+from gaap.core.base import BaseLayer, BaseProvider
+from gaap.core.logging import get_standard_logger as get_logger
 from gaap.core.types import LayerType, TaskComplexity
 from gaap.security.firewall import PromptFirewall
-from gaap.core.base import BaseProvider
-import json
 
 # =============================================================================
 # Logger Setup
 # =============================================================================
 
-
-from gaap.core.logging import get_standard_logger as get_logger
 
 
 # =============================================================================
@@ -273,7 +271,7 @@ Analyze the user's input and return a pure JSON object mapping strictly to this 
 Return ONLY valid JSON.
 """
         try:
-            from gaap.core.types import Message, MessageRole, ChatCompletionRequest
+            from gaap.core.types import Message, MessageRole
 
             messages = [
                 Message(role=MessageRole.SYSTEM, content=system_prompt.strip()),

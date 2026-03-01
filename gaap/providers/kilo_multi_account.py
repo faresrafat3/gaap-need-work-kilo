@@ -30,9 +30,9 @@ from typing import Any
 import aiohttp
 
 from gaap.core.exceptions import ProviderNotAvailableError, ProviderResponseError
-from gaap.core.types import ChatCompletionResponse, Message, MessageRole, ProviderType
 from gaap.core.logging import get_standard_logger as get_logger
-from gaap.providers.base_provider import BaseProvider, register_provider
+from gaap.core.types import Message, ProviderType
+from gaap.providers.base_provider import BaseProvider
 
 KILO_API_URL = "https://api.kilo.ai/api/openrouter/chat/completions"
 

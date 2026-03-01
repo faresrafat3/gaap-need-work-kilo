@@ -28,7 +28,6 @@ Usage:
 """
 
 # Router
-import logging
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -154,7 +153,7 @@ class ProviderScore:
 
     Usage:
         >>> score = ProviderScore(
-        ...     provider_name="groq",
+        ...     provider_name="kimi",
         ...     model="llama-3.3-70b",
         ...     quality_score=0.9,
         ...     cost_score=1.0,
@@ -425,7 +424,7 @@ class SmartRouter:
             provider_name: Name of provider to remove
 
         Example:
-            >>> router.unregister_provider("groq")
+            >>> router.unregister_provider("kimi")
         """
         if provider_name in self._providers:
             del self._providers[provider_name]
@@ -443,7 +442,7 @@ class SmartRouter:
             Provider instance or None if not found
 
         Example:
-            >>> provider = router.get_provider("groq")
+            >>> provider = router.get_provider("kimi")
         """
         return self._providers.get(provider_name)
 
@@ -944,8 +943,8 @@ class SmartRouter:
 
         latency, score = latency_estimates.get(provider.provider_type, (3000, 70))
 
-        # Groq is much faster
-        if provider.name.lower() == "groq":
+        # Kimi is much faster
+        if provider.name.lower() == "kimi":
             latency = 200
             score = 100
 
@@ -1063,7 +1062,7 @@ class SmartRouter:
             Updates provider statistics including success rate and average latency
 
         Example:
-            >>> router.record_result("groq", True, 250.0, 0.001)
+            >>> router.record_result("kimi", True, 250.0, 0.001)
         """
         if provider_name not in self._provider_stats:
             return
@@ -1151,7 +1150,7 @@ def create_router(
         Configured SmartRouter instance
 
     Example:
-        >>> router = create_router(providers=[groq], strategy="balanced", budget=50.0)
+        >>> router = create_router(providers=[kimi], strategy="balanced", budget=50.0)
     """
     strategy_enum = RoutingStrategy(strategy.lower())
     return SmartRouter(providers=providers, strategy=strategy_enum, budget_limit=budget)

@@ -34,8 +34,8 @@ from typing import TYPE_CHECKING, Any
 from gaap.core.logging import get_standard_logger
 
 if TYPE_CHECKING:
-    from gaap.tools.library_discoverer import LibraryInfo
     from gaap.core.base import BaseProvider
+    from gaap.tools.library_discoverer import LibraryInfo
 
 logger = get_standard_logger("gaap.tools.code_synthesizer")
 

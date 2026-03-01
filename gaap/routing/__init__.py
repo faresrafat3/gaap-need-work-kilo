@@ -34,6 +34,13 @@ Usage:
     decision = await router.route(messages, task)
 """
 
+from .cascade_router import (
+    CascadeResult,
+    CascadeRouter,
+    QualityGate,
+    QualityGateResult,
+    create_cascade_router,
+)
 from .fallback import (
     CircuitBreaker,
     FallbackChain,
@@ -41,6 +48,17 @@ from .fallback import (
     FallbackManager,
     ProviderHealth,
     create_fallback_manager,
+)
+from .pricing_table import (
+    MODEL_PRICING,
+    ModelPricing,
+    count_tokens,
+    estimate_cost,
+    get_all_pricing,
+    get_best_value_model,
+    get_cheapest_model,
+    get_pricing,
+    get_pricing_by_provider,
 )
 from .router import (
     COMPLEXITY_MODEL_TIER,
@@ -50,24 +68,6 @@ from .router import (
     RoutingStrategy,
     SmartRouter,
     create_router,
-)
-from .pricing_table import (
-    MODEL_PRICING,
-    ModelPricing,
-    get_pricing,
-    get_all_pricing,
-    get_pricing_by_provider,
-    estimate_cost,
-    get_cheapest_model,
-    get_best_value_model,
-    count_tokens,
-)
-from .cascade_router import (
-    QualityGate,
-    QualityGateResult,
-    CascadeRouter,
-    CascadeResult,
-    create_cascade_router,
 )
 
 __all__ = [

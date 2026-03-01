@@ -12,7 +12,6 @@ Provides beautiful terminal interface with:
 Reference: docs/evolution_plan_2026/44_CLI_AUDIT_SPEC.md
 """
 
-import asyncio
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -23,14 +22,6 @@ from rich.console import Console, Group
 from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TaskID,
-    TextColumn,
-    TimeElapsedColumn,
-)
 from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
@@ -516,9 +507,7 @@ def print_stats(stats: dict[str, Any]) -> None:
             layer_color = (
                 "purple"
                 if "L1" in layer or "strategy" in layer.lower()
-                else "blue"
-                if "L2" in layer or "tactic" in layer.lower()
-                else "green"
+                else "blue" if "L2" in layer or "tactic" in layer.lower() else "green"
             )
             time_table.add_row(
                 f"[{layer_color}]{layer}[/{layer_color}]",

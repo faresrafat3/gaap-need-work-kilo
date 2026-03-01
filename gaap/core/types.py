@@ -252,7 +252,7 @@ class MessageRole(Enum):
 class CriticType(Enum):
     """
     أنواع النقاد في لجنة MAD
-    
+
     تحدد مجالات الخبرة لكل ناقد.
     """
 
@@ -263,20 +263,19 @@ class CriticType(Enum):
     STYLE = auto()  # ناقد الأسلوب
     COMPLIANCE = auto()  # ناقد الامتثال
     ETHICS = auto()  # ناقد الأخلاق
-    
+
     # Research & Intelligence (New)
     ACCURACY = auto()  # ناقد الدقة العلمية
     SOURCE_CREDIBILITY = auto()  # ناقد موثوقية المصادر
     COMPLETENESS = auto()  # ناقد كمال البحث
-    
+
     # Diagnostics (New)
     ROOT_CAUSE = auto()  # ناقد السبب الجذري
     RELIABILITY = auto()  # ناقد الموثوقية التشخيصية
-    
+
     # Analysis
     CRITICAL_THINKING = auto()  # ناقد التفكير النقدي
     BIAS_DETECTION = auto()  # ناقد كشف التحيز
-
 
 
 class HealingLevel(Enum):

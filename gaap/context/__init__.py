@@ -31,27 +31,25 @@ Usage:
     graph.build(project_path)
 """
 
-from .smart_chunking import (
-    SmartChunker,
-    ChunkingConfig,
-    CodeChunk,
-    ChunkType,
-    create_chunker,
-)
-
 from .call_graph import (
     CallGraph,
-    CallGraphNode,
-    CallGraphEdge,
     CallGraphConfig,
+    CallGraphEdge,
+    CallGraphNode,
     create_call_graph,
 )
-
 from .semantic_index import (
-    SemanticIndex,
     IndexConfig,
     IndexEntry,
+    SemanticIndex,
     create_semantic_index,
+)
+from .smart_chunking import (
+    ChunkingConfig,
+    ChunkType,
+    CodeChunk,
+    SmartChunker,
+    create_chunker,
 )
 
 __all__ = [

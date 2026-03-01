@@ -16,7 +16,6 @@ Modes:
 - full: Complete reanalysis
 """
 
-import asyncio
 import json
 import time
 from dataclasses import dataclass, field
@@ -25,14 +24,14 @@ from typing import Any, Literal
 
 from gaap.core.logging import get_standard_logger as get_logger
 from gaap.core.types import Message, MessageRole
-from gaap.layers.layer1_strategic import ArchitectureSpec, ArchitectureParadigm
+from gaap.layers.layer1_strategic import ArchitectureParadigm, ArchitectureSpec
 from gaap.layers.layer2_config import Layer2Config
 from gaap.layers.task_schema import (
     IntelligentTask,
     Phase,
     ReassessmentResult,
-    RiskLevel,
     RiskFactor,
+    RiskLevel,
     RiskType,
     TaskPhase,
 )
@@ -932,7 +931,7 @@ Output ONLY valid JSON:
                     )
 
                 for risk in task_data.get("risks", []):
-                    from gaap.layers.task_schema import RiskFactor, RiskType, RiskLevel
+                    from gaap.layers.task_schema import RiskFactor, RiskLevel, RiskType
 
                     try:
                         task.risk_factors.append(

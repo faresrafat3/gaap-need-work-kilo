@@ -1,4 +1,4 @@
 # Chat-Based Providers
-from .g4f_provider import G4FProvider
+# Note: g4f has been removed - use webchat_bridge instead
 
-__all__ = ["G4FProvider"]
+__all__ = []

@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from gaap.core.types import TaskComplexity, TaskPriority
-from gaap.layers.mcts_logic import (
+from gaap.layers.strategic.mcts_engine import (
     MCTSConfig,
     MCTSNode,
     MCTSPhase,

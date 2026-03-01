@@ -17,12 +17,10 @@ Learning Areas:
 - Phase planning optimization
 """
 
-import json
+import hashlib
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Literal
-import hashlib
+from typing import Any
 
 from gaap.core.logging import get_standard_logger as get_logger
 from gaap.layers.layer2_config import Layer2Config
@@ -30,7 +28,6 @@ from gaap.layers.task_schema import (
     IntelligentTask,
     Phase,
     RiskLevel,
-    TaskPhase,
 )
 
 logger = get_logger("gaap.layer2.learner")

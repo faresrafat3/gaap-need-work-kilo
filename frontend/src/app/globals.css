@@ -1,0 +1,196 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 8%;
+    --foreground: 210 40% 98%;
+    --card: 220 20% 10%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 20% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 267 60% 55%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217 20% 20%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 20% 20%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 267 60% 55%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 20% 25%;
+    --input: 217 20% 25%;
+    --ring: 267 60% 55%;
+    --radius: 0.5rem;
+    --chart-1: 267 60% 55%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --sidebar: 220 20% 10%;
+    --sidebar-foreground: 215 20% 80%;
+    --sidebar-primary: 267 60% 55%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 217 20% 20%;
+    --sidebar-accent-foreground: 215 20% 80%;
+    --sidebar-border: 217 20% 25%;
+    --sidebar-ring: 267 60% 55%;
+  }
+
+  .dark {
+    --background: 220 20% 8%;
+    --foreground: 210 40% 98%;
+    --card: 220 20% 10%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 20% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 267 60% 55%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217 20% 20%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 20% 20%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 267 60% 55%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 20% 25%;
+    --input: 217 20% 25%;
+    --ring: 267 60% 55%;
+    --sidebar: 220 20% 10%;
+    --sidebar-foreground: 215 20% 80%;
+    --sidebar-primary: 267 60% 55%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 217 20% 20%;
+    --sidebar-accent-foreground: 215 20% 80%;
+    --sidebar-border: 217 20% 25%;
+    --sidebar-ring: 267 60% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Ensure proper RTL support */
+[dir="rtl"] {
+  text-align: right;
+}
+
+/* Improve text contrast */
+.text-contrast {
+  color: hsl(210 40% 98%);
+  text-shadow: 0 0 2px rgba(0,0,0,0.5);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(220 20% 8%);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.4);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.6);
+}
+
+/* Glow effects */
+.glow-purple {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+}
+
+.glow-blue {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+}
+
+.glow-gradient {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(99, 102, 241, 0.15));
+}
+
+/* Status indicators with better contrast */
+.status-active {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.status-inactive {
+  background: linear-gradient(135deg, #71717a, #52525b);
+  color: white;
+}
+
+.status-error {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* Code block styling */
+.code-block {
+  background: hsl(220 20% 12%);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 8px;
+}
+
+/* Pulse animation */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(139, 92, 246, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.8);
+  }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #a78bfa, #818cf8, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 600;
+}
+
+/* Card hover effect */
+.card-hover {
+  transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 40px rgba(139, 92, 246, 0.2);
+}
+
+/* OODA cycle animation */
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ooda-rotate {
+  animation: rotate 20s linear infinite;
+}

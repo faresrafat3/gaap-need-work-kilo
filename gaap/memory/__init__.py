@@ -66,64 +66,20 @@ class LessonStore:
 
 # --- New Memory Agents & Rerankers ---
 
-from gaap.memory.rerankers import (
-    BaseReranker,
-    CrossEncoderReranker,
-    LLMReranker,
-    RerankResult,
-)
-from gaap.memory.rerankers.base import RerankRequest
-
 from gaap.memory.agents import (
+    DomainDecision,
     RetrievalAgent,
     RetrievalContext,
-    RetrievalResult as AgentRetrievalResult,
+)
+from gaap.memory.agents import RetrievalResult as AgentRetrievalResult
+from gaap.memory.agents import (
     SpecialistAgent,
-    DomainDecision,
 )
-
-from gaap.memory.knowledge import (
-    KnowledgeGraphBuilder,
-    MemoryNode,
-    MemoryEdge,
-    RelationExtractor,
-    RelationType,
-)
-from gaap.memory.knowledge.graph_builder import NodeType
-
 from gaap.memory.evolution import (
+    ClarificationRequest,
+    ClarificationSystem,
     REAPEngine,
     REAPResult,
-    ClarificationSystem,
-    ClarificationRequest,
-)
-
-from gaap.memory.raptor import (
-    SummaryTreeNode,
-    SummaryTree,
-    CollapsedTreeRetrieval,
-    Document,
-    NodeType as RaptorNodeType,
-    QueryLevel,
-    RetrievalResult as RaptorRetrievalResult,
-    build_raptor_tree,
-)
-
-from gaap.memory.vector_backends import (
-    VectorBackend,
-    InMemoryBackend,
-    SearchResult,
-    VectorRecord,
-    get_backend,
-    get_available_backends,
-)
-
-from gaap.memory.summary_builder import (
-    SummaryBuilder,
-    SummaryResult,
-    KeyConcept,
-    HierarchicalSummarizer,
-    create_summary_builder,
 )
 
 # Few-Shot Retriever (Medprompt-inspired)
@@ -136,6 +92,50 @@ from gaap.memory.fewshot_retriever import (
     Trajectory,
     TrajectoryStep,
     create_fewshot_retriever,
+)
+from gaap.memory.knowledge import (
+    KnowledgeGraphBuilder,
+    MemoryEdge,
+    MemoryNode,
+    RelationExtractor,
+    RelationType,
+)
+from gaap.memory.knowledge.graph_builder import NodeType
+from gaap.memory.raptor import (
+    CollapsedTreeRetrieval,
+    Document,
+)
+from gaap.memory.raptor import NodeType as RaptorNodeType
+from gaap.memory.raptor import (
+    QueryLevel,
+)
+from gaap.memory.raptor import RetrievalResult as RaptorRetrievalResult
+from gaap.memory.raptor import (
+    SummaryTree,
+    SummaryTreeNode,
+    build_raptor_tree,
+)
+from gaap.memory.rerankers import (
+    BaseReranker,
+    CrossEncoderReranker,
+    LLMReranker,
+    RerankResult,
+)
+from gaap.memory.rerankers.base import RerankRequest
+from gaap.memory.summary_builder import (
+    HierarchicalSummarizer,
+    KeyConcept,
+    SummaryBuilder,
+    SummaryResult,
+    create_summary_builder,
+)
+from gaap.memory.vector_backends import (
+    InMemoryBackend,
+    SearchResult,
+    VectorBackend,
+    VectorRecord,
+    get_available_backends,
+    get_backend,
 )
 
 
@@ -221,14 +221,14 @@ class MemorySystem:
 # --- Legacy Exports ---
 
 from gaap.memory.hierarchical import (
-    HierarchicalMemory,
-    MemoryTier,
-    WorkingMemory,
     EpisodicMemory,
     EpisodicMemoryStore,
+    HierarchicalMemory,
+    MemoryTier,
+    ProceduralMemoryStore,
     SemanticMemoryStore,
     SemanticRule,
-    ProceduralMemoryStore,
+    WorkingMemory,
 )
 
 try:
@@ -237,12 +237,12 @@ except ImportError:
     DreamProcessor = None  # type: ignore
 
 try:
+    from gaap.memory.memorag import KnowledgeGraph as _KnowledgeGraph
     from gaap.memory.memorag import (
         MemoRAG,
-        KnowledgeGraph as _KnowledgeGraph,
         RetrievalResult,
-        get_memorag as _get_memorag,
     )
+    from gaap.memory.memorag import get_memorag as _get_memorag
 except ImportError:
     MemoRAG = None  # type: ignore
     _KnowledgeGraph = None  # type: ignore

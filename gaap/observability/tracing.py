@@ -30,9 +30,7 @@ import time
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, ContextManager, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, ContextManager, Optional, TypeVar
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -45,9 +43,8 @@ try:
         ConsoleSpanExporter,
         SimpleSpanProcessor,
     )
-    from opentelemetry.trace import Span, SpanKind, Status, StatusCode
+    from opentelemetry.trace import SpanKind, Status, StatusCode
     from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
-    from opentelemetry.context import Context
 
     OTEL_AVAILABLE = True
 except ImportError:

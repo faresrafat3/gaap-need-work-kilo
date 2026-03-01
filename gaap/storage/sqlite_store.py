@@ -10,6 +10,7 @@ Features:
 - Instant lookups by ID
 - Query support with indexes
 - Thread-safe operations
+- Streaming queries for large datasets
 
 Usage:
     store = SQLiteStore(db_path=".gaap/gaap.db")
@@ -19,6 +20,10 @@ Usage:
 
     # Query
     results = store.query("history", where={"action": "query"}, limit=10)
+
+    # Stream large results
+    for batch in store.query_stream("history", batch_size=100):
+        process_batch(batch)
 """
 
 from __future__ import annotations
@@ -27,10 +32,9 @@ import json
 import logging
 import sqlite3
 import threading
-import time
 import uuid
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator
@@ -65,11 +69,16 @@ class SQLiteStore:
     - Indexed queries
     - Connection pooling via thread-local connections
     - ACID compliance
+    - Streaming queries for large datasets
 
     Example:
         >>> store = SQLiteStore()
         >>> store.insert("events", {"type": "query", "data": {"key": "value"}})
         >>> events = store.query("events", where={"type": "query"})
+        >>>
+        >>> # Stream large results in batches
+        >>> for batch in store.query_stream("events", batch_size=100):
+        ...     process_batch(batch)
     """
 
     def __init__(self, config: SQLiteConfig | None = None) -> None:
@@ -240,6 +249,102 @@ class SQLiteStore:
 
         return results
 
+    def query_stream(
+        self,
+        table: str,
+        where: dict[str, Any] | None = None,
+        order_by: str = "created_at DESC",
+        batch_size: int = 100,
+    ) -> Iterator[list[dict[str, Any]]]:
+        """
+        Stream query results in batches for large datasets.
+
+        This generator yields batches of records, allowing processing of
+        large datasets without loading everything into memory.
+
+        Args:
+            table: Table name
+            where: JSON path conditions
+            order_by: ORDER BY clause
+            batch_size: Number of records per batch
+
+        Yields:
+            Batches of records (list of dicts)
+
+        Example:
+            >>> for batch in store.query_stream("events", batch_size=100):
+            ...     for record in batch:
+            ...         process(record)
+        """
+        offset = 0
+
+        while True:
+            batch = self.query(
+                table=table,
+                where=where,
+                order_by=order_by,
+                limit=batch_size,
+                offset=offset,
+            )
+
+            if not batch:
+                break
+
+            yield batch
+
+            if len(batch) < batch_size:
+                # Last batch
+                break
+
+            offset += batch_size
+
+    def query_generator(
+        self,
+        table: str,
+        where: dict[str, Any] | None = None,
+        order_by: str = "created_at DESC",
+    ) -> Iterator[dict[str, Any]]:
+        """
+        Stream individual records as a generator.
+
+        This is useful when you want to process records one at a time
+        without the overhead of batching.
+
+        Args:
+            table: Table name
+            where: JSON path conditions
+            order_by: ORDER BY clause
+
+        Yields:
+            Individual records
+
+        Example:
+            >>> for record in store.query_generator("events"):
+            ...     process(record)
+        """
+        offset = 0
+        batch_size = 100
+
+        while True:
+            batch = self.query(
+                table=table,
+                where=where,
+                order_by=order_by,
+                limit=batch_size,
+                offset=offset,
+            )
+
+            if not batch:
+                break
+
+            for record in batch:
+                yield record
+
+            if len(batch) < batch_size:
+                break
+
+            offset += batch_size
+
     def update(
         self,
         table: str,
@@ -332,6 +437,41 @@ class SQLiteStore:
         with self._get_connection() as conn:
             conn.execute("VACUUM")
             conn.commit()
+
+    def batch_insert(
+        self,
+        table: str,
+        records: list[dict[str, Any]],
+    ) -> list[str]:
+        """
+        Insert multiple records in a single transaction.
+
+        More efficient than individual inserts for large datasets.
+
+        Args:
+            table: Table name
+            records: List of record data dictionaries
+
+        Returns:
+            List of inserted record IDs
+        """
+        self._ensure_table(table)
+
+        ids = []
+        now = datetime.now().isoformat()
+
+        with self._get_connection() as conn:
+            for data in records:
+                item_id = self._generate_id()
+                conn.execute(
+                    f"INSERT INTO {table} (id, data, created_at) VALUES (?, ?, ?)",
+                    (item_id, json.dumps(data, ensure_ascii=False, default=str), now),
+                )
+                ids.append(item_id)
+
+            conn.commit()
+
+        return ids
 
 
 _store_instance: SQLiteStore | None = None

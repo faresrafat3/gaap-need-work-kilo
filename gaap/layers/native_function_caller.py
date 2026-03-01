@@ -26,10 +26,10 @@ from gaap.core.types import Message, MessageRole
 from gaap.layers.execution_schema import (
     StructuredOutput,
     StructuredToolCall,
+    StructuredToolRegistry,
+    ToolCallStatus,
     ToolDefinition,
     ToolResult,
-    ToolCallStatus,
-    StructuredToolRegistry,
 )
 from gaap.layers.layer3_config import Layer3Config
 
@@ -52,7 +52,7 @@ class NativeFunctionCaller:
         "openai": "native",
         "anthropic": "native",
         "gemini": "native",
-        "groq": "native",
+        "kimi": "native",
         "mistral": "native",
         "ollama": "structured",
         "grok": "structured",
@@ -97,7 +97,7 @@ class NativeFunctionCaller:
     def _get_format_for_provider(self, provider: str) -> Literal["openai", "anthropic", "gemini"]:
         provider_lower = provider.lower()
 
-        if provider_lower in ("openai", "groq", "mistral"):
+        if provider_lower in ("openai", "kimi", "deepseek"):
             return "openai"
         elif provider_lower == "anthropic":
             return "anthropic"
@@ -299,7 +299,7 @@ class NativeFunctionCaller:
         tools_schema = [t.to_openai_schema() for t in tools]
 
         try:
-            if provider_name in ("openai", "groq", "mistral"):
+            if provider_name in ("openai", "kimi", "deepseek"):
                 response = await provider.chat_completion(
                     messages=messages,
                     model=model,

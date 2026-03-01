@@ -8,6 +8,7 @@ Implements: docs/evolution_plan_2026/45_TESTING_AUDIT_SPEC.md
 """
 
 import ast
+import json
 import os
 import sys
 import tempfile
@@ -308,7 +309,14 @@ class TestFlaskAppGauntlet:
             [Message(role=MessageRole.USER, content="Create a simple Flask app")]
         )
 
-        content = eval(response.choices[0].message.content)
+        content_str = response.choices[0].message.content
+        try:
+            content = json.loads(content_str.replace("'", '"'))
+        except json.JSONDecodeError:
+            try:
+                content = ast.literal_eval(content_str)
+            except (ValueError, SyntaxError) as e:
+                pytest.fail(f"Failed to parse response content: {e}")
 
         builder = FlaskAppBuilder(tmp_path)
         for name, code in content.items():
@@ -341,7 +349,14 @@ class TestFlaskAppGauntlet:
             ]
         )
 
-        content = eval(response.choices[0].message.content)
+        content_str = response.choices[0].message.content
+        try:
+            content = json.loads(content_str.replace("'", '"'))
+        except json.JSONDecodeError:
+            try:
+                content = ast.literal_eval(content_str)
+            except (ValueError, SyntaxError) as e:
+                pytest.fail(f"Failed to parse response content: {e}")
 
         builder = FlaskAppBuilder(tmp_path)
         for name, code in content.items():
@@ -371,7 +386,14 @@ class TestFlaskAppGauntlet:
             [Message(role=MessageRole.USER, content="Create a Flask app")]
         )
 
-        content = eval(response.choices[0].message.content)
+        content_str = response.choices[0].message.content
+        try:
+            content = json.loads(content_str.replace("'", '"'))
+        except json.JSONDecodeError:
+            try:
+                content = ast.literal_eval(content_str)
+            except (ValueError, SyntaxError) as e:
+                pytest.fail(f"Failed to parse response content: {e}")
 
         req_path = tmp_path / "requirements.txt"
         req_path.write_text(content["requirements.txt"])
@@ -392,7 +414,14 @@ class TestFlaskAppGauntlet:
             [Message(role=MessageRole.USER, content="Create a Flask app with tests")]
         )
 
-        content = eval(response.choices[0].message.content)
+        content_str = response.choices[0].message.content
+        try:
+            content = json.loads(content_str.replace("'", '"'))
+        except json.JSONDecodeError:
+            try:
+                content = ast.literal_eval(content_str)
+            except (ValueError, SyntaxError) as e:
+                pytest.fail(f"Failed to parse response content: {e}")
 
         if "test_app.py" in content:
             test_path = tmp_path / "test_app.py"

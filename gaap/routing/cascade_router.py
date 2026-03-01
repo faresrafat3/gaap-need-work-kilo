@@ -11,16 +11,15 @@ Features:
 from __future__ import annotations
 
 import ast
-import logging
 from dataclasses import dataclass, field
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from gaap.core.types import Message, ModelTier, Task
 from gaap.core.logging import get_standard_logger as get_logger
+from gaap.core.types import Message, ModelTier, Task
 
 if TYPE_CHECKING:
-    from gaap.routing.router import SmartRouter
     from gaap.providers.base_provider import BaseProvider
+    from gaap.routing.router import SmartRouter
 
 
 @dataclass

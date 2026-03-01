@@ -41,28 +41,25 @@ Usage:
 
 from typing import TYPE_CHECKING, Any, Protocol
 
-from .firewall import AuditTrail, CapabilityManager, FirewallResult, PromptFirewall, RiskLevel
-
+from .audit_logger import (
+    AuditLogEntry,
+    AuditLogger,
+    AuditLoggerConfig,
+    create_audit_logger,
+)
 from .dlp import (
+    DLPFinding,
     DLPScanner,
     DLPScanResult,
-    DLPFinding,
     LeakType,
     create_dlp_scanner,
 )
-
+from .firewall import AuditTrail, CapabilityManager, FirewallResult, PromptFirewall, RiskLevel
 from .semantic_shield import (
     SemanticShield,
-    ThreatCategory,
     ThreatAssessment,
+    ThreatCategory,
     create_semantic_shield,
-)
-
-from .audit_logger import (
-    AuditLogger,
-    AuditLoggerConfig,
-    AuditLogEntry,
-    create_audit_logger,
 )
 
 # =============================================================================
@@ -102,6 +99,7 @@ else:
 
     class LocalSandbox(Protocol):
         async def execute(self, code: str, language: str = "python") -> SandboxResult: ...
+
 
 # =============================================================================
 # Imports with Graceful Degradation

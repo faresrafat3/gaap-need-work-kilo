@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .base import WebChatAuth, WebChatProvider, save_auth
+from .base import WebChatAuth, WebChatProvider
 
 logger = logging.getLogger("gaap.providers.webchat")
 

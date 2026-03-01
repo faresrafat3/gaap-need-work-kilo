@@ -24,7 +24,6 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from contextlib import suppress
@@ -32,9 +31,9 @@ from datetime import datetime
 from typing import Any
 from weakref import WeakSet
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 
-from gaap.core.events import EventEmitter, Event, EventType
+from gaap.core.events import Event, EventEmitter, EventType
 
 logger = logging.getLogger("gaap.api.websocket")
 

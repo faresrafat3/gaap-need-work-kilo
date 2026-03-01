@@ -1,5 +1,18 @@
+"""
+Configuration Management for GAAP
+==================================
+
+Refactored from a God Class (ConfigManager) into specialized components:
+- ConfigLoader: Handles loading from files and environment
+- ConfigValidator: Validates configuration values
+- ConfigManager: Coordinates loading and validation
+"""
+
+from __future__ import annotations
+
 import hashlib
 import json
+import logging
 import os
 import threading
 from collections.abc import Callable
@@ -11,28 +24,35 @@ from typing import Any
 import yaml
 
 from gaap.storage.atomic import atomic_write
-from .exceptions import (
-    ConfigLoadError,
-    ConfigurationError,
-)
+
+from .exceptions import ConfigLoadError, ConfigurationError
+
+# Import secrets module (optional - will work without it)
+try:
+    from .secrets import SecretsManager, SecretsProvider
+
+    _HAS_SECRETS = True
+except ImportError:
+    _HAS_SECRETS = False
+    SecretsManager = None  # type: ignore
+    SecretsProvider = None  # type: ignore
+
 
 # =============================================================================
-# Configuration Dataclasses
+# Configuration Dataclasses (unchanged)
 # =============================================================================
 
 
 @dataclass
 class FirewallConfig:
-    """تكوين جدار الحماية (Layer 0)"""
+    """Firewall configuration (Layer 0)"""
 
-    strictness: str = "high"  # low, medium, high, paranoid
+    strictness: str = "high"
     adversarial_test_enabled: bool = True
     blocked_patterns_update_interval: str = "6h"
     max_input_length: int = 100000
     enable_behavioral_analysis: bool = True
     enable_semantic_analysis: bool = True
-
-    # طبقات الفحص السبعة
     layer1_surface_enabled: bool = True
     layer2_lexical_enabled: bool = True
     layer3_syntactic_enabled: bool = True
@@ -44,10 +64,10 @@ class FirewallConfig:
 
 @dataclass
 class ParserConfig:
-    """تكوين محلل الطلبات"""
+    """Request parser configuration"""
 
     default_model: str = "gpt-4o-mini"
-    routing_strategy: str = "quality_first"  # speed_first, cost_optimized, quality_first
+    routing_strategy: str = "quality_first"
     extract_implicit_requirements: bool = True
     max_classification_retries: int = 2
     confidence_threshold: float = 0.85
@@ -55,7 +75,7 @@ class ParserConfig:
 
 @dataclass
 class StrategicPlannerConfig:
-    """تكوين المخطط الاستراتيجي (Layer 1)"""
+    """Strategic planner configuration (Layer 1)"""
 
     tot_depth: int = 5
     branching_factor: int = 4
@@ -67,7 +87,7 @@ class StrategicPlannerConfig:
 
 @dataclass
 class ResourceAllocatorConfig:
-    """تكوين موجه الموارد"""
+    """Resource allocator configuration"""
 
     tier_1_model: str = "claude-3-5-opus"
     tier_2_model: str = "gpt-4o"
@@ -80,7 +100,7 @@ class ResourceAllocatorConfig:
 
 @dataclass
 class TacticalDecomposerConfig:
-    """تكوين المحلل التكتيكي (Layer 2)"""
+    """Tactical decomposer configuration (Layer 2)"""
 
     max_subtasks: int = 50
     max_task_size_lines: int = 500
@@ -92,25 +112,36 @@ class TacticalDecomposerConfig:
 
 @dataclass
 class SovereignConfig:
-    """تكوين السيادة والذكاء المتقدم (v2.1)"""
+    """Sovereign intelligence configuration (v2.1)"""
 
-    # Cognitive Features
-    enable_deep_research: bool = True  # تفعيل البحث العميق
-    enable_tool_synthesis: bool = True  # تفعيل تصنيع الأدوات
-    enable_ghost_fs: bool = True  # تفعيل محاكاة نظام الملفات
+    enable_deep_research: bool = True
+    enable_tool_synthesis: bool = True
+    enable_ghost_fs: bool = True
+    enable_dlp_shield: bool = True
+    enable_semantic_firewall: bool = True
+    dlp_strictness: str = "high"
+    research_depth: int = 3
 
-    # Security Features
-    enable_dlp_shield: bool = True  # تفعيل درع منع التسريب
-    enable_semantic_firewall: bool = True  # تفعيل الجدار الدلالي
 
-    # Thresholds
-    dlp_strictness: str = "high"  # low, medium, high
-    research_depth: int = 3  # عمق البحث (عدد الخطوات)
+@dataclass
+class PerformanceMonitorConfig:
+    """Performance monitoring configuration"""
+
+    enabled: bool = True
+    sampling_strategy: str = "adaptive"
+    sampling_rate: float = 0.1
+    max_samples_per_metric: int = 10000
+    max_age_minutes: int = 60
+    enable_memory_tracking: bool = True
+    enable_throughput: bool = True
+    enable_latency_percentiles: bool = True
+    gc_during_cleanup: bool = True
+    export_format: str = "json"
 
 
 @dataclass
 class ExecutionConfig:
-    """تكوين التنفيذ (Layer 3)"""
+    """Execution configuration (Layer 3)"""
 
     max_parallel_tasks: int = 10
     genetic_twin_enabled: bool = True
@@ -119,12 +150,12 @@ class ExecutionConfig:
     self_healing_max_retries: int = 3
     consciousness_migration_enabled: bool = True
     checkpoint_interval_seconds: int = 30
-    sandbox_type: str = "gvisor"  # gvisor, docker, process
+    sandbox_type: str = "gvisor"
 
 
 @dataclass
 class CriticConfig:
-    """تكوين ناقد واحد"""
+    """Individual critic configuration"""
 
     name: str
     weight: float = 1.0
@@ -134,7 +165,7 @@ class CriticConfig:
 
 @dataclass
 class QualityPanelConfig:
-    """تكوين لجنة الجودة"""
+    """Quality panel configuration"""
 
     critics: list[CriticConfig] = field(
         default_factory=lambda: [
@@ -153,46 +184,42 @@ class QualityPanelConfig:
 
 @dataclass
 class SecurityConfig:
-    """تكوين الأمان"""
+    """Security configuration"""
 
     sandbox_type: str = "gvisor"
-    capability_tokens_ttl: int = 300  # seconds
+    capability_tokens_ttl: int = 300
     blockchain_audit_enabled: bool = True
-    audit_storage_provider: str = "local"  # local, s3, gcs
+    audit_storage_provider: str = "local"
     audit_storage_path: str = "./audit_logs"
     encryption_enabled: bool = True
     encryption_algorithm: str = "AES-256-GCM"
-
-    # Seccomp filters
     seccomp_enabled: bool = True
     seccomp_default_action: str = "kill"
-
-    # Cgroups limits
-    cgroup_cpu_max: float = 0.5  # 50% of one core
+    cgroup_cpu_max: float = 0.5
     cgroup_memory_max: str = "512M"
     cgroup_pids_max: int = 100
 
 
 @dataclass
 class BudgetConfig:
-    """تكوين الميزانية"""
+    """Budget configuration"""
 
-    monthly_limit: float = 5000.0  # USD
+    monthly_limit: float = 5000.0
     daily_limit: float = 200.0
     per_task_limit: float = 10.0
     alert_thresholds: list[float] = field(default_factory=lambda: [0.5, 0.8, 0.95])
     auto_throttle_at: float = 0.9
     hard_stop_at: float = 1.0
-    cost_optimization_mode: str = "balanced"  # aggressive, balanced, quality_first
+    cost_optimization_mode: str = "balanced"
 
 
 @dataclass
 class ContextManagementConfig:
-    """تكوين إدارة السياق"""
+    """Context management configuration"""
 
     default_budget_level: str = "medium"
     hierarchical_loading_enabled: bool = True
-    pkg_agent_enabled: bool = False  # للمشاريع الضخمة فقط
+    pkg_agent_enabled: bool = False
     smart_chunking_enabled: bool = True
     external_brain_enabled: bool = True
     context_cache_enabled: bool = True
@@ -204,7 +231,7 @@ class ContextManagementConfig:
 
 @dataclass
 class ProviderSettings:
-    """إعدادات مزود واحد"""
+    """Individual provider settings"""
 
     name: str
     enabled: bool = True
@@ -222,7 +249,7 @@ class ProviderSettings:
 
 @dataclass
 class ExternalConnectorsConfig:
-    """تكوين الموصلات الخارجية"""
+    """External connectors configuration"""
 
     enable_web_search: bool = False
     enable_perplexity: bool = False
@@ -236,13 +263,13 @@ class ExternalConnectorsConfig:
 
 @dataclass
 class SystemConfig:
-    """التكوين الأساسي للنظام"""
+    """Core system configuration"""
 
     name: str = "GAAP-Production-Alpha"
-    environment: str = "production"  # development, staging, production
+    environment: str = "production"
     version: str = "1.0.0"
-    log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
-    log_format: str = "json"  # json, text
+    log_level: str = "INFO"
+    log_format: str = "json"
     metrics_enabled: bool = True
     metrics_port: int = 9090
     health_check_enabled: bool = True
@@ -251,7 +278,7 @@ class SystemConfig:
 
 @dataclass
 class GAAPConfig:
-    """التكوين الشامل لنظام GAAP"""
+    """Complete GAAP system configuration"""
 
     system: SystemConfig = field(default_factory=SystemConfig)
     firewall: FirewallConfig = field(default_factory=FirewallConfig)
@@ -266,12 +293,13 @@ class GAAPConfig:
     budget: BudgetConfig = field(default_factory=BudgetConfig)
     context_management: ContextManagementConfig = field(default_factory=ContextManagementConfig)
     sovereign: SovereignConfig = field(default_factory=SovereignConfig)
+    performance_monitor: PerformanceMonitorConfig = field(default_factory=PerformanceMonitorConfig)
     providers: list[ProviderSettings] = field(default_factory=list)
-
     custom: dict[str, Any] = field(default_factory=dict)
+    _secrets_manager: Any = field(default=None, repr=False, compare=False)
 
     def to_dict(self) -> dict[str, Any]:
-        """تحويل التكوين إلى قاموس"""
+        """Convert configuration to dictionary"""
 
         def dataclass_to_dict(obj: Any) -> Any:
             if hasattr(obj, "__dataclass_fields__"):
@@ -286,78 +314,61 @@ class GAAPConfig:
         result = dataclass_to_dict(self)
         return result if isinstance(result, dict) else {}
 
+    @property
+    def secrets(self) -> Any:
+        """Get the secrets provider associated with this configuration"""
+        if self._secrets_manager is not None:
+            return self._secrets_manager.secrets
+        return None
+
+    def init_secrets(
+        self,
+        env_prefix: str = "GAAP_",
+        env_file: str | None = ".env",
+        auto_load: bool = True,
+    ) -> Any:
+        """Initialize the secrets manager for this configuration"""
+        if not _HAS_SECRETS:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Secrets module not available. Install with: pip install python-dotenv"
+            )
+            return None
+
+        if _HAS_SECRETS:
+            from .secrets import SecretsManager as _SecretsManagerClass
+
+            self._secrets_manager = _SecretsManagerClass(
+                env_prefix=env_prefix,
+                env_file=env_file,
+                auto_load=auto_load,
+            )
+            return self._secrets_manager
+        return None
+
 
 # =============================================================================
-# Configuration Manager
+# ConfigLoader - Handles loading configuration from various sources
 # =============================================================================
 
 
-class ConfigManager:
+class ConfigLoader:
     """
-    مدير التكوين - يوفر وصولاً موحداً للتكوين
+    Loads configuration from files (YAML/JSON) and environment variables.
 
-    الميزات:
-    - تحميل من ملفات YAML/JSON
-    - دعم متغيرات البيئة
-    - تكوين هرمي (توريث)
-    - تحقق من الصحة
-    - إعادة تحميل ساخنة
-    - خيط آمن (Thread-safe)
+    Responsibilities:
+    - File I/O operations
+    - Environment variable parsing
+    - Deep merging of configuration sources
     """
 
-    _instance: "ConfigManager | None" = None
-    _lock = threading.Lock()
-    _initialized: bool = False
+    def __init__(self, env_prefix: str = "GAAP_"):
+        self.env_prefix = env_prefix
+        self._logger = logging.getLogger("gaap.config.loader")
 
-    def __new__(cls, *args: Any, **kwargs: Any) -> "ConfigManager":
-        """نمط Singleton للتأكد من وجود مدير تكوين واحد"""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-        return cls._instance
-
-    def __init__(
-        self, config_path: str | None = None, env_prefix: str = "GAAP_", auto_reload: bool = False
-    ):
-        if hasattr(self, "_initialized") and self._initialized:
-            return
-
-        self._config: GAAPConfig | None = None
-        self._config_path = config_path
-        self._env_prefix = env_prefix
-        self._auto_reload = auto_reload
-        self._file_hash: str | None = None
-        self._watchers: list[Callable[[GAAPConfig], None]] = []
-        self._layer_configs: dict[str, dict[str, Any]] = {}
-
-        # تحميل التكوين
-        self._load_config()
-        self._initialized = True
-
-    def _load_config(self) -> None:
-        """تحميل التكوين من المصادر المتاحة"""
-        # 1. تحميل التكوين الافتراضي
-        config_dict: dict[str, Any] = {}
-
-        # 2. تحميل من الملف إذا وُجد
-        if self._config_path:
-            file_config = self._load_from_file(self._config_path)
-            config_dict = self._deep_merge(config_dict, file_config)
-            self._file_hash = self._calculate_file_hash(self._config_path)
-
-        # 3. تحميل من متغيرات البيئة
-        env_config = self._load_from_env()
-        config_dict = self._deep_merge(config_dict, env_config)
-
-        # 4. إنشاء كائن التكوين
-        self._config = self._dict_to_config(config_dict)
-
-        # 5. التحقق من الصحة
-        self._validate_config(self._config)
-
-    def _load_from_file(self, path: str) -> dict[str, Any]:
-        """تحميل التكوين من ملف"""
+    def load_from_file(self, path: str) -> dict[str, Any]:
+        """Load configuration from a YAML or JSON file"""
         file_path = Path(path)
 
         if not file_path.exists():
@@ -382,35 +393,30 @@ class ConfigManager:
         except Exception as e:
             raise ConfigLoadError(config_path=path, reason=str(e))
 
-    def _load_from_env(self) -> dict[str, Any]:
-        """تحميل التكوين من متغيرات البيئة"""
+    def load_from_env(self) -> dict[str, Any]:
+        """Load configuration from environment variables"""
         config: dict[str, Any] = {}
 
-        # تعيينات متغيرات البيئة
         env_mappings = {
-            # النظام
-            f"{self._env_prefix}SYSTEM_NAME": ("system", "name"),
-            f"{self._env_prefix}ENVIRONMENT": ("system", "environment"),
-            f"{self._env_prefix}LOG_LEVEL": ("system", "log_level"),
-            # الميزانية
-            f"{self._env_prefix}BUDGET_MONTHLY_LIMIT": ("budget", "monthly_limit"),
-            f"{self._env_prefix}BUDGET_DAILY_LIMIT": ("budget", "daily_limit"),
-            # الموارد
-            f"{self._env_prefix}TIER_1_MODEL": ("resource_allocator", "tier_1_model"),
-            f"{self._env_prefix}TIER_2_MODEL": ("resource_allocator", "tier_2_model"),
-            f"{self._env_prefix}TIER_3_MODEL": ("resource_allocator", "tier_3_model"),
-            # الأمان
-            f"{self._env_prefix}SANDBOX_TYPE": ("security", "sandbox_type"),
-            f"{self._env_prefix}AUDIT_ENABLED": ("security", "blockchain_audit_enabled"),
-            # التنفيذ
-            f"{self._env_prefix}MAX_PARALLEL_TASKS": ("execution", "max_parallel_tasks"),
-            f"{self._env_prefix}GENETIC_TWIN_ENABLED": ("execution", "genetic_twin_enabled"),
-            # مفاتيح API
-            f"{self._env_prefix}OPENAI_API_KEY": ("_api_keys", "openai"),
-            f"{self._env_prefix}ANTHROPIC_API_KEY": ("_api_keys", "anthropic"),
-            f"{self._env_prefix}GROQ_API_KEY": ("_api_keys", "groq"),
-            f"{self._env_prefix}GEMINI_API_KEY": ("_api_keys", "gemini"),
-            f"{self._env_prefix}PERPLEXITY_API_KEY": ("_api_keys", "perplexity"),
+            f"{self.env_prefix}SYSTEM_NAME": ("system", "name"),
+            f"{self.env_prefix}ENVIRONMENT": ("system", "environment"),
+            f"{self.env_prefix}LOG_LEVEL": ("system", "log_level"),
+            f"{self.env_prefix}BUDGET_MONTHLY_LIMIT": ("budget", "monthly_limit"),
+            f"{self.env_prefix}BUDGET_DAILY_LIMIT": ("budget", "daily_limit"),
+            f"{self.env_prefix}TIER_1_MODEL": ("resource_allocator", "tier_1_model"),
+            f"{self.env_prefix}TIER_2_MODEL": ("resource_allocator", "tier_2_model"),
+            f"{self.env_prefix}TIER_3_MODEL": ("resource_allocator", "tier_3_model"),
+            f"{self.env_prefix}SANDBOX_TYPE": ("security", "sandbox_type"),
+            f"{self.env_prefix}AUDIT_ENABLED": ("security", "blockchain_audit_enabled"),
+            f"{self.env_prefix}MAX_PARALLEL_TASKS": ("execution", "max_parallel_tasks"),
+            f"{self.env_prefix}GENETIC_TWIN_ENABLED": ("execution", "genetic_twin_enabled"),
+            f"{self.env_prefix}PERFORMANCE_MONITOR_ENABLED": ("performance_monitor", "enabled"),
+            f"{self.env_prefix}PERFORMANCE_SAMPLING_RATE": ("performance_monitor", "sampling_rate"),
+            f"{self.env_prefix}OPENAI_API_KEY": ("_api_keys", "openai"),
+            f"{self.env_prefix}ANTHROPIC_API_KEY": ("_api_keys", "anthropic"),
+            f"{self.env_prefix}GROQ_API_KEY": ("_api_keys", "kimi"),
+            f"{self.env_prefix}GEMINI_API_KEY": ("_api_keys", "gemini"),
+            f"{self.env_prefix}PERPLEXITY_API_KEY": ("_api_keys", "perplexity"),
         }
 
         for env_var, config_path in env_mappings.items():
@@ -421,7 +427,7 @@ class ConfigManager:
         return config
 
     def _set_nested(self, config: dict[str, Any], path: tuple, value: Any) -> None:
-        """تعيين قيمة في مسار متداخل"""
+        """Set a value in a nested dictionary path"""
         current = config
         for key in path[:-1]:
             if key not in current:
@@ -429,21 +435,167 @@ class ConfigManager:
             current = current[key]
         current[path[-1]] = value
 
-    def _deep_merge(self, base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-        """دمج عميق لقاموسين"""
+    def deep_merge(self, base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+        """Deep merge two dictionaries"""
         result = deepcopy(base)
 
         for key, value in override.items():
             if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-                result[key] = self._deep_merge(result[key], value)
+                result[key] = self.deep_merge(result[key], value)
             else:
                 result[key] = deepcopy(value)
 
         return result
 
-    def _dict_to_config(self, config_dict: dict[str, Any]) -> GAAPConfig:
-        """تحويل القاموس إلى كائن تكوين"""
-        # إنشاء كائنات فرعية
+    def calculate_file_hash(self, path: str) -> str:
+        """Calculate MD5 hash of a file"""
+        with open(path, "rb") as f:
+            return hashlib.md5(f.read()).hexdigest()
+
+
+# =============================================================================
+# ConfigValidator - Validates configuration values
+# =============================================================================
+
+
+class ConfigValidator:
+    """
+    Validates configuration values and provides defaults.
+
+    Responsibilities:
+    - Validate configuration values
+    - Normalize weights and thresholds
+    - Provide default values for invalid inputs
+    """
+
+    def __init__(self):
+        self._logger = logging.getLogger("gaap.config.validator")
+
+    # Default critics configuration - used for weight normalization
+    DEFAULT_CRITICS = [
+        CriticConfig(name="logic", weight=0.35),
+        CriticConfig(name="security", weight=0.25),
+        CriticConfig(name="performance", weight=0.20),
+        CriticConfig(name="style", weight=0.10),
+        CriticConfig(name="compliance", weight=0.05),
+        CriticConfig(name="ethics", weight=0.05),
+    ]
+
+    def validate(self, config: GAAPConfig) -> tuple[list[str], list[str]]:
+        """
+        Validate configuration and return warnings and errors.
+
+        Returns:
+            Tuple of (warnings, errors)
+        """
+        warnings: list[str] = []
+        errors: list[str] = []
+
+        # Validate environment
+        valid_environments = {"development", "staging", "production"}
+        if config.system.environment not in valid_environments:
+            errors.append(
+                f"Invalid environment: {config.system.environment}. "
+                f"Must be one of: {valid_environments}"
+            )
+
+        # Validate log level
+        valid_log_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+        if config.system.log_level.upper() not in valid_log_levels:
+            warnings.append(f"Invalid log_level: {config.system.log_level}, defaulting to INFO")
+            config.system.log_level = "INFO"
+
+        # Validate budget
+        self._validate_budget(config, warnings)
+
+        # Validate and normalize critics
+        self._validate_and_normalize_critics(config, warnings)
+
+        # Validate sandbox type
+        valid_sandbox_types = {"gvisor", "docker", "process"}
+        if config.security.sandbox_type not in valid_sandbox_types:
+            warnings.append(
+                f"Invalid sandbox_type: {config.security.sandbox_type}, defaulting to gvisor"
+            )
+            config.security.sandbox_type = "gvisor"
+
+        return warnings, errors
+
+    def _validate_budget(self, config: GAAPConfig, warnings: list[str]) -> None:
+        """Validate budget configuration"""
+        if config.budget.monthly_limit <= 0:
+            warnings.append("budget.monthly_limit must be positive, using default 5000.0")
+            config.budget.monthly_limit = 5000.0
+        if config.budget.daily_limit <= 0:
+            warnings.append("budget.daily_limit must be positive, using default 200.0")
+            config.budget.daily_limit = 200.0
+        if config.budget.daily_limit > config.budget.monthly_limit:
+            warnings.append("budget.daily_limit cannot exceed budget.monthly_limit, adjusting")
+            config.budget.daily_limit = config.budget.monthly_limit
+
+        # Validate alert thresholds
+        if config.budget.alert_thresholds:
+            if not all(0 <= t <= 1 for t in config.budget.alert_thresholds):
+                warnings.append("budget.alert_thresholds must be between 0 and 1, using defaults")
+                config.budget.alert_thresholds = [0.5, 0.8, 0.95]
+
+    def _validate_and_normalize_critics(self, config: GAAPConfig, warnings: list[str]) -> None:
+        """Validate and normalize critic weights"""
+        enabled_critics = [c for c in config.quality_panel.critics if c.enabled]
+
+        if not enabled_critics:
+            warnings.append("No enabled critics found, using defaults")
+            config.quality_panel.critics = list(self.DEFAULT_CRITICS)
+            return
+
+        total_weight = sum(c.weight for c in enabled_critics)
+
+        if abs(total_weight - 1.0) > 0.01:
+            if total_weight > 0:
+                warnings.append(
+                    f"quality_panel critics weights sum to {total_weight:.2f}, normalizing to 1.0"
+                )
+                # Normalize weights
+                for c in enabled_critics:
+                    c.weight = c.weight / total_weight
+            else:
+                warnings.append("quality_panel critics weights sum to 0, using defaults")
+                config.quality_panel.critics = list(self.DEFAULT_CRITICS)
+
+    def normalize_weights(self, critics: list[CriticConfig]) -> list[CriticConfig]:
+        """
+        Normalize critic weights to sum to 1.0.
+
+        This is a utility method that can be used independently
+        of the full validation process.
+        """
+        enabled = [c for c in critics if c.enabled]
+        if not enabled:
+            return list(self.DEFAULT_CRITICS)
+
+        total = sum(c.weight for c in enabled)
+        if total <= 0:
+            return list(self.DEFAULT_CRITICS)
+
+        if abs(total - 1.0) > 0.01:
+            for c in enabled:
+                c.weight = round(c.weight / total, 4)
+
+        return critics
+
+
+# =============================================================================
+# ConfigConverter - Converts dictionaries to GAAPConfig objects
+# =============================================================================
+
+
+class ConfigConverter:
+    """Converts configuration dictionaries to GAAPConfig objects"""
+
+    @staticmethod
+    def dict_to_config(config_dict: dict[str, Any]) -> GAAPConfig:
+        """Convert a configuration dictionary to a GAAPConfig object"""
+        # Create sub-configurations
         system = SystemConfig(**config_dict.get("system", {}))
         firewall = FirewallConfig(**config_dict.get("firewall", {}))
         parser = ParserConfig(**config_dict.get("parser", {}))
@@ -452,13 +604,46 @@ class ConfigManager:
         tactical_decomposer = TacticalDecomposerConfig(**config_dict.get("tactical_decomposer", {}))
         execution = ExecutionConfig(**config_dict.get("execution", {}))
 
-        # معالجة لجنة الجودة - استخدام الافتراضي إذا كانت فارغة
-        quality_dict = config_dict.get("quality_panel", {})
+        # Process quality panel
+        quality_panel = ConfigConverter._process_quality_panel(config_dict.get("quality_panel", {}))
+
+        external_connectors = ExternalConnectorsConfig(**config_dict.get("external_connectors", {}))
+        security = SecurityConfig(**config_dict.get("security", {}))
+        budget = BudgetConfig(**config_dict.get("budget", {}))
+        context_management = ContextManagementConfig(**config_dict.get("context_management", {}))
+        sovereign = SovereignConfig(**config_dict.get("sovereign", {}))
+        performance_monitor = PerformanceMonitorConfig(**config_dict.get("performance_monitor", {}))
+
+        # Process providers
+        providers_list = [ProviderSettings(**p) for p in config_dict.get("providers", [])]
+
+        return GAAPConfig(
+            system=system,
+            firewall=firewall,
+            parser=parser,
+            strategic_planner=strategic_planner,
+            resource_allocator=resource_allocator,
+            tactical_decomposer=tactical_decomposer,
+            execution=execution,
+            quality_panel=quality_panel,
+            external_connectors=external_connectors,
+            security=security,
+            budget=budget,
+            context_management=context_management,
+            sovereign=sovereign,
+            performance_monitor=performance_monitor,
+            providers=providers_list,
+            custom=config_dict.get("custom", {}),
+        )
+
+    @staticmethod
+    def _process_quality_panel(quality_dict: dict) -> QualityPanelConfig:
+        """Process quality panel configuration with defaults"""
         critics_list = []
         for c in quality_dict.get("critics", []):
             critics_list.append(CriticConfig(**c))
 
-        # استخدام النقاد الافتراضيين إذا كانت القائمة فارغة
+        # Use defaults if empty
         if not critics_list:
             critics_list = [
                 CriticConfig(name="logic", weight=0.35),
@@ -477,110 +662,91 @@ class ConfigManager:
                 "unanimous_required_for_critical"
             ]
 
-        external_connectors = ExternalConnectorsConfig(**config_dict.get("external_connectors", {}))
-        security = SecurityConfig(**config_dict.get("security", {}))
-        budget = BudgetConfig(**config_dict.get("budget", {}))
-        context_management = ContextManagementConfig(**config_dict.get("context_management", {}))
+        return quality_panel
 
-        # معالجة المزودين
-        providers_list = []
-        for p in config_dict.get("providers", []):
-            providers_list.append(ProviderSettings(**p))
 
-        return GAAPConfig(
-            system=system,
-            firewall=firewall,
-            parser=parser,
-            strategic_planner=strategic_planner,
-            resource_allocator=resource_allocator,
-            tactical_decomposer=tactical_decomposer,
-            execution=execution,
-            quality_panel=quality_panel,
-            external_connectors=external_connectors,
-            security=security,
-            budget=budget,
-            context_management=context_management,
-            providers=providers_list,
-            custom=config_dict.get("custom", {}),
-        )
+# =============================================================================
+# ConfigManager - Coordinates configuration loading and management
+# =============================================================================
+
+
+class ConfigManager:
+    """
+    Configuration manager - coordinates loading, validation, and access.
+
+    Refactored from a God Class to use specialized components:
+    - ConfigLoader: Handles file I/O and environment variables
+    - ConfigValidator: Validates and normalizes values
+    - ConfigConverter: Converts dict to GAAPConfig objects
+
+    Features:
+    - Thread-safe singleton
+    - Hot reload support
+    - Change watchers
+    """
+
+    _instance: "ConfigManager | None" = None
+    _lock = threading.Lock()
+    _initialized: bool = False
+
+    def __new__(cls, *args: Any, **kwargs: Any) -> "ConfigManager":
+        """Singleton pattern to ensure single ConfigManager instance"""
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(
+        self, config_path: str | None = None, env_prefix: str = "GAAP_", auto_reload: bool = False
+    ):
+        if hasattr(self, "_initialized") and self._initialized:
+            return
+
+        self._config: GAAPConfig | None = None
+        self._config_path = config_path
+        self._env_prefix = env_prefix
+        self._auto_reload = auto_reload
+        self._file_hash: str | None = None
+        self._watchers: list[Callable[[GAAPConfig], None]] = []
+        self._layer_configs: dict[str, dict[str, Any]] = {}
+
+        # Initialize components
+        self._loader = ConfigLoader(env_prefix=env_prefix)
+        self._validator = ConfigValidator()
+        self._converter = ConfigConverter()
+
+        # Load configuration
+        self._load_config()
+        self._initialized = True
+
+    def _load_config(self) -> None:
+        """Load configuration from all sources"""
+        # 1. Start with empty config
+        config_dict: dict[str, Any] = {}
+
+        # 2. Load from file if provided
+        if self._config_path:
+            file_config = self._loader.load_from_file(self._config_path)
+            config_dict = self._loader.deep_merge(config_dict, file_config)
+            self._file_hash = self._loader.calculate_file_hash(self._config_path)
+
+        # 3. Merge environment variables
+        env_config = self._loader.load_from_env()
+        config_dict = self._loader.deep_merge(config_dict, env_config)
+
+        # 4. Convert to GAAPConfig
+        self._config = self._converter.dict_to_config(config_dict)
+
+        # 5. Validate
+        self._validate_config(self._config)
 
     def _validate_config(self, config: GAAPConfig) -> None:
-        """التحقق من صحة التكوين"""
-        warnings: list[str] = []
-        errors: list[str] = []
+        """Validate configuration and raise on errors"""
+        warnings, errors = self._validator.validate(config)
 
-        # التحقق من البيئة
-        valid_environments = {"development", "staging", "production"}
-        if config.system.environment not in valid_environments:
-            errors.append(
-                f"Invalid environment: {config.system.environment}. "
-                f"Must be one of: {valid_environments}"
-            )
-
-        # التحقق من مستوى السجل
-        valid_log_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-        if config.system.log_level.upper() not in valid_log_levels:
-            warnings.append(f"Invalid log_level: {config.system.log_level}, defaulting to INFO")
-            config.system.log_level = "INFO"
-
-        # التحقق من الميزانية - استخدام الافتراضي إذا كانت القيم غير صالحة
-        if config.budget.monthly_limit <= 0:
-            warnings.append("budget.monthly_limit must be positive, using default 5000.0")
-            config.budget.monthly_limit = 5000.0
-        if config.budget.daily_limit <= 0:
-            warnings.append("budget.daily_limit must be positive, using default 200.0")
-            config.budget.daily_limit = 200.0
-        if config.budget.daily_limit > config.budget.monthly_limit:
-            warnings.append("budget.daily_limit cannot exceed budget.monthly_limit, adjusting")
-            config.budget.daily_limit = config.budget.monthly_limit
-
-        # التحقق من عتبات التنبيه
-        if config.budget.alert_thresholds:
-            if not all(0 <= t <= 1 for t in config.budget.alert_thresholds):
-                warnings.append("budget.alert_thresholds must be between 0 and 1, using defaults")
-                config.budget.alert_thresholds = [0.5, 0.8, 0.95]
-
-        # التحقق من صلاحيات النقاد - تطبيع أو استخدام الافتراضي
-        enabled_critics = [c for c in config.quality_panel.critics if c.enabled]
-        if not enabled_critics:
-            warnings.append("No enabled critics found, using defaults")
-            config.quality_panel.critics = [
-                CriticConfig(name="logic", weight=0.35),
-                CriticConfig(name="security", weight=0.25),
-                CriticConfig(name="performance", weight=0.20),
-                CriticConfig(name="style", weight=0.10),
-                CriticConfig(name="compliance", weight=0.05),
-                CriticConfig(name="ethics", weight=0.05),
-            ]
-            enabled_critics = config.quality_panel.critics
-
-        total_weight = sum(c.weight for c in enabled_critics)
-        if abs(total_weight - 1.0) > 0.01:
-            if total_weight > 0:
-                warnings.append(
-                    f"quality_panel critics weights sum to {total_weight:.2f}, normalizing to 1.0"
-                )
-                # تطبيع الأوزان
-                for c in enabled_critics:
-                    c.weight = c.weight / total_weight
-            else:
-                warnings.append("quality_panel critics weights sum to 0, using defaults")
-                config.quality_panel.critics = [
-                    CriticConfig(name="logic", weight=0.35),
-                    CriticConfig(name="security", weight=0.25),
-                    CriticConfig(name="performance", weight=0.20),
-                    CriticConfig(name="style", weight=0.10),
-                    CriticConfig(name="compliance", weight=0.05),
-                    CriticConfig(name="ethics", weight=0.05),
-                ]
-
-        # التحقق من نوع الـ sandbox - استخدام الافتراضي إذا كان غير صالح
-        valid_sandbox_types = {"gvisor", "docker", "process"}
-        if config.security.sandbox_type not in valid_sandbox_types:
-            warnings.append(
-                f"Invalid sandbox_type: {config.security.sandbox_type}, defaulting to gvisor"
-            )
-            config.security.sandbox_type = "gvisor"
+        for warning in warnings:
+            logging.getLogger("gaap.config").warning(warning)
 
         if errors:
             raise ConfigurationError(
@@ -589,44 +755,39 @@ class ConfigManager:
                 suggestions=["Fix the configuration errors listed above"],
             )
 
-    def _calculate_file_hash(self, path: str) -> str:
-        """حساب hash للملف للتحقق من التغييرات"""
-        with open(path, "rb") as f:
-            return hashlib.md5(f.read()).hexdigest()
-
     def reload(self) -> None:
-        """إعادة تحميل التكوين"""
+        """Reload configuration from sources"""
         old_config = self._config
         self._load_config()
 
-        # إشعار المراقبين
+        # Notify watchers
         if old_config != self._config and self._config is not None:
             for watcher in self._watchers:
                 watcher(self._config)
 
     def check_and_reload(self) -> bool:
-        """التحقق من التغييرات وإعادة التحميل إذا لزم الأمر"""
+        """Check for changes and reload if necessary"""
         if not self._config_path or not self._auto_reload:
             return False
 
-        current_hash = self._calculate_file_hash(self._config_path)
+        current_hash = self._loader.calculate_file_hash(self._config_path)
         if current_hash != self._file_hash:
             self.reload()
             return True
         return False
 
     def add_watcher(self, callback: Callable[[GAAPConfig], None]) -> None:
-        """إضافة مراقب للتغييرات في التكوين"""
+        """Add a configuration change watcher"""
         self._watchers.append(callback)
 
     def remove_watcher(self, callback: Callable[[GAAPConfig], None]) -> None:
-        """إزالة مراقب"""
+        """Remove a configuration change watcher"""
         if callback in self._watchers:
             self._watchers.remove(callback)
 
     @property
     def config(self) -> GAAPConfig:
-        """الحصول على التكوين الحالي"""
+        """Get current configuration"""
         if self._config is None:
             self._load_config()
         if self._config is None:
@@ -637,14 +798,14 @@ class ConfigManager:
 
     def get(self, path: str, default: Any = None) -> Any:
         """
-        الحصول على قيمة من التكوين باستخدام مسار
+        Get a value from configuration using dot notation.
 
         Args:
-            path: المسار مفصول بنقاط (مثل: "system.log_level")
-            default: القيمة الافتراضية إذا لم يوجد
+            path: Dot-separated path (e.g., "system.log_level")
+            default: Default value if not found
 
         Returns:
-            القيمة المطلوبة أو القيمة الافتراضية
+            The requested value or default
         """
         config_dict = self.config.to_dict()
         keys = path.split(".")
@@ -659,25 +820,25 @@ class ConfigManager:
         return current
 
     def set_layer_config(self, layer: str, config: dict[str, Any]) -> None:
-        """تعيين تكوين خاص بطبقة معينة"""
+        """Set layer-specific configuration"""
         self._layer_configs[layer] = config
 
     def get_layer_config(self, layer: str) -> dict[str, Any]:
-        """الحصول على تكوين طبقة معينة"""
+        """Get layer-specific configuration"""
         return self._layer_configs.get(layer, {})
 
     def get_api_key(self, provider: str) -> str | None:
-        """الحصول على مفتاح API لمزود معين"""
-        # البحث أولاً في المزودين
+        """Get API key for a provider"""
+        # Search in providers first
         for p in self.config.providers:
             if p.name.lower() == provider.lower():
                 return p.api_key
 
-        # البحث في متغيرات البيئة
+        # Search in environment variables
         env_mappings = {
             "openai": f"{self._env_prefix}OPENAI_API_KEY",
             "anthropic": f"{self._env_prefix}ANTHROPIC_API_KEY",
-            "groq": f"{self._env_prefix}GROQ_API_KEY",
+            "kimi": f"{self._env_prefix}GROQ_API_KEY",
             "gemini": f"{self._env_prefix}GEMINI_API_KEY",
             "perplexity": f"{self._env_prefix}PERPLEXITY_API_KEY",
             "deepinfra": f"{self._env_prefix}DEEPINFRA_API_KEY",
@@ -691,32 +852,32 @@ class ConfigManager:
         return None
 
     def get_enabled_providers(self) -> list[ProviderSettings]:
-        """الحصول على قائمة المزودين المفعّلين"""
+        """Get list of enabled providers"""
         return [p for p in self.config.providers if p.enabled]
 
     def is_production(self) -> bool:
-        """هل البيئة إنتاجية؟"""
+        """Check if environment is production"""
         return self.config.system.environment == "production"
 
     def is_development(self) -> bool:
-        """هل البيئة تطويرية؟"""
+        """Check if environment is development"""
         return self.config.system.environment == "development"
 
 
 # =============================================================================
-# Configuration Builder (Fluent Interface)
+# ConfigBuilder - Fluent interface for building configuration
 # =============================================================================
 
 
 class ConfigBuilder:
     """
-    منشئ التكوين - واجهة fluent لبناء التكوين برمجياً
+    Configuration builder - fluent interface for building configuration programmatically.
 
     Example:
         config = (ConfigBuilder()
             .with_system(name="MyApp", environment="production")
             .with_budget(monthly=1000)
-            .with_provider("groq", api_key="...")
+            .with_provider("kimi", api_key="...")
             .build())
     """
 
@@ -726,7 +887,7 @@ class ConfigBuilder:
     def with_system(
         self, name: str = "GAAP-App", environment: str = "development", log_level: str = "INFO"
     ) -> "ConfigBuilder":
-        """إضافة تكوين النظام"""
+        """Add system configuration"""
         self._config_dict["system"] = {
             "name": name,
             "environment": environment,
@@ -737,7 +898,7 @@ class ConfigBuilder:
     def with_budget(
         self, monthly: float = 1000.0, daily: float = 50.0, per_task: float = 5.0
     ) -> "ConfigBuilder":
-        """إضافة تكوين الميزانية"""
+        """Add budget configuration"""
         self._config_dict["budget"] = {
             "monthly_limit": monthly,
             "daily_limit": daily,
@@ -753,7 +914,7 @@ class ConfigBuilder:
         default_model: str = "",
         priority: int = 0,
     ) -> "ConfigBuilder":
-        """إضافة مزود"""
+        """Add a provider"""
         if "providers" not in self._config_dict:
             self._config_dict["providers"] = []
 
@@ -771,7 +932,7 @@ class ConfigBuilder:
     def with_security(
         self, sandbox_type: str = "gvisor", audit_enabled: bool = True
     ) -> "ConfigBuilder":
-        """إضافة تكوين الأمان"""
+        """Add security configuration"""
         self._config_dict["security"] = {
             "sandbox_type": sandbox_type,
             "blockchain_audit_enabled": audit_enabled,
@@ -781,7 +942,7 @@ class ConfigBuilder:
     def with_execution(
         self, max_parallel: int = 10, genetic_twin: bool = True, self_healing: bool = True
     ) -> "ConfigBuilder":
-        """إضافة تكوين التنفيذ"""
+        """Add execution configuration"""
         self._config_dict["execution"] = {
             "max_parallel_tasks": max_parallel,
             "genetic_twin_enabled": genetic_twin,
@@ -790,79 +951,94 @@ class ConfigBuilder:
         return self
 
     def with_custom(self, key: str, value: Any) -> "ConfigBuilder":
-        """إضافة تكوين مخصص"""
+        """Add custom configuration"""
         if "custom" not in self._config_dict:
             self._config_dict["custom"] = {}
         self._config_dict["custom"][key] = value
         return self
 
     def from_file(self, path: str) -> "ConfigBuilder":
-        """تحميل من ملف كأساس"""
-        if path.endswith((".yaml", ".yml")):
-            with open(path) as f:
-                file_config = yaml.safe_load(f) or {}
-        elif path.endswith(".json"):
-            with open(path) as f:
-                file_config = json.load(f)
-        else:
-            raise ValueError(f"Unsupported file format: {path}")
-
-        # دمج عميق
-        self._config_dict = self._deep_merge(file_config, self._config_dict)
+        """Load from file as base"""
+        loader = ConfigLoader()
+        file_config = loader.load_from_file(path)
+        self._config_dict = loader.deep_merge(file_config, self._config_dict)
         return self
 
-    def _deep_merge(self, base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-        """دمج عميق"""
-        result = deepcopy(base)
-        for key, value in override.items():
-            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-                result[key] = self._deep_merge(result[key], value)
-            else:
-                result[key] = deepcopy(value)
-        return result
+    def with_secrets(
+        self,
+        env_prefix: str = "GAAP_",
+        env_file: str | None = ".env",
+        auto_load: bool = True,
+    ) -> "ConfigBuilder":
+        """Initialize secrets management"""
+        self._config_dict["_secrets_config"] = {
+            "env_prefix": env_prefix,
+            "env_file": env_file,
+            "auto_load": auto_load,
+        }
+        return self
 
     def build(self) -> GAAPConfig:
-        """بناء التكوين النهائي"""
-        # إنشاء ConfigManager مؤقت للتحويل والتحقق
-        manager = ConfigManager.__new__(ConfigManager)
-        manager._env_prefix = "GAAP_"
-        config = manager._dict_to_config(self._config_dict)
-        manager._validate_config(config)
+        """Build final configuration"""
+        converter = ConfigConverter()
+        config = converter.dict_to_config(self._config_dict)
+
+        # Initialize secrets if configured
+        secrets_config = self._config_dict.get("_secrets_config")
+        if secrets_config and _HAS_SECRETS:
+            config.init_secrets(
+                env_prefix=secrets_config.get("env_prefix", "GAAP_"),
+                env_file=secrets_config.get("env_file", ".env"),
+                auto_load=secrets_config.get("auto_load", True),
+            )
+
+        # Validate
+        validator = ConfigValidator()
+        warnings, errors = validator.validate(config)
+        for warning in warnings:
+            logging.getLogger("gaap.config").warning(warning)
+
+        if errors:
+            raise ConfigurationError(
+                message="Configuration validation failed",
+                details={"errors": errors},
+            )
+
         return config
 
     def to_yaml(self, path: str) -> None:
-        """حفظ التكوين كملف YAML"""
+        """Save configuration as YAML file"""
         config = self.build()
         content = yaml.dump(config.to_dict(), default_flow_style=False)
         atomic_write(path, content)
 
     def to_json(self, path: str) -> None:
-        """حفظ التكوين كملف JSON"""
+        """Save configuration as JSON file"""
         config = self.build()
         content = json.dumps(config.to_dict(), indent=2)
         atomic_write(path, content)
 
 
 # =============================================================================
-# Default Configuration
+# Convenience Functions
 # =============================================================================
 
 
 def get_default_config() -> GAAPConfig:
-    """الحصول على التكوين الافتراضي"""
+    """Get default configuration"""
     return GAAPConfig()
 
 
 def load_config(config_path: str | None = None, env_prefix: str = "GAAP_") -> GAAPConfig:
     """
-    تحميل التكوين من المصادر المتاحة
+    Load configuration from available sources.
 
     Args:
-        config_path: مسار ملف التكوين (اختياري)
-        env_prefix: بادئة متغيرات البيئة
+        config_path: Path to configuration file (optional)
+        env_prefix: Environment variable prefix
 
     Returns:
-        كائن التكوين
+        Configuration object
     """
     manager = ConfigManager(config_path=config_path, env_prefix=env_prefix)
     return manager.config
@@ -878,7 +1054,7 @@ _config_manager: ConfigManager | None = None
 def init_config(
     config_path: str | None = None, env_prefix: str = "GAAP_", auto_reload: bool = False
 ) -> ConfigManager:
-    """تهيئة مدير التكوين العام"""
+    """Initialize global configuration manager"""
     global _config_manager
     _config_manager = ConfigManager(
         config_path=config_path, env_prefix=env_prefix, auto_reload=auto_reload
@@ -887,7 +1063,7 @@ def init_config(
 
 
 def get_config() -> GAAPConfig:
-    """الحصول على التكوين العام"""
+    """Get global configuration"""
     global _config_manager
     if _config_manager is None:
         _config_manager = ConfigManager()
@@ -895,7 +1071,7 @@ def get_config() -> GAAPConfig:
 
 
 def get_config_manager() -> ConfigManager:
-    """الحصول على مدير التكوين العام"""
+    """Get global configuration manager"""
     global _config_manager
     if _config_manager is None:
         _config_manager = ConfigManager()

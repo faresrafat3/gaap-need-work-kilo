@@ -9,30 +9,20 @@ Implements: docs/evolution_plan_2026/17_DEEP_RESEARCH_AGENT_SPEC.md
 
 from __future__ import annotations
 
-import asyncio
-import hashlib
 import logging
 import re
 import time
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
 from typing import Any
 
-from .types import (
-    Source,
-    SourceStatus,
-    Hypothesis,
-    HypothesisStatus,
-    AssociativeTriple,
-    ResearchFinding,
-    Contradiction,
-)
 from .config import DeepDiveConfig
-
-from .web_fetcher import WebFetcher
 from .content_extractor import ContentExtractor
 from .source_auditor import SourceAuditor
 from .synthesizer import Synthesizer
+from .types import (
+    Source,
+)
+from .web_fetcher import WebFetcher
 
 logger = logging.getLogger("gaap.research.deep_dive")
 

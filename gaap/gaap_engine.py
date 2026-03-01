@@ -11,14 +11,14 @@ from __future__ import annotations
 
 import asyncio
 import gc
-import logging
-import os
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from gaap.core.governance import SOPGatekeeper
 from gaap.core.memory_guard import MemoryGuard, get_rss_mb
-from gaap.core.types import OODAPhase, OODAState, ReplanTrigger, Task, TaskPriority, TaskType
+from gaap.core.observability import Observability
+from gaap.core.types import OODAPhase, OODAState, ReplanTrigger, TaskPriority, TaskType
 from gaap.healing.healer import SelfHealingSystem
 from gaap.layers.layer0_interface import Layer0Interface, StructuredIntent
 from gaap.layers.layer1_strategic import ArchitectureSpec, Layer1Strategic
@@ -29,17 +29,12 @@ from gaap.providers.base_provider import BaseProvider
 from gaap.providers.unified_gaap_provider import UnifiedGAAPProvider
 from gaap.routing.fallback import FallbackManager
 from gaap.routing.router import RoutingStrategy, SmartRouter
-from gaap.security.firewall import AuditTrail, PromptFirewall
 from gaap.security.dlp import DLPScanner
-from gaap.core.observer import create_observer
-from gaap.core.observability import Observability
-from gaap.core.governance import SOPGatekeeper
-from gaap.core.exceptions import AxiomViolationError
+from gaap.security.firewall import AuditTrail, PromptFirewall
 
 if TYPE_CHECKING:
-    from gaap.core.axioms import AxiomValidator, AxiomCheckResult
+    from gaap.core.axioms import AxiomValidator
     from gaap.core.observer import EnvironmentState
-
 
 from gaap.core.logging import get_standard_logger as get_logger
 
@@ -157,7 +152,7 @@ class GAAPEngine:
         # v2: Optional MCP Support
         self.mcp_client = None
         if enable_mcp:
-            from gaap.tools import MCPClient, MCP_AVAILABLE
+            from gaap.tools import MCP_AVAILABLE, MCPClient
 
             if MCP_AVAILABLE:
                 self.mcp_client = MCPClient(timeout=30)

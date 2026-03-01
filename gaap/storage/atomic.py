@@ -17,11 +17,10 @@ This guarantees:
 import logging
 import os
 import shutil
-import tempfile
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterator, TypeVar, TextIO, BinaryIO
+from typing import Any, BinaryIO, Iterator, TextIO, TypeVar
 
 from pydantic import BaseModel
 

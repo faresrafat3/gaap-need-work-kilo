@@ -86,12 +86,10 @@ class BaseRateLimiter(ABC):
     @abstractmethod
     async def acquire(self, tokens: int = 1) -> RateLimitResult:
         """Try to acquire tokens"""
-        pass
 
     @abstractmethod
     async def try_acquire(self, tokens: int = 1) -> bool:
         """Non-blocking acquire check"""
-        pass
 
     async def wait_for_token(self, tokens: int = 1, timeout: float | None = None) -> bool:
         """Wait until tokens are available"""

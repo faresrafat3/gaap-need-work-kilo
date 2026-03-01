@@ -18,60 +18,43 @@ logging.basicConfig(level=logging.INFO, format="%(name)s: %(message)s")
 logger = logging.getLogger("gaap.grand_tour")
 
 async def run_grand_tour():
-    print("
-" + "🚀" * 20)
+    print("\n" + "🚀" * 20)
     print("   WELCOME TO GAAP v2.0 EVOLUTION")
-    print("🚀" * 20 + "
-")
+    print("🚀" * 20 + "\n")
 
     # --- PHASE 1: Deep Research (STORM) ---
     print("🧪 Phase 1: Deep Research (STORM Architecture)")
     researcher = create_researcher()
     result = await researcher.research("Cross-Site Scripting (XSS) in modern Next.js apps")
-    print(f"   [Result]: {result.report[:100]}...")
-    print(f"   [PCC Score]: {result.pcc_score}
-")
+    print(f"✅ Research complete: {len(result)} pages analyzed")
 
-    # --- PHASE 2: Simulation (Holodeck) ---
-    print("🔮 Phase 2: World Simulation (The Holodeck)")
-    simulator = create_simulator()
-    sim_res = await simulator.simulate_action("Create a payload to test /api/search")
-    print(f"   [Risk Score]: {sim_res.risk_score}")
-    print(f"   [Predicted Change]: {sim_res.predicted_delta}
-")
+    # --- PHASE 2: Tool Synthesis (Dreamer) ---
+    print("\n🔧 Phase 2: Tool Synthesis (Dreamer)")
+    synthesizer = ToolSynthesizer()
+    tool_code = synthesizer.synthesize("scrape_website", "https://example.com")
+    print(f"✅ Tool synthesized: {len(tool_code)} characters")
 
-    # --- PHASE 3: Just-in-Time Tooling (Synthesis) ---
-    print("🛠️ Phase 3: Tool Synthesis (The Inventor)")
-    synth = ToolSynthesizer()
-    tool = await synth.synthesize(
-        intent="XSS Auditor",
-        code_content="def run(): return 'No XSS found in payload'"
-    )
-    if tool:
-        print(f"   [Tool Created]: {tool.name} (Hot-loaded successfully)
-")
-
-    # --- PHASE 4: Formal Verification (Z3) ---
-    print("⚖️ Phase 4: Formal Verification (Mathematical Proof)")
+    # --- PHASE 3: Formal Verification (Z3) ---
+    print("\n✨ Phase 3: Formal Verification (Z3)")
     prover = Z3Prover()
-    # Let's prove that our 'budget' variable will never go negative
-    is_proven = prover.prove_range("x", "x - 10", min_val=0, max_val=1000)
-    print(f"   [Logic Proof]: Budget safety guaranteed: {is_proven}
-")
+    is_valid = prover.prove("x > 0 and y > 0 implies x + y > 0")
+    print(f"✅ Proof result: {is_valid}")
 
-    # --- PHASE 5: Data Loss Prevention (DLP Shield) ---
-    print("🛡️ Phase 5: Security Shield (DLP)")
-    dlp = DLPScanner()
-    raw_output = "The vulnerability was found on IP 192.168.1.50 using key sk-live-SECRET-KEY."
-    safe_output = dlp.scan_and_redact(raw_output)
-    print(f"   [Raw]: {raw_output}")
-    print(f"   [Redacted]: {safe_output}
-")
+    # --- PHASE 4: Security (DLP) ---
+    print("\n🔒 Phase 4: Data Loss Prevention (DLP)")
+    scanner = DLPScanner()
+    violations = scanner.scan("My password is 12345 and my SSN is 123-45-6789")
+    print(f"✅ Violations found: {len(violations)}")
 
-    print("🏁" * 20)
-    print("   TOUR COMPLETE: GAAP IS NOW FULLY AUTONOMOUS")
-    print("🏁" * 20 + "
-")
+    # --- PHASE 5: Swarm Consensus ---
+    print("\n🌐 Phase 5: Swarm Consensus")
+    oracle = ConsensusOracle()
+    consensus = await oracle.reach_consensus("What is the capital of France?")
+    print(f"✅ Consensus reached: {consensus}")
+
+    print("\n" + "=" * 60)
+    print("🎉 Grand Tour Complete! All engines operational.")
+    print("=" * 60)
 
 if __name__ == "__main__":
     asyncio.run(run_grand_tour())

@@ -1,6 +1,3 @@
-import json
-import logging
-import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -131,7 +128,7 @@ class NativeToolCaller:
         return self.TOOL_CALL_PROMPT.format(tools="\n".join(desc))
 
     def execute_call(self, call: ToolCall) -> ToolResult:
-        import os
+        pass
 
         try:
             res = self._default_execute(call.name, call.arguments)

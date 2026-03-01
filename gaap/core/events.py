@@ -11,18 +11,17 @@ Usage:
     emitter = EventEmitter.get_instance()
 
     # Subscribe
-    sub_id = emitter.subscribe(EventType.CONFIG_CHANGED, my_callback)
+    callback_id = emitter.subscribe(EventType.CONFIG_CHANGED, my_callback)
 
     # Emit
     emitter.emit(EventType.CONFIG_CHANGED, {"module": "healing"})
 
     # Unsubscribe
-    emitter.unsubscribe(sub_id)
+    emitter.unsubscribe(callback_id)
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import threading
 import uuid
@@ -139,17 +138,19 @@ class EventEmitter:
         if self._initialized:
             return
 
-        self._subscribers: dict[EventType, dict[str, Callable[[Event], None]]] = {}
-        self._async_subscribers: dict[EventType, dict[str, Callable[[Event], Any]]] = {}
+        # Sync callbacks - for synchronous event handlers
+        self._sync_callbacks: dict[EventType, dict[str, Callable[[Event], None]]] = {}
+        # Async callbacks - for asynchronous event handlers
+        self._async_callbacks: dict[EventType, dict[str, Callable[[Event], Any]]] = {}
         self._lock = threading.RLock()
         self._event_history: list[Event] = []
         self._max_history = 1000
         self._initialized = True
 
-        # Initialize subscriber dicts
+        # Initialize callback dicts
         for event_type in EventType:
-            self._subscribers[event_type] = {}
-            self._async_subscribers[event_type] = {}
+            self._sync_callbacks[event_type] = {}
+            self._async_callbacks[event_type] = {}
 
     @classmethod
     def get_instance(cls) -> EventEmitter:
@@ -162,7 +163,7 @@ class EventEmitter:
         callback: Callable[[Event], None],
     ) -> str:
         """
-        Subscribe to an event type.
+        Subscribe to an event type with a synchronous callback.
 
         Args:
             event_type: Type of event to subscribe to
@@ -173,7 +174,7 @@ class EventEmitter:
         """
         sub_id = str(uuid.uuid4())
         with self._lock:
-            self._subscribers[event_type][sub_id] = callback
+            self._sync_callbacks[event_type][sub_id] = callback
         logger.debug(f"Subscribed {sub_id} to {event_type.name}")
         return sub_id
 
@@ -194,7 +195,7 @@ class EventEmitter:
         """
         sub_id = str(uuid.uuid4())
         with self._lock:
-            self._async_subscribers[event_type][sub_id] = callback
+            self._async_callbacks[event_type][sub_id] = callback
         logger.debug(f"Async subscribed {sub_id} to {event_type.name}")
         return sub_id
 
@@ -210,12 +211,12 @@ class EventEmitter:
         """
         with self._lock:
             for event_type in EventType:
-                if subscription_id in self._subscribers[event_type]:
-                    del self._subscribers[event_type][subscription_id]
+                if subscription_id in self._sync_callbacks[event_type]:
+                    del self._sync_callbacks[event_type][subscription_id]
                     logger.debug(f"Unsubscribed {subscription_id} from {event_type.name}")
                     return True
-                if subscription_id in self._async_subscribers[event_type]:
-                    del self._async_subscribers[event_type][subscription_id]
+                if subscription_id in self._async_callbacks[event_type]:
+                    del self._async_callbacks[event_type][subscription_id]
                     logger.debug(f"Async unsubscribed {subscription_id} from {event_type.name}")
                     return True
         return False
@@ -248,22 +249,22 @@ class EventEmitter:
         if len(self._event_history) > self._max_history:
             self._event_history.pop(0)
 
-        # Call sync subscribers
+        # Call sync callbacks
         with self._lock:
-            subs = self._subscribers[event_type].copy()
-            async_subs = self._async_subscribers[event_type].copy()
+            sync_cbs = self._sync_callbacks[event_type].copy()
+            async_cbs = self._async_callbacks[event_type].copy()
 
-        for sub_id, callback in subs.items():
+        for sub_id, callback in sync_cbs.items():
             try:
                 callback(event)
             except Exception as e:
                 logger.error(f"Error in subscriber {sub_id}: {e}")
 
-        # Log for async subscribers (they'll be called via asyncio)
-        if async_subs:
-            logger.debug(f"Event {event_type.name} has {len(async_subs)} async subscribers")
+        # Log for async callbacks (they'll be called via asyncio)
+        if async_cbs:
+            logger.debug(f"Event {event_type.name} has {len(async_cbs)} async callbacks")
 
-        logger.debug(f"Emitted {event_type.name} to {len(subs)} subscribers")
+        logger.debug(f"Emitted {event_type.name} to {len(sync_cbs)} sync callbacks")
         return event
 
     async def emit_async(
@@ -273,7 +274,7 @@ class EventEmitter:
         source: str = "",
     ) -> Event:
         """
-        Emit an event asynchronously, calling all async subscribers.
+        Emit an event asynchronously, calling all async callbacks.
 
         Args:
             event_type: Type of event
@@ -285,11 +286,11 @@ class EventEmitter:
         """
         event = self.emit(event_type, data, source)
 
-        # Call async subscribers
+        # Call async callbacks
         with self._lock:
-            async_subs = self._async_subscribers[event_type].copy()
+            async_cbs = self._async_callbacks[event_type].copy()
 
-        for sub_id, callback in async_subs.items():
+        for sub_id, callback in async_cbs.items():
             try:
                 await callback(event)
             except Exception as e:
@@ -324,9 +325,9 @@ class EventEmitter:
     def subscriber_count(self, event_type: EventType | None = None) -> int:
         """Count subscribers."""
         if event_type:
-            return len(self._subscribers[event_type]) + len(self._async_subscribers[event_type])
+            return len(self._sync_callbacks[event_type]) + len(self._async_callbacks[event_type])
         return sum(
-            len(self._subscribers[et]) + len(self._async_subscribers[et]) for et in EventType
+            len(self._sync_callbacks[et]) + len(self._async_callbacks[et]) for et in EventType
         )
 
 

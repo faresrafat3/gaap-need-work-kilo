@@ -17,7 +17,7 @@ Usage:
     configure_logging(level=logging.INFO, json_format=False)
 
     # Get logger
-    logger = get_logger("gaap.provider.groq")
+    logger = get_logger("gaap.provider.kimi")
     logger.info("Processing request", model="llama-3.3-70b", tokens=100)
 
 Environment Variables:
@@ -130,7 +130,7 @@ class GAAPLogger:
         Initialize GAAP logger.
 
         Args:
-            name: Logger name (typically module name like "gaap.provider.groq")
+            name: Logger name (typically module name like "gaap.provider.kimi")
             level: Logging level (default: INFO)
             json_format: Enable JSON formatting (default: False)
         """
@@ -318,7 +318,7 @@ class JSONFormatter(logging.Formatter):
         {
             "timestamp": "2026-02-17T10:30:00.000000",
             "level": "INFO",
-            "logger": "gaap.provider.groq",
+            "logger": "gaap.provider.kimi",
             "message": "Request processed",
             "extra": {"tokens": 100, "latency_ms": 250}
         }
@@ -395,9 +395,7 @@ def get_logger(name: str, level: int | None = None) -> GAAPLogger:
     log_level = (
         level
         if level is not None
-        else int(env_level)
-        if isinstance(env_level, int)
-        else DEFAULT_LOG_LEVEL
+        else int(env_level) if isinstance(env_level, int) else DEFAULT_LOG_LEVEL
     )
     json_format = os.getenv("GAAP_LOG_FORMAT", DEFAULT_LOG_FORMAT) == "json"
 
@@ -509,9 +507,7 @@ def get_standard_logger(name: str, level: int | None = None) -> logging.Logger:
     log_level = (
         level
         if level is not None
-        else int(env_level)
-        if isinstance(env_level, int)
-        else logging.INFO
+        else int(env_level) if isinstance(env_level, int) else logging.INFO
     )
     logger.setLevel(log_level)
 

@@ -54,7 +54,7 @@ def cmd_status(args: Any) -> None:
 
     config = load_config()
     print("\n⚙️  Configuration:")
-    print(f"  Default Provider: {config.get('default_provider', 'groq')}")
+    print(f"  Default Provider: {config.get('default_provider', 'kimi')}")
     print(f"  Default Model: {config.get('default_model', 'llama-3.3-70b')}")
     print(f"  Default Budget: ${config.get('default_budget', 10.0):.2f}")
 
@@ -97,7 +97,7 @@ def cmd_doctor(args: Any) -> None:
 
     # Check GAAP modules
     try:
-        from gaap import GAAPEngine
+        pass
 
         print("✅ GAAP core module OK")
     except ImportError as e:

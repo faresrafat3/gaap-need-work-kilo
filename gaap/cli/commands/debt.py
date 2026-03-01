@@ -27,7 +27,6 @@ from gaap.maintenance import (
     InterestCalculator,
     ProposalStatus,
     RefinancingEngine,
-    create_debt_config,
 )
 
 
@@ -329,6 +328,6 @@ def _get_llm_provider(args: Any) -> Any:
     try:
         from gaap.providers import get_provider
 
-        return get_provider("groq")
+        return get_provider("kimi")
     except Exception:
         return None

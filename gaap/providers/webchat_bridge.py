@@ -8,13 +8,13 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 from gaap.core.exceptions import ProviderResponseError
+from gaap.core.logging import get_standard_logger as get_logger
 from gaap.core.memory_guard import get_guard
 from gaap.core.types import (
     Message,
     ModelTier,
     ProviderType,
 )
-from gaap.core.logging import get_standard_logger as get_logger
 from gaap.providers.base_provider import BaseProvider
 
 # =============================================================================
@@ -41,14 +41,26 @@ WEBCHAT_MODELS = {
         "tier": ModelTier.TIER_1_STRATEGIC,
     },
     "glm": {
-        "models": ["glm-4-plus"],
-        "default": "glm-4-plus",
+        "models": ["GLM-5", "GLM-4.7", "glm-4-plus"],
+        "default": "GLM-5",
         "tier": ModelTier.TIER_2_TACTICAL,
     },
     "deepseek": {
         "models": ["deepseek-v3"],
         "default": "deepseek-v3",
         "tier": ModelTier.TIER_2_TACTICAL,
+    },
+    "aistudio": {
+        "models": [
+            "gemini-3.1-pro-preview",
+            "gemini-3.1-flash-preview",
+            "gemini-3-pro-preview",
+            "gemini-3-flash-preview",
+            "gemini-2.5-pro",
+            "gemini-2.5-flash",
+        ],
+        "default": "gemini-3.1-pro-preview",
+        "tier": ModelTier.TIER_1_STRATEGIC,
     },
 }
 
@@ -463,3 +475,18 @@ def create_deepseek_provider(
         account=account,
         timeout=timeout,
     )
+
+
+def create_aistudio_provider(
+    model: str = "gemini-3.1-pro-preview",
+    account: str = "default",
+    timeout: int = 120,
+) -> WebChatBridgeProvider:
+    """إنشاء مزود Google AI Studio"""
+    provider = WebChatBridgeProvider(
+        webchat_provider="aistudio",
+        account=account,
+        timeout=timeout,
+    )
+    provider.default_model = model
+    return provider

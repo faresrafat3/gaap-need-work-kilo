@@ -14,7 +14,7 @@ Implements: docs/evolution_plan_2026/17_DEEP_RESEARCH_AGENT_SPEC.md
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
 

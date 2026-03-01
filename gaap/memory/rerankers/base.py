@@ -7,7 +7,6 @@ Abstract base class for all rerankers.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 
@@ -90,7 +89,6 @@ class BaseReranker(ABC):
         Returns:
             List of RerankResult sorted by score descending
         """
-        pass
 
     def _prepare_candidates(
         self,

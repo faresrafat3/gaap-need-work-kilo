@@ -18,17 +18,15 @@ Usage:
 """
 
 import asyncio
-import base64
 import json
 import logging
 import struct
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, AsyncGenerator, Callable
+from typing import Any, AsyncGenerator
 
-from .async_session import AsyncSessionManager, SSEEvent
+from .async_session import AsyncSessionManager
 
 logger = logging.getLogger("gaap.providers.streaming")
 

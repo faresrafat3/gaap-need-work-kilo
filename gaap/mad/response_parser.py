@@ -9,8 +9,6 @@ from gaap.mad.critic_prompts import ArchitectureCriticType
 class CriticParseError(Exception):
     """Error parsing critic response."""
 
-    pass
-
 
 def parse_critic_response(response: str, critic_type: CriticType) -> dict[str, Any]:
     """

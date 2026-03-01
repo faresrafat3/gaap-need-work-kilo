@@ -22,17 +22,15 @@ Usage:
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from typing import Any
 
-from gaap.core.knowledge_map import KnowledgeMap, KnowledgeLevel
+from gaap.core.knowledge_map import KnowledgeMap
+from gaap.memory.hierarchical import EpisodicMemoryStore
 from gaap.meta_learning.confidence import (
+    ActionRecommendation,
     ConfidenceCalculator,
     ConfidenceResult,
-    ConfidenceLevel,
-    ActionRecommendation,
 )
-from gaap.memory.hierarchical import EpisodicMemoryStore
 
 logger = logging.getLogger("gaap.core.confidence_scorer")
 

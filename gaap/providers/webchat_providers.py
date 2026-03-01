@@ -18,19 +18,19 @@ The actual implementation is now in:
 
 from gaap.providers.webchat import (
     WEBCHAT_CACHE_DIR,
-    WebChatAuth,
-    WebChatProvider,
+    CopilotWebChat,
+    DeepSeekWebChat,
     GLMWebChat,
     KimiWebChat,
-    DeepSeekWebChat,
-    CopilotWebChat,
-    save_auth,
-    load_auth,
+    WebChatAuth,
+    WebChatProvider,
+    check_all_webchat_auth,
+    get_provider,
     invalidate_auth,
     list_accounts,
-    get_provider,
+    load_auth,
+    save_auth,
     webchat_call,
-    check_all_webchat_auth,
 )
 
 __all__ = [

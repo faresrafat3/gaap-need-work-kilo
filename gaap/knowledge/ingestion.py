@@ -20,7 +20,6 @@ import asyncio
 import json
 import logging
 import shutil
-import subprocess
 import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -28,14 +27,13 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from gaap.knowledge.knowledge_config import KnowledgeConfig, create_knowledge_config
-from gaap.knowledge.ast_parser import ASTParser, ParsedFile, create_parser
-from gaap.knowledge.usage_miner import UsageMiner, MiningResult, create_usage_miner
+from gaap.knowledge.ast_parser import ParsedFile, create_parser
 from gaap.knowledge.cheat_sheet import (
-    CheatSheetGenerator,
     ReferenceCard,
     create_cheat_sheet_generator,
 )
+from gaap.knowledge.knowledge_config import KnowledgeConfig
+from gaap.knowledge.usage_miner import MiningResult, create_usage_miner
 
 logger = logging.getLogger("gaap.knowledge.ingestion")
 
@@ -309,9 +307,9 @@ class KnowledgeIngestion:
             if data.get("reference_card"):
                 card_data = data["reference_card"]
                 from gaap.knowledge.cheat_sheet import (
-                    ReferenceCard,
                     FunctionSummary,
                     PatternExample,
+                    ReferenceCard,
                 )
 
                 top_functions = [FunctionSummary(**f) for f in card_data.get("top_functions", [])]
@@ -335,9 +333,11 @@ class KnowledgeIngestion:
                 description=data.get("description"),
                 reference_card=reference_card,
                 usage_examples=data.get("usage_examples", []),
-                ingested_at=datetime.fromisoformat(data["ingested_at"])
-                if "ingested_at" in data
-                else datetime.now(),
+                ingested_at=(
+                    datetime.fromisoformat(data["ingested_at"])
+                    if "ingested_at" in data
+                    else datetime.now()
+                ),
             )
 
         except Exception as e:

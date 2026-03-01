@@ -1,0 +1,845 @@
+# =============================================================================
+# GAAP Security Scanning Workflow
+# =============================================================================
+# Comprehensive security scanning for CI/CD pipeline
+# - Runs on PR and push to main
+# - Bandit (Python security linter)
+# - Safety (dependency vulnerability scanner)
+# - pip-audit (PyPA security audit)
+# - CodeQL (GitHub security analysis)
+# - Secret scanning (gitleaks)
+# - Custom security audits
+#
+# Usage:
+#   - Automatic: Triggers on PRs and pushes to main
+#   - Manual: Can be triggered manually with workflow_dispatch
+# =============================================================================
+
+name: Security Scanning
+
+on:
+  # Run on PRs to any branch (non-blocking warnings)
+  pull_request:
+    branches:
+      - '**'
+    paths:
+      - '**.py'
+      - '**.yml'
+      - '**.yaml'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+      - '.github/workflows/security.yml'
+
+  # Run on pushes to main (blocking for critical issues)
+  push:
+    branches:
+      - main
+    paths:
+      - '**.py'
+      - '**.yml'
+      - '**.yaml'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+      - '.github/workflows/security.yml'
+
+  # Weekly automated scan (Sundays at 00:00 UTC)
+  schedule:
+    - cron: '0 0 * * 0'
+
+  # Manual trigger with options
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of security scan to run'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - dependencies
+          - code
+          - secrets
+          - quick
+      fail_on_warning:
+        description: 'Fail on warnings (not just critical)'
+        required: false
+        default: false
+        type: boolean
+      upload_reports:
+        description: 'Upload security reports as artifacts'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  PYTHON_VERSION: '3.12'
+  PIP_DISABLE_PIP_VERSION_CHECK: 1
+  FORCE_COLOR: 1
+
+jobs:
+  # =============================================================================
+  # Job: Detect Changes
+  # =============================================================================
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      dependencies: ${{ steps.filter.outputs.dependencies }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for accurate diff
+
+      - name: Filter changed files
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            python:
+              - '**.py'
+            dependencies:
+              - 'requirements*.txt'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'poetry.lock'
+            workflows:
+              - '.github/workflows/**'
+
+  # =============================================================================
+  # Job: Bandit Security Linter
+  # =============================================================================
+  bandit:
+    name: Bandit Security Scan
+    runs-on: ubuntu-latest
+    needs: changes
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      needs.changes.outputs.python == 'true' ||
+      needs.changes.outputs.workflows == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Bandit
+        run: |
+          pip install --upgrade bandit[toml]>=1.7.0
+
+      - name: Run Bandit scan
+        id: bandit
+        run: |
+          # Create reports directory
+          mkdir -p security-reports
+
+          # Run bandit with different severities
+          echo "Running Bandit security scan..."
+
+          # High severity - fail on these
+          bandit \
+            -r . \
+            -f json \
+            -o security-reports/bandit-high.json \
+            -lll \
+            -iii \
+            --exclude './.venv,./venv,./.git,./__pycache__,./.pytest_cache,./.mypy_cache,./build,./dist,./.eggs,./frontend/node_modules' \
+            || true
+
+          # Medium severity
+          bandit \
+            -r . \
+            -f json \
+            -o security-reports/bandit-medium.json \
+            -ll \
+            -ii \
+            --exclude './.venv,./venv,./.git,./__pycache__,./.pytest_cache,./.mypy_cache,./build,./dist,./.eggs,./frontend/node_modules' \
+            || true
+
+          # Low severity (informational)
+          bandit \
+            -r . \
+            -f json \
+            -o security-reports/bandit-low.json \
+            -l \
+            -i \
+            --exclude './.venv,./venv,./.git,./__pycache__,./.pytest_cache,./.mypy_cache,./build,./dist,./.eggs,./frontend/node_modules' \
+            || true
+
+          # Generate text report for logs
+          bandit \
+            -r . \
+            -f txt \
+            -o security-reports/bandit-report.txt \
+            --exclude './.venv,./venv,./.git,./__pycache__,./.pytest_cache,./.mypy_cache,./build,./dist,./.eggs,./frontend/node_modules' \
+            || true
+
+          echo "Bandit scan complete"
+
+      - name: Parse Bandit results
+        id: parse
+        run: |
+          # Check for high severity issues
+          HIGH_COUNT=$(python3 << 'EOF'
+          import json
+          try:
+              with open('security-reports/bandit-high.json', 'r') as f:
+                  data = json.load(f)
+                  print(len(data.get('results', [])))
+          except:
+              print(0)
+          EOF
+          )
+
+          # Check for medium severity issues
+          MEDIUM_COUNT=$(python3 << 'EOF'
+          import json
+          try:
+              with open('security-reports/bandit-medium.json', 'r') as f:
+                  data = json.load(f)
+                  print(len(data.get('results', [])))
+          except:
+              print(0)
+          EOF
+          )
+
+          echo "high_count=$HIGH_COUNT" >> $GITHUB_OUTPUT
+          echo "medium_count=$MEDIUM_COUNT" >> $GITHUB_OUTPUT
+
+          echo "High severity issues: $HIGH_COUNT"
+          echo "Medium severity issues: $MEDIUM_COUNT"
+
+          # Display findings
+          if [ -f security-reports/bandit-report.txt ]; then
+            echo "=== Bandit Report ==="
+            cat security-reports/bandit-report.txt
+          fi
+
+      - name: Upload Bandit reports
+        if: always() && (github.event.inputs.upload_reports != 'false')
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-reports
+          path: security-reports/bandit-*.json
+          retention-days: 30
+
+      - name: Fail on high severity
+        if: |
+          github.ref == 'refs/heads/main' &&
+          steps.parse.outputs.high_count != '0'
+        run: |
+          echo "❌ Critical security issues found: ${{ steps.parse.outputs.high_count }}"
+          exit 1
+
+      - name: Report medium severity
+        if: steps.parse.outputs.medium_count != '0'
+        run: |
+          echo "⚠️ Medium security issues found: ${{ steps.parse.outputs.medium_count }}"
+          if [[ "${{ github.event.inputs.fail_on_warning }}" == "true" ]]; then
+            exit 1
+          fi
+
+  # =============================================================================
+  # Job: Safety Dependency Check
+  # =============================================================================
+  safety:
+    name: Safety Vulnerability Scan
+    runs-on: ubuntu-latest
+    needs: changes
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      needs.changes.outputs.dependencies == 'true' ||
+      needs.changes.outputs.python == 'true' ||
+      github.event.inputs.scan_type == 'full' ||
+      github.event.inputs.scan_type == 'dependencies'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Safety
+        run: |
+          pip install --upgrade safety>=3.0.0
+
+      - name: Run Safety scan
+        id: safety
+        run: |
+          mkdir -p security-reports
+
+          echo "Running Safety vulnerability scan..."
+
+          # Run safety check and capture output
+          safety check \
+            --json \
+            --output security-reports/safety-report.json \
+            --file requirements.txt \
+            || SAFETY_EXIT=$?
+
+          # Also check requirements-dev.txt if it exists
+          if [ -f requirements-dev.txt ]; then
+            safety check \
+              --json \
+              --output security-reports/safety-dev-report.json \
+              --file requirements-dev.txt \
+              || SAFETY_EXIT_DEV=$?
+          fi
+
+          # Generate text report
+          safety check \
+            --output security-reports/safety-report.txt \
+            --file requirements.txt \
+            || true
+
+          echo "Safety scan complete"
+
+      - name: Parse Safety results
+        id: parse
+        run: |
+          CRITICAL_COUNT=0
+          HIGH_COUNT=0
+          MEDIUM_COUNT=0
+
+          # Parse Safety JSON output
+          if [ -f security-reports/safety-report.json ]; then
+            COUNTS=$(python3 << 'EOF'
+          import json
+          try:
+              with open('security-reports/safety-report.json', 'r') as f:
+                  data = json.load(f)
+                  vulns = data.get('vulnerabilities', [])
+                  critical = sum(1 for v in vulns if v.get('severity') == 'critical')
+                  high = sum(1 for v in vulns if v.get('severity') == 'high')
+                  medium = sum(1 for v in vulns if v.get('severity') == 'medium')
+                  print(f"{critical} {high} {medium}")
+          except:
+              print("0 0 0")
+          EOF
+          )
+            read CRITICAL_COUNT HIGH_COUNT MEDIUM_COUNT <<< "$COUNTS"
+          fi
+
+          echo "critical_count=$CRITICAL_COUNT" >> $GITHUB_OUTPUT
+          echo "high_count=$HIGH_COUNT" >> $GITHUB_OUTPUT
+          echo "medium_count=$MEDIUM_COUNT" >> $GITHUB_OUTPUT
+
+          echo "Critical vulnerabilities: $CRITICAL_COUNT"
+          echo "High vulnerabilities: $HIGH_COUNT"
+          echo "Medium vulnerabilities: $MEDIUM_COUNT"
+
+          # Display report
+          if [ -f security-reports/safety-report.txt ]; then
+            echo "=== Safety Report ==="
+            cat security-reports/safety-report.txt
+          fi
+
+      - name: Upload Safety reports
+        if: always() && (github.event.inputs.upload_reports != 'false')
+        uses: actions/upload-artifact@v4
+        with:
+          name: safety-reports
+          path: security-reports/safety-*.json
+          retention-days: 30
+
+      - name: Fail on critical vulnerabilities
+        if: |
+          github.ref == 'refs/heads/main' &&
+          steps.parse.outputs.critical_count != '0'
+        run: |
+          echo "❌ Critical vulnerabilities found: ${{ steps.parse.outputs.critical_count }}"
+          exit 1
+
+  # =============================================================================
+  # Job: pip-audit Security Audit
+  # =============================================================================
+  pip-audit:
+    name: pip-audit Security Audit
+    runs-on: ubuntu-latest
+    needs: changes
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      needs.changes.outputs.dependencies == 'true' ||
+      github.event.inputs.scan_type == 'full' ||
+      github.event.inputs.scan_type == 'dependencies'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pip-audit
+        run: |
+          pip install --upgrade pip-audit>=2.6.0
+
+      - name: Run pip-audit
+        id: pipaudit
+        run: |
+          mkdir -p security-reports
+
+          echo "Running pip-audit..."
+
+          # Run pip-audit with vulnerability service
+          pip-audit \
+            --requirement requirements.txt \
+            --format=json \
+            --output=security-reports/pip-audit-report.json \
+            --vulnerability-service=pypi \
+            || PIP_AUDIT_EXIT=$?
+
+          # Generate text report
+          pip-audit \
+            --requirement requirements.txt \
+            --format=markdown \
+            --output=security-reports/pip-audit-report.md \
+            || true
+
+          # If there were findings, the exit code will be non-zero
+          if [ -n "$PIP_AUDIT_EXIT" ] && [ "$PIP_AUDIT_EXIT" -ne 0 ]; then
+            echo "Vulnerabilities detected"
+          fi
+
+          echo "pip-audit complete"
+
+      - name: Parse pip-audit results
+        id: parse
+        run: |
+          VULN_COUNT=$(python3 << 'EOF'
+          import json
+          try:
+              with open('security-reports/pip-audit-report.json', 'r') as f:
+                  data = json.load(f)
+                  print(len(data.get('dependencies', [])))
+          except:
+              print(0)
+          EOF
+          )
+
+          echo "vuln_count=$VULN_COUNT" >> $GITHUB_OUTPUT
+          echo "Vulnerable dependencies: $VULN_COUNT"
+
+          # Display markdown report
+          if [ -f security-reports/pip-audit-report.md ]; then
+            echo "=== pip-audit Report ==="
+            cat security-reports/pip-audit-report.md
+          fi
+
+      - name: Upload pip-audit reports
+        if: always() && (github.event.inputs.upload_reports != 'false')
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-reports
+          path: security-reports/pip-audit-*.json
+          retention-days: 30
+
+  # =============================================================================
+  # Job: Secret Scanning (Gitleaks)
+  # =============================================================================
+  gitleaks:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      github.event.inputs.scan_type == 'full' ||
+      github.event.inputs.scan_type == 'secrets'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for secret scanning
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Optional: for commercial features
+        with:
+          config-path: .gitleaks.toml
+          redact: true
+
+      - name: Manual Gitleaks Scan (fallback)
+        if: failure()
+        run: |
+          mkdir -p security-reports
+
+          # Install gitleaks if action fails
+          wget -q -O gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz
+          tar -xzf gitleaks.tar.gz
+
+          ./gitleaks detect \
+            --source . \
+            --report-format json \
+            --report-path security-reports/gitleaks-report.json \
+            --verbose \
+            || true
+
+          rm -f gitleaks gitleaks.tar.gz
+
+      - name: Upload Gitleaks reports
+        if: always() && (github.event.inputs.upload_reports != 'false')
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-reports
+          path: security-reports/gitleaks-*.json
+          retention-days: 30
+
+  # =============================================================================
+  # Job: CodeQL Analysis
+  # =============================================================================
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    needs: changes
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      needs.changes.outputs.python == 'true' ||
+      github.event.inputs.scan_type == 'full' ||
+      github.event.inputs.scan_type == 'code'
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+          config-file: .github/codeql/codeql-config.yml
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
+          output: security-reports/codeql-results
+
+      - name: Upload CodeQL results
+        if: always() && (github.event.inputs.upload_reports != 'false')
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-reports
+          path: security-reports/codeql-results/
+          retention-days: 30
+
+  # =============================================================================
+  # Job: Custom Security Audit
+  # =============================================================================
+  custom-audit:
+    name: Custom Security Audit
+    runs-on: ubuntu-latest
+    needs: changes
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      needs.changes.outputs.python == 'true' ||
+      github.event.inputs.scan_type == 'full' ||
+      github.event.inputs.scan_type == 'code'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt || true
+
+      - name: Run custom security audit
+        id: custom
+        run: |
+          mkdir -p security-reports
+
+          echo "Running custom security audit..."
+          python scripts/security/audit-codebase.py \
+            --output security-reports/custom-audit.json \
+            --format json \
+            || CUSTOM_EXIT=$?
+
+          # Generate text report
+          python scripts/security/audit-codebase.py \
+            --output security-reports/custom-audit.txt \
+            --format text \
+            || true
+
+          echo "Custom audit complete"
+
+      - name: Parse custom audit results
+        id: parse
+        run: |
+          if [ -f security-reports/custom-audit.json ]; then
+            COUNTS=$(python3 << 'EOF'
+          import json
+          try:
+              with open('security-reports/custom-audit.json', 'r') as f:
+                  data = json.load(f)
+                  critical = len(data.get('critical', []))
+                  high = len(data.get('high', []))
+                  medium = len(data.get('medium', []))
+                  print(f"{critical} {high} {medium}")
+          except:
+              print("0 0 0")
+          EOF
+          )
+            read CRITICAL HIGH MEDIUM <<< "$COUNTS"
+
+            echo "critical_count=$CRITICAL" >> $GITHUB_OUTPUT
+            echo "high_count=$HIGH" >> $GITHUB_OUTPUT
+            echo "medium_count=$MEDIUM" >> $GITHUB_OUTPUT
+
+            echo "Custom audit - Critical: $CRITICAL, High: $HIGH, Medium: $MEDIUM"
+          fi
+
+          # Display text report
+          if [ -f security-reports/custom-audit.txt ]; then
+            echo "=== Custom Audit Report ==="
+            cat security-reports/custom-audit.txt
+          fi
+
+      - name: Upload custom audit reports
+        if: always() && (github.event.inputs.upload_reports != 'false')
+        uses: actions/upload-artifact@v4
+        with:
+          name: custom-audit-reports
+          path: security-reports/custom-audit.*
+          retention-days: 30
+
+      - name: Fail on critical findings
+        if: |
+          github.ref == 'refs/heads/main' &&
+          steps.parse.outputs.critical_count != '0'
+        run: |
+          echo "❌ Critical custom audit findings: ${{ steps.parse.outputs.critical_count }}"
+          exit 1
+
+  # =============================================================================
+  # Job: Dependency Health Check
+  # =============================================================================
+  dependency-check:
+    name: Dependency Health Check
+    runs-on: ubuntu-latest
+    needs: changes
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      needs.changes.outputs.dependencies == 'true' ||
+      github.event.inputs.scan_type == 'full' ||
+      github.event.inputs.scan_type == 'dependencies'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install packaging requests
+
+      - name: Run dependency health check
+        id: health
+        run: |
+          mkdir -p security-reports
+
+          echo "Running dependency health check..."
+          python scripts/security/check-dependencies.py \
+            --requirements requirements.txt \
+            --output security-reports/dependency-health.json \
+            || true
+
+          # Generate text report
+          python scripts/security/check-dependencies.py \
+            --requirements requirements.txt \
+            --output security-reports/dependency-health.txt \
+            --format text \
+            || true
+
+          echo "Dependency health check complete"
+
+      - name: Display health report
+        run: |
+          if [ -f security-reports/dependency-health.txt ]; then
+            echo "=== Dependency Health Report ==="
+            cat security-reports/dependency-health.txt
+          fi
+
+      - name: Upload dependency health reports
+        if: always() && (github.event.inputs.upload_reports != 'false')
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-health-reports
+          path: security-reports/dependency-health.*
+          retention-days: 30
+
+  # =============================================================================
+  # Job: Security Summary
+  # =============================================================================
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [bandit, safety, pip-audit, gitleaks, codeql, custom-audit, dependency-check]
+    if: always()
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: security-reports
+          pattern: '*-reports'
+
+      - name: Generate security summary
+        run: |
+          echo "# Security Scan Summary" > security-summary.md
+          echo "" >> security-summary.md
+          echo "| Tool | Status |" >> security-summary.md
+          echo "|------|--------|" >> security-summary.md
+
+          # Bandit status
+          if [ "${{ needs.bandit.result }}" == "success" ]; then
+            echo "| Bandit | ✅ Passed |" >> security-summary.md
+          elif [ "${{ needs.bandit.result }}" == "failure" ]; then
+            echo "| Bandit | ❌ Failed |" >> security-summary.md
+          else
+            echo "| Bandit | ⚪ Skipped |" >> security-summary.md
+          fi
+
+          # Safety status
+          if [ "${{ needs.safety.result }}" == "success" ]; then
+            echo "| Safety | ✅ Passed |" >> security-summary.md
+          elif [ "${{ needs.safety.result }}" == "failure" ]; then
+            echo "| Safety | ❌ Failed |" >> security-summary.md
+          else
+            echo "| Safety | ⚪ Skipped |" >> security-summary.md
+          fi
+
+          # pip-audit status
+          if [ "${{ needs.pip-audit.result }}" == "success" ]; then
+            echo "| pip-audit | ✅ Passed |" >> security-summary.md
+          elif [ "${{ needs.pip-audit.result }}" == "failure" ]; then
+            echo "| pip-audit | ❌ Failed |" >> security-summary.md
+          else
+            echo "| pip-audit | ⚪ Skipped |" >> security-summary.md
+          fi
+
+          # Gitleaks status
+          if [ "${{ needs.gitleaks.result }}" == "success" ]; then
+            echo "| Gitleaks | ✅ Passed |" >> security-summary.md
+          elif [ "${{ needs.gitleaks.result }}" == "failure" ]; then
+            echo "| Gitleaks | ❌ Failed |" >> security-summary.md
+          else
+            echo "| Gitleaks | ⚪ Skipped |" >> security-summary.md
+          fi
+
+          # CodeQL status
+          if [ "${{ needs.codeql.result }}" == "success" ]; then
+            echo "| CodeQL | ✅ Passed |" >> security-summary.md
+          elif [ "${{ needs.codeql.result }}" == "failure" ]; then
+            echo "| CodeQL | ❌ Failed |" >> security-summary.md
+          else
+            echo "| CodeQL | ⚪ Skipped |" >> security-summary.md
+          fi
+
+          # Custom audit status
+          if [ "${{ needs.custom-audit.result }}" == "success" ]; then
+            echo "| Custom Audit | ✅ Passed |" >> security-summary.md
+          elif [ "${{ needs.custom-audit.result }}" == "failure" ]; then
+            echo "| Custom Audit | ❌ Failed |" >> security-summary.md
+          else
+            echo "| Custom Audit | ⚪ Skipped |" >> security-summary.md
+          fi
+
+          # Dependency check status
+          if [ "${{ needs.dependency-check.result }}" == "success" ]; then
+            echo "| Dependency Check | ✅ Passed |" >> security-summary.md
+          elif [ "${{ needs.dependency-check.result }}" == "failure" ]; then
+            echo "| Dependency Check | ❌ Failed |" >> security-summary.md
+          else
+            echo "| Dependency Check | ⚪ Skipped |" >> security-summary.md
+          fi
+
+          echo "" >> security-summary.md
+          echo "## Job Status" >> security-summary.md
+          echo "" >> security-summary.md
+
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ All security checks passed" >> security-summary.md
+          elif [ "${{ job.status }}" == "failure" ]; then
+            echo "❌ Some security checks failed" >> security-summary.md
+          else
+            echo "⚠️ Security checks incomplete" >> security-summary.md
+          fi
+
+          cat security-summary.md
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('security-summary.md', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+      - name: Upload summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: security-summary.md
+          retention-days: 30
+
+      - name: Final status check
+        if: |
+          github.ref == 'refs/heads/main' &&
+          (needs.bandit.result == 'failure' ||
+           needs.safety.result == 'failure' ||
+           needs.gitleaks.result == 'failure' ||
+           needs.custom-audit.result == 'failure')
+        run: |
+          echo "❌ Critical security checks failed on main branch"
+          exit 1

@@ -16,13 +16,12 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger("gaap.sandbox")
 
@@ -31,7 +30,6 @@ DOCKER_AVAILABLE = False
 if TYPE_CHECKING:
     from docker import DockerClient
     from docker.errors import APIError, DockerException, ImageNotFound
-    from docker.models.containers import Container
 
 try:
     import docker as _docker
@@ -288,7 +286,6 @@ class DockerSandbox:
 
 
 import shutil
-
 
 FIREJAIL_AVAILABLE = shutil.which("firejail") is not None
 

@@ -16,7 +16,6 @@ Usage:
     results = backend.search("documents", query_vector, k=5)
 """
 
-import hashlib
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -554,8 +553,7 @@ class LanceDBBackend(VectorBackend):
 
 CHROMADB_AVAILABLE = False
 try:
-    import chromadb
-    from chromadb.config import Settings
+    pass
 
     CHROMADB_AVAILABLE = True
 except ImportError:

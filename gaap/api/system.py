@@ -189,7 +189,7 @@ def _check_config_health() -> ComponentHealth:
 def _check_storage_health() -> ComponentHealth:
     """Check storage health."""
     try:
-        from gaap.storage.sqlite_store import SQLiteStore, SQLiteConfig
+        from gaap.storage.sqlite_store import SQLiteConfig, SQLiteStore
 
         store = SQLiteStore(config=SQLiteConfig())
         stats = store.get_stats()

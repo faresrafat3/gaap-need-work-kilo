@@ -121,12 +121,14 @@ class ProfileEvolution:
             trigger=EvolutionTrigger[data.get("trigger", "MANUAL_REQUEST")],
             confidence=data.get("confidence", 0.5),
             status=EvolutionStatus[data.get("status", "PROPOSED")],
-            created_at=datetime.fromisoformat(data["created_at"])
-            if "created_at" in data
-            else datetime.now(),
-            applied_at=datetime.fromisoformat(data["applied_at"])
-            if data.get("applied_at")
-            else None,
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if "created_at" in data
+                else datetime.now()
+            ),
+            applied_at=(
+                datetime.fromisoformat(data["applied_at"]) if data.get("applied_at") else None
+            ),
             performance_before=data.get("performance_before", {}),
             performance_after=data.get("performance_after", {}),
             metadata=data.get("metadata", {}),

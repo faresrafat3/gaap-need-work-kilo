@@ -1,0 +1,247 @@
+groups:
+  - name: gaap-alerts
+    interval: 30s
+    rules:
+      # High Error Rate Alert
+      - alert: GAAPHighErrorRate
+        expr: |
+          (
+            sum(rate(gaap_api_errors_total[5m])) by (instance, job)
+            /
+            sum(rate(gaap_api_requests_total[5m])) by (instance, job)
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "High error rate detected on GAAP"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%) on {{ $labels.instance }}"
+          runbook_url: "https://docs.gaap.local/runbooks/high-error-rate"
+
+      # High P95 Latency Alert
+      - alert: GAAPHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(gaap_api_request_duration_seconds_bucket[5m])) by (le, instance, job)
+          ) > 2.0
+        for: 3m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High P95 latency on GAAP API"
+          description: "P95 latency is {{ $value }}s (threshold: 2s) on {{ $labels.instance }}"
+          runbook_url: "https://docs.gaap.local/runbooks/high-latency"
+
+      # Provider Down Alert
+      - alert: GAAPProviderDown
+        expr: |
+          sum(rate(gaap_providers_requests_total[10m])) by (provider) == 0
+          and
+          sum(rate(gaap_providers_requests_total[1h])) by (provider) > 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "LLM provider {{ $labels.provider }} appears down"
+          description: "No requests to {{ $labels.provider }} in the last 10 minutes"
+          runbook_url: "https://docs.gaap.local/runbooks/provider-down"
+
+      # Provider High Error Rate
+      - alert: GAAPProviderHighErrorRate
+        expr: |
+          (
+            sum(rate(gaap_providers_errors_total[5m])) by (provider)
+            /
+            sum(rate(gaap_providers_requests_total[5m])) by (provider)
+          ) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High error rate for provider {{ $labels.provider }}"
+          description: "Provider {{ $labels.provider }} has {{ $value | humanizePercentage }} error rate"
+          runbook_url: "https://docs.gaap.local/runbooks/provider-errors"
+
+      # Database Connection Failures
+      - alert: GAAPDatabaseDown
+        expr: gaap_database_connections_active == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "GAAP database is down"
+          description: "No active database connections detected"
+          runbook_url: "https://docs.gaap.local/runbooks/database-down"
+
+      # High Memory Usage
+      - alert: GAAPHighMemoryUsage
+        expr: |
+          (
+            gaap_system_memory_usage_bytes{type="used"}
+            /
+            (
+              gaap_system_memory_usage_bytes{type="used"}
+              + gaap_system_memory_usage_bytes{type="available"}
+            )
+          ) > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "High memory usage on GAAP instance"
+          description: "Memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.gaap.local/runbooks/high-memory"
+
+      # Low Disk Space
+      - alert: GAAPLowDiskSpace
+        expr: |
+          (
+            gaap_system_disk_usage_bytes{type="free"}
+            /
+            gaap_system_disk_usage_bytes{type="total"}
+          ) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Low disk space on GAAP instance"
+          description: "Free disk space is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.gaap.local/runbooks/low-disk"
+
+      # High CPU Usage
+      - alert: GAAPHighCPUUsage
+        expr: gaap_system_cpu_usage_percent{mode="user"} > 80
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High CPU usage on GAAP instance"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+          runbook_url: "https://docs.gaap.local/runbooks/high-cpu"
+
+      # Too Many Active Connections
+      - alert: GAAPHighActiveConnections
+        expr: gaap_api_active_connections > 1000
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High number of active connections"
+          description: "{{ $value }} active connections on {{ $labels.instance }}"
+
+      # Cost Threshold Exceeded
+      - alert: GAAPDailyCostThreshold
+        expr: |
+          increase(gaap_cost_dollars_total[24h]) > 100
+        for: 1m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Daily cost threshold exceeded"
+          description: "Daily cost is ${{ $value }} (threshold: $100)"
+
+      # WebSocket Connection Issues
+      - alert: GAAPWebSocketIssues
+        expr: |
+          rate(gaap_api_connection_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "WebSocket connection issues detected"
+          description: "WebSocket error rate is {{ $value | humanizePercentage }}"
+
+      # Service Down (Instance Level)
+      - alert: GAAPInstanceDown
+        expr: up{job="gaap"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "GAAP instance {{ $labels.instance }} is down"
+          description: "Instance {{ $labels.instance }} has been down for more than 1 minute"
+
+      # Request Rate Drop
+      - alert: GAAPRequestRateDrop
+        expr: |
+          (
+            sum(rate(gaap_api_requests_total[5m]))
+            /
+            sum(rate(gaap_api_requests_total[1h] offset 1h))
+          ) < 0.5
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Request rate has dropped significantly"
+          description: "Request rate is {{ $value | humanizePercentage }} of normal"
+
+      # Slow Provider Response
+      - alert: GAAPSlowProviderResponse
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(gaap_providers_latency_seconds_bucket[5m])) by (le, provider)
+          ) > 30
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Slow provider response from {{ $labels.provider }}"
+          description: "P95 latency from {{ $labels.provider }} is {{ $value }}s"
+
+  - name: gaap-business-alerts
+    interval: 1m
+    rules:
+      # High Token Usage
+      - alert: GAAPHighTokenUsage
+        expr: |
+          sum(rate(gaap_cost_tokens_total[1h])) by (provider, model) > 1000000
+        for: 10m
+        labels:
+          severity: info
+          team: platform
+        annotations:
+          summary: "High token usage detected"
+          description: "{{ $value }} tokens/hour for {{ $labels.provider }}/{{ $labels.model }}"
+
+      # Session Drop
+      - alert: GAAPSessionDrop
+        expr: |
+          (
+            sum(rate(gaap_business_chat_sessions_total[10m]))
+            /
+            sum(rate(gaap_business_chat_sessions_total[1h] offset 1h))
+          ) < 0.3
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Session creation rate has dropped"
+          description: "Session rate is {{ $value | humanizePercentage }} of normal"
+
+      # Token Rate Limit Approaching
+      - alert: GAAPTokenRateLimit
+        expr: |
+          sum(rate(gaap_cost_tokens_total[1m])) by (provider) > 50000
+        for: 2m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Approaching token rate limit"
+          description: "Token rate for {{ $labels.provider }} is {{ $value }}/minute"

@@ -1,5 +1,3 @@
-import asyncio
-import time
 from typing import Any, AsyncGenerator
 
 from gaap.core.types import (
@@ -8,7 +6,7 @@ from gaap.core.types import (
     ProviderType,
 )
 from gaap.providers.base_provider import BaseProvider, register_provider
-from gaap.providers.chat_based.g4f_provider import G4FProvider  # Sovereign Replacement
+from gaap.providers.webchat_bridge import WebChatBridgeProvider
 
 
 @register_provider("unified_gaap")
@@ -16,7 +14,7 @@ class UnifiedGAAPProvider(BaseProvider):
     """
     Sovereign Unified Provider
 
-    Acts as a high-level facade for the best available free-tier models (G4F).
+    Acts as a high-level facade for Kimi, GLM, and DeepSeek via WebChat Bridge.
     """
 
     def __init__(
@@ -42,8 +40,8 @@ class UnifiedGAAPProvider(BaseProvider):
             default_model=default_model,
         )
 
-        self._backend = G4FProvider()
-        self._logger.info(f"UnifiedGAAPProvider initialized (Backend: G4F)")
+        self._backend = WebChatBridgeProvider()
+        self._logger.info(f"UnifiedGAAPProvider initialized (Backend: WebChatBridge)")
 
     async def chat_completion(
         self,

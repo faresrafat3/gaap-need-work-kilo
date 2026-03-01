@@ -2,12 +2,9 @@
 Sovereign CLI Commands (v2.1)
 """
 
-import asyncio
-import sys
-import json
 from typing import Any
-from gaap.gaap_engine import create_engine, GAAPRequest
-from gaap.layers.layer0_interface import IntentType
+
+from gaap.gaap_engine import GAAPRequest, create_engine
 
 
 async def cmd_research(args: Any) -> None:

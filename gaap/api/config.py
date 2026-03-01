@@ -25,9 +25,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from gaap.core.config import (
+    GAAPConfig,
     get_config,
     get_config_manager,
-    GAAPConfig,
 )
 from gaap.core.exceptions import ConfigurationError
 
@@ -40,14 +40,7 @@ class ConfigUpdateRequest(BaseModel):
     """Request to update configuration."""
 
     config: dict[str, Any]
-    validate: bool = True
-
-
-class ModuleConfigUpdateRequest(BaseModel):
-    """Request to update module configuration."""
-
-    config: dict[str, Any]
-    validate: bool = True
+    validate_config: bool = True
 
 
 class ConfigResponse(BaseModel):
@@ -56,6 +49,13 @@ class ConfigResponse(BaseModel):
     success: bool
     config: dict[str, Any] | None = None
     error: str | None = None
+
+
+class ModuleConfigUpdateRequest(BaseModel):
+    """Request to update module configuration."""
+
+    config: dict[str, Any]
+    validate_config: bool = True
 
 
 class ValidationResult(BaseModel):
@@ -112,7 +112,7 @@ async def update_full_config(request: ConfigUpdateRequest) -> ConfigResponse:
 
         config = manager._dict_to_config(request.config)
 
-        if request.validate:
+        if request.validate_config:
             manager._validate_config(config)
 
         manager._config = config
@@ -169,7 +169,7 @@ async def update_module_config(
             else:
                 logger.warning(f"Unknown config field: {module}.{key}")
 
-        if request.validate:
+        if request.validate_config:
             manager._validate_config(config)
 
         logger.info(f"Module '{module}' configuration updated")

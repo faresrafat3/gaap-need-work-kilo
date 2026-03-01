@@ -1,0 +1,258 @@
+# =============================================================================
+# GAAP Dependabot Configuration
+# =============================================================================
+# Automated dependency updates with security-focused settings
+#
+# Features:
+# - Weekly scans for all ecosystems
+# - Auto-merge for patch updates (non-breaking)
+# - Review required for minor/major updates
+# - Grouped updates to reduce PR noise
+# - Security updates prioritized
+#
+# Documentation: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+# =============================================================================
+
+version: 2
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+updates:
+  # ===========================================================================
+  # Python Dependencies (pip)
+  # ===========================================================================
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+
+    # PR Configuration
+    open-pull-requests-limit: 10
+    target-branch: "main"
+
+    # Labeling
+    labels:
+      - "dependencies"
+      - "python"
+      - "security"
+
+    # Assignees
+    assignees:
+      - "gaap-team"
+
+    # Reviewers
+    reviewers:
+      - "gaap-team"
+
+    # Commit message format
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps(dev)"
+      include: "scope"
+
+    # Group updates to reduce PR noise
+    groups:
+      # Security patches - auto-merge eligible
+      security-patches:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+        exclude-patterns:
+          - "cryptography"
+          - "requests"
+          - "urllib3"
+
+      # Development dependencies
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "patch"
+          - "minor"
+
+      # Major updates - always require review
+      major-updates:
+        update-types:
+          - "major"
+
+    # Ignore certain dependencies or versions
+    ignore:
+      # Ignore major version updates for critical security packages
+      # These require careful testing
+      - dependency-name: "cryptography"
+        update-types: ["version-update:semver-major"]
+
+      # Ignore alpha/beta/rc versions
+      - dependency-name: "*"
+        versions: ["*-alpha*", "*-beta*", "*-rc*", "*-dev*"]
+
+    # Allow specific dependencies
+    allow:
+      # Allow all dependency types
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+
+  # ===========================================================================
+  # Python Dependencies (Development)
+  # ===========================================================================
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:30"
+      timezone: "UTC"
+
+    # Only for requirements-dev.txt
+    target-branch: "main"
+
+    labels:
+      - "dependencies"
+      - "python"
+      - "dev-dependencies"
+
+    assignees:
+      - "gaap-team"
+
+    reviewers:
+      - "gaap-team"
+
+    commit-message:
+      prefix: "deps(dev)"
+      include: "scope"
+
+    # More lenient for dev dependencies
+    groups:
+      dev-patches:
+        dependency-type: "development"
+        update-types:
+          - "patch"
+
+      dev-minor:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+
+  # ===========================================================================
+  # GitHub Actions
+  # ===========================================================================
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+      timezone: "UTC"
+
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "ci-cd"
+
+    assignees:
+      - "gaap-team"
+
+    reviewers:
+      - "gaap-team"
+
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+    # Group GitHub Actions updates
+    groups:
+      actions-minor:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ===========================================================================
+  # Docker
+  # ===========================================================================
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:30"
+      timezone: "UTC"
+
+    labels:
+      - "dependencies"
+      - "docker"
+      - "infrastructure"
+
+    assignees:
+      - "gaap-team"
+
+    reviewers:
+      - "gaap-team"
+
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+
+    # Be conservative with Docker base images
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major"]
+
+  # ===========================================================================
+  # npm (Frontend)
+  # ===========================================================================
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "11:00"
+      timezone: "UTC"
+
+    labels:
+      - "dependencies"
+      - "javascript"
+      - "frontend"
+
+    assignees:
+      - "gaap-team"
+
+    reviewers:
+      - "gaap-team"
+
+    commit-message:
+      prefix: "deps(frontend)"
+      include: "scope"
+
+    # Group frontend updates
+    groups:
+      frontend-patches:
+        update-types:
+          - "patch"
+
+      frontend-minor:
+        update-types:
+          - "minor"
+
+    # Ignore major framework updates (manual review required)
+    ignore:
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+
+# =============================================================================
+# Security Updates Configuration
+# =============================================================================
+# Note: Security updates are configured in the repository settings
+# Settings > Code security and analysis > Dependabot security updates
+#
+# Ensure these are enabled:
+# - Dependabot security updates: Enabled
+# - Dependency graph: Enabled
+# - Dependency review: Enabled

@@ -17,7 +17,6 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any
 
-
 logger = logging.getLogger("gaap.validators.performance")
 
 
@@ -177,9 +176,11 @@ class PerformanceValidator:
                         "message": f"{result.type} '{result.name}' has complexity {result.complexity} "
                         f"(max: {self.config.max_complexity})",
                         "line": result.lineno,
-                        "severity": "high"
-                        if result.complexity > self.config.max_complexity * 2
-                        else "medium",
+                        "severity": (
+                            "high"
+                            if result.complexity > self.config.max_complexity * 2
+                            else "medium"
+                        ),
                     }
                 )
 

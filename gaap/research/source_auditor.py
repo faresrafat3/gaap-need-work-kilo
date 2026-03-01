@@ -14,12 +14,11 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Any
-from urllib.parse import urlparse
 
-from .types import Source, SourceStatus, ETSLevel
 from .config import SourceAuditConfig
+from .types import ETSLevel, Source, SourceStatus
 
 logger = logging.getLogger("gaap.research.source_auditor")
 

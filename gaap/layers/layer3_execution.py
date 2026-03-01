@@ -1,9 +1,6 @@
 # Layer 3: Execution Layer
 import asyncio
-import logging
-import os
 import re
-import sys
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -32,23 +29,15 @@ from gaap.mad.response_parser import (
 )
 from gaap.memory import VECTOR_MEMORY_AVAILABLE, LessonStore
 from gaap.providers.base_provider import BaseProvider
-from gaap.providers.tool_calling import ToolRegistry as StructuredToolRegistry
 from gaap.routing.fallback import FallbackManager
 from gaap.routing.router import SmartRouter
 from gaap.tools.synthesizer import ToolSynthesizer
 from gaap.layers.sop_mixin import SOPExecutionMixin
 
-from gaap.layers.layer3_config import Layer3Config, create_layer3_config
-from gaap.layers.execution_schema import (
-    StructuredOutput,
-    StructuredToolCall,
-    ToolDefinition,
-    ToolResult,
-)
-from gaap.layers.native_function_caller import NativeFunctionCaller, create_native_caller
-from gaap.layers.active_lesson_injector import ActiveLessonInjector, create_lesson_injector
-from gaap.layers.code_auditor import CodeAuditor, create_code_auditor
-
+from gaap.layers.layer3_config import Layer3Config
+from gaap.layers.native_function_caller import create_native_caller
+from gaap.layers.active_lesson_injector import create_lesson_injector
+from gaap.layers.code_auditor import create_code_auditor
 
 # =============================================================================
 # Logger Setup
@@ -56,7 +45,6 @@ from gaap.layers.code_auditor import CodeAuditor, create_code_auditor
 
 
 from gaap.core.logging import get_standard_logger as get_logger
-
 
 # =============================================================================
 # Helper Functions

@@ -36,14 +36,6 @@ Usage:
     result = await healer.heal(error, task, execute_func)
 """
 
-from .healing_config import (
-    HealingConfig,
-    ReflexionConfig,
-    SemanticClassifierConfig,
-    PostMortemConfig,
-    PatternDetectionConfig,
-    create_healing_config,
-)
 from .healer import (
     ErrorCategory,
     ErrorClassifier,
@@ -53,6 +45,14 @@ from .healer import (
     RecoveryResult,
     SelfHealingSystem,
     SemanticErrorClassifier,
+)
+from .healing_config import (
+    HealingConfig,
+    PatternDetectionConfig,
+    PostMortemConfig,
+    ReflexionConfig,
+    SemanticClassifierConfig,
+    create_healing_config,
 )
 from .reflexion import Reflection, ReflectionDepth, ReflexionEngine
 

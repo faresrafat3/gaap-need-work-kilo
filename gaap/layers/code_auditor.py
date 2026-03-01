@@ -23,8 +23,8 @@ from enum import Enum, auto
 from typing import Any
 
 from gaap.core.logging import get_standard_logger as get_logger
-from gaap.layers.layer3_config import Layer3Config, AuditConfig
 from gaap.layers.layer2_tactical import AtomicTask
+from gaap.layers.layer3_config import Layer3Config
 
 logger = get_logger("gaap.layer3.auditor")
 

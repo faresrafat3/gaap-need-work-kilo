@@ -27,10 +27,10 @@ from typing import Any
 
 from datasets import load_dataset
 from detailed_logger import DetailedBenchmarkLogger, QuestionLog
-from gaap_system_glm5 import GAAPRequest, create_engine
+from gaap import GAAPRequest, create_engine
 
 # Ensure package import works when running from file path
-from gaap_system_glm5.env import load_env
+from gaap.env import load_env
 from gaap.system_glm5.providers.free_tier.groq_provider import GeminiProvider
 
 from gaap.core.exceptions import ProviderRateLimitError, ProviderResponseError

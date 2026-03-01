@@ -19,7 +19,7 @@ Usage:
 import hashlib
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
@@ -359,7 +359,7 @@ def estimate_cache_savings(
         "normal_cost": normal_cost,
         "cached_cost": cached_cost,
         "savings": normal_cost - cached_cost,
-        "savings_percent": ((normal_cost - cached_cost) / normal_cost * 100)
-        if normal_cost > 0
-        else 0,
+        "savings_percent": (
+            ((normal_cost - cached_cost) / normal_cost * 100) if normal_cost > 0 else 0
+        ),
     }

@@ -1,0 +1,188 @@
+# =============================================================================
+# Gitleaks Configuration for GAAP
+# =============================================================================
+# Custom configuration for secret detection in the GAAP repository
+#
+# Documentation: https://github.com/gitleaks/gitleaks#configuration
+# =============================================================================
+
+title = "GAAP Gitleaks Configuration"
+
+# =============================================================================
+# Global Allowlist
+# =============================================================================
+[allowlist]
+# Paths to ignore during scanning
+paths = [
+    # Virtual environments
+    '''\.venv/''',
+    '''venv/''',
+    # Git directory
+    '''\.git/''',
+    # Cache directories
+    '''__pycache__/''',
+    '''\.pytest_cache/''',
+    '''\.mypy_cache/''',
+    '''\.ruff_cache/''',
+    # Build artifacts
+    '''build/''',
+    '''dist/''',
+    '''\.eggs/''',
+    '''.*\.egg-info/''',
+    # Coverage reports
+    '''\.coverage''',
+    '''htmlcov/''',
+    # Node modules
+    '''node_modules/''',
+    '''frontend/\.next/''',
+    # Test data (may contain mock secrets)
+    '''tests/data/''',
+    '''test_data/''',
+    # Documentation
+    '''docs/''',
+    # Security scripts (contain patterns for detection)
+    '''scripts/security/''',
+    # Example files
+    '''\.env\.example''',
+    # Configuration templates
+    '''.*\.template\.''',
+]
+
+# Regexes for text to ignore
+regexes = [
+    # Ignore placeholder/example secrets
+    '''example''',
+    '''placeholder''',
+    '''changeme''',
+    '''your-''',
+    '''YOUR_''',
+    '''fake-''',
+    '''mock-''',
+    '''test-''',
+    '''TEST_''',
+    # Ignore documentation references
+    '''AKIAIOSFODNN7EXAMPLE''',  # AWS example key
+]
+
+# =============================================================================
+# Custom Rules
+# =============================================================================
+
+# Generic API Key with GAAP prefix
+[[rules]]
+id = "gaap-api-key"
+description = "GAAP API Key"
+regex = '''(?i)(gaap[_-]?api[_-]?key|gaap[_-]?key)\s*[=:]\s*["'][a-zA-Z0-9_\-]{20,}["']'''
+keywords = ["gaap"]
+tags = ["apikey", "gaap"]
+
+# LLM Provider API Keys
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key"
+regex = '''sk-[a-zA-Z0-9]{20,}'''
+keywords = ["sk-"]
+tags = ["apikey", "openai"]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API Key"
+regex = '''sk-ant-[a-zA-Z0-9]{32,}'''
+keywords = ["sk-ant-"]
+tags = ["apikey", "anthropic"]
+
+# Database Connection Strings
+[[rules]]
+id = "postgres-connection-string"
+description = "PostgreSQL Connection String with Password"
+regex = '''postgres(ql)?://[^:]+:[^@]+@'''
+keywords = ["postgres"]
+tags = ["database", "connection-string"]
+
+[[rules]]
+id = "mongodb-connection-string"
+description = "MongoDB Connection String with Password"
+regex = '''mongodb(\+srv)?://[^:]+:[^@]+@'''
+keywords = ["mongodb"]
+tags = ["database", "connection-string"]
+
+# JWT Secrets
+[[rules]]
+id = "jwt-secret"
+description = "JWT Secret or Private Key"
+regex = '''(?i)(jwt[_-]?secret|jwt[_-]?private[_-]?key)\s*[=:]\s*["'][a-zA-Z0-9_\-]{16,}["']'''
+keywords = ["jwt"]
+tags = ["jwt", "secret"]
+
+# ChromaDB Keys
+[[rules]]
+id = "chromadb-key"
+description = "ChromaDB API Key"
+regex = '''(?i)(chroma[_-]?key|chromadb[_-]?key)\s*[=:]\s*["'][a-zA-Z0-9_\-]{16,}["']'''
+keywords = ["chroma"]
+tags = ["apikey", "chromadb"]
+
+# Docker Registry Tokens
+[[rules]]
+id = "docker-registry-token"
+description = "Docker Registry Authentication Token"
+regex = '''dckr_pat_[a-zA-Z0-9_-]{20,}'''
+keywords = ["dckr_pat_"]
+tags = ["docker", "token"]
+
+# Azure Service Principal
+[[rules]]
+id = "azure-service-principal"
+description = "Azure Service Principal Secret"
+regex = '''(?i)(azure[_-]?client[_-]?secret|azure[_-]?secret)\s*[=:]\s*["'][a-zA-Z0-9_\-]{20,}["']'''
+keywords = ["azure"]
+tags = ["azure", "secret"]
+
+# Google Cloud Service Account
+[[rules]]
+id = "gcp-service-account"
+description = "Google Cloud Service Account Key"
+regex = '''"type":\s*"service_account"'''
+keywords = ["service_account"]
+tags = ["gcp", "service-account"]
+
+# Kubernetes Secrets
+[[rules]]
+id = "kubernetes-secret"
+description = "Kubernetes Secret Token"
+regex = '''eyJhbGciOiJSUzI1NiIsImtpZCI6'''
+keywords = ["eyJhbGci"]
+tags = ["kubernetes", "token"]
+
+# =============================================================================
+# Rule Allowlists
+# =============================================================================
+
+# Allow test files to contain mock secrets
+[[rules.allowlists]]
+paths = [
+    '''test_.*\.py''',
+    '''.*_test\.py''',
+    '''conftest\.py''',
+    '''tests/.*''',
+]
+regexes = [
+    '''test[_-]?key''',
+    '''mock[_-]?key''',
+    '''fake[_-]?secret''',
+]
+
+# Allow example configurations
+[[rules.allowlists]]
+paths = [
+    '''\.env\.example''',
+    '''config\.example\.''',
+    '''.*\.template\.''',
+]
+
+# Allow documentation
+[[rules.allowlists]]
+paths = [
+    '''.*\.md''',
+    '''docs/.*''',
+]

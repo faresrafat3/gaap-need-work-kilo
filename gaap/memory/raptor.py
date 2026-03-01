@@ -647,12 +647,16 @@ class RetrievalResult:
             "score": self.score,
             "level": self.level,
             "path": self.path,
-            "matched_text": self.matched_text[:200] + "..."
-            if len(self.matched_text) > 200
-            else self.matched_text,
-            "summary": self.node.summary[:200] + "..."
-            if len(self.node.summary) > 200
-            else self.node.summary,
+            "matched_text": (
+                self.matched_text[:200] + "..."
+                if len(self.matched_text) > 200
+                else self.matched_text
+            ),
+            "summary": (
+                self.node.summary[:200] + "..."
+                if len(self.node.summary) > 200
+                else self.node.summary
+            ),
         }
 
 

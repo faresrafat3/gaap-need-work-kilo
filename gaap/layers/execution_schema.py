@@ -14,12 +14,12 @@ These schemas enable native function calling with providers
 that support it, and structured JSON output for those that don't.
 """
 
+import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from typing import Any, Literal
-import json
 
 
 class FinishReason(Enum):

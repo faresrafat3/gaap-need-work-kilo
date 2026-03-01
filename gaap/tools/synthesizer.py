@@ -24,9 +24,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
-import logging
 import sys
-import time
 import uuid
 from collections import Counter
 from dataclasses import dataclass, field
@@ -38,7 +36,7 @@ from gaap.core.events import EventEmitter, EventType
 from gaap.core.logging import get_standard_logger
 from gaap.security.dlp import DLPScanner
 from gaap.tools.code_synthesizer import CodeSynthesizer, SynthesisRequest, SynthesisResult
-from gaap.tools.library_discoverer import LibraryDiscoverer, LibraryInfo
+from gaap.tools.library_discoverer import LibraryDiscoverer
 from gaap.tools.skill_cache import SkillCache, SkillMetadata
 
 logger = get_standard_logger("gaap.tools.synthesizer")

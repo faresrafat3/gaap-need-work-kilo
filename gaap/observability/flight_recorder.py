@@ -30,11 +30,11 @@ import sys
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, Iterator
+from typing import Any, Optional
 import hashlib
 
 logger = logging.getLogger("gaap.observability.flight_recorder")
@@ -571,9 +571,9 @@ class FlightRecorder:
         return {
             "start_time": self._start_time.isoformat(),
             "uptime_seconds": (datetime.now() - self._start_time).total_seconds(),
-            "last_persist": self._last_persist_time.isoformat()
-            if self._last_persist_time
-            else None,
+            "last_persist": (
+                self._last_persist_time.isoformat() if self._last_persist_time else None
+            ),
             "buffer": buffer_stats,
             "event_counts": event_counts,
             "enabled": self._enabled,

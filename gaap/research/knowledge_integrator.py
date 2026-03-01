@@ -10,23 +10,20 @@ Implements: docs/evolution_plan_2026/17_DEEP_RESEARCH_AGENT_SPEC.md
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
-import json
 import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from .types import (
-    Source,
-    Hypothesis,
-    AssociativeTriple,
-    ResearchFinding,
-    ETSLevel,
-)
 from .config import StorageConfig
+from .types import (
+    AssociativeTriple,
+    Hypothesis,
+    ResearchFinding,
+    Source,
+)
 
 if TYPE_CHECKING:
     from gaap.memory.knowledge.graph_builder import KnowledgeGraphBuilder
@@ -321,7 +318,6 @@ class KnowledgeIntegrator:
 
     async def _store_finding_node(self, finding: ResearchFinding) -> None:
         """Store finding as node."""
-        pass
 
     async def _store_source_node(
         self,
@@ -338,11 +334,9 @@ class KnowledgeIntegrator:
         finding_id: str,
     ) -> None:
         """Store hypothesis as node."""
-        pass
 
     async def _store_triple_in_kg(self, triple: AssociativeTriple) -> None:
         """Store triple in KnowledgeGraph."""
-        pass
 
     def _record_to_finding(self, data: dict[str, Any]) -> ResearchFinding | None:
         """Convert SQLite record to ResearchFinding."""

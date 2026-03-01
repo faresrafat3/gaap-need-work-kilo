@@ -15,10 +15,10 @@ Usage:
     metrics = get_metrics()
 
     # Record a request
-    metrics.record_request("layer1", "groq", "llama-3", success=True)
+    metrics.record_request("layer1", "kimi", "llama-3", success=True)
 
     # Record LLM usage
-    metrics.record_llm_usage("groq", "llama-3", input_tokens=100, output_tokens=200, cost=0.01)
+    metrics.record_llm_usage("kimi", "llama-3", input_tokens=100, output_tokens=200, cost=0.01)
 
     # Get metrics summary
     summary = metrics.get_metrics()
@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -38,13 +37,13 @@ logger = logging.getLogger("gaap.observability.metrics")
 
 try:
     from prometheus_client import (
+        REGISTRY,
+        CollectorRegistry,
         Counter,
         Gauge,
         Histogram,
         Info,
-        CollectorRegistry,
         generate_latest,
-        REGISTRY,
     )
 
     PROMETHEUS_AVAILABLE = True
@@ -215,8 +214,8 @@ class GAAPMetrics:
         metrics = GAAPMetrics()
 
         # Record operations
-        metrics.record_request("strategic", "groq", "llama-3", success=True)
-        metrics.record_llm_usage("groq", "llama-3", 100, 200, 0.01)
+        metrics.record_request("strategic", "kimi", "llama-3", success=True)
+        metrics.record_llm_usage("kimi", "llama-3", 100, 200, 0.01)
         metrics.record_tool_call("read_file", success=True)
         metrics.record_error("layer1", "TimeoutError")
 
@@ -264,12 +263,16 @@ class GAAPMetrics:
         ns = self.namespace
         sub = self.subsystem
 
+        # Create a custom registry to avoid conflicts with existing metrics
+        self._registry = CollectorRegistry()
+        
+        # Also keep reference to default registry for /metrics endpoint compatibility
+
         self._prometheus_metrics["requests_total"] = Counter(
             f"{ns}_requests_total",
             "Total number of requests processed",
             ["layer", "provider", "model", "status"],
-            subsystem=sub,
-        )
+            subsystem=sub, registry=self._registry)
 
         self._prometheus_metrics["request_duration_seconds"] = Histogram(
             f"{ns}_request_duration_seconds",
@@ -282,50 +285,43 @@ class GAAPMetrics:
         self._prometheus_metrics["active_sessions"] = Gauge(
             f"{ns}_active_sessions",
             "Number of active sessions",
-            subsystem=sub,
-        )
+            subsystem=sub, registry=self._registry)
 
         self._prometheus_metrics["active_requests"] = Gauge(
             f"{ns}_active_requests",
             "Number of active requests being processed",
             ["layer"],
-            subsystem=sub,
-        )
+            subsystem=sub, registry=self._registry)
 
         self._prometheus_metrics["tokens_total"] = Counter(
             f"{ns}_tokens_total",
             "Total number of tokens processed",
             ["provider", "model", "type"],
-            subsystem=sub,
-        )
+            subsystem=sub, registry=self._registry)
 
         self._prometheus_metrics["cost_dollars"] = Counter(
             f"{ns}_cost_dollars",
             "Total cost in dollars",
             ["provider", "model"],
-            subsystem=sub,
-        )
+            subsystem=sub, registry=self._registry)
 
         self._prometheus_metrics["errors_total"] = Counter(
             f"{ns}_errors_total",
             "Total number of errors",
             ["layer", "error_type", "severity"],
-            subsystem=sub,
-        )
+            subsystem=sub, registry=self._registry)
 
         self._prometheus_metrics["tool_calls_total"] = Counter(
             f"{ns}_tool_calls_total",
             "Total number of tool calls",
             ["tool_name", "status"],
-            subsystem=sub,
-        )
+            subsystem=sub, registry=self._registry)
 
         self._prometheus_metrics["healing_attempts_total"] = Counter(
             f"{ns}_healing_attempts_total",
             "Total number of healing attempts",
             ["level", "success"],
-            subsystem=sub,
-        )
+            subsystem=sub, registry=self._registry)
 
         self._prometheus_metrics["thought_depth"] = Histogram(
             f"{ns}_thought_depth",
@@ -347,8 +343,7 @@ class GAAPMetrics:
             f"{ns}_memory_usage_bytes",
             "Memory usage in bytes",
             ["tier"],
-            subsystem=sub,
-        )
+            subsystem=sub, registry=self._registry)
 
         self._prometheus_metrics["quality_score"] = Histogram(
             f"{ns}_quality_score",
@@ -447,7 +442,7 @@ class GAAPMetrics:
 
         Args:
             layer: Layer name (interface, strategic, tactical, execution)
-            provider: Provider name (groq, openai, etc.)
+            provider: Provider name (kimi, openai, etc.)
             model: Model name
             success: Whether the request succeeded
             latency_seconds: Optional latency in seconds

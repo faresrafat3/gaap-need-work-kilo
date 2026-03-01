@@ -1,0 +1,187 @@
+# =============================================================================
+# GAAP Security Makefile
+# =============================================================================
+# Security-focused make targets for local development
+#
+# Usage:
+#   make -f Makefile.security <target>
+#
+# Or include in main Makefile:
+#   include Makefile.security
+# =============================================================================
+
+.PHONY: security-help security-audit security-bandit security-safety \
+        security-pip-audit security-gitleaks security-custom-audit \
+        security-deps security-all security-clean
+
+# Colors for output
+BLUE := \033[36m
+GREEN := \033[32m
+YELLOW := \033[33m
+RED := \033[31m
+NC := \033[0m # No Color
+
+# =============================================================================
+# Help
+# =============================================================================
+security-help:
+	@echo "$(BLUE)GAAP Security Commands$(NC)"
+	@echo "======================"
+	@echo ""
+	@echo "$(GREEN)Quick Commands:$(NC)"
+	@echo "  security-audit       - Run full security audit"
+	@echo "  security-all         - Run all security checks"
+	@echo ""
+	@echo "$(GREEN)Individual Scans:$(NC)"
+	@echo "  security-bandit      - Run Bandit security linter"
+	@echo "  security-safety      - Run Safety vulnerability check"
+	@echo "  security-pip-audit   - Run pip-audit security audit"
+	@echo "  security-gitleaks    - Run Gitleaks secret scanner"
+	@echo "  security-custom-audit - Run custom security auditor"
+	@echo "  security-deps        - Check dependency health"
+	@echo ""
+	@echo "$(GREEN)Utilities:$(NC)"
+	@echo "  security-clean       - Clean security reports"
+	@echo "  security-help        - Show this help"
+
+# =============================================================================
+# Full Security Audit
+# =============================================================================
+security-audit: security-all
+
+security-all: security-clean
+	@echo "$(BLUE)Running full security audit...$(NC)"
+	@mkdir -p security-reports
+	@$(MAKE) -f Makefile.security security-bandit || true
+	@$(MAKE) -f Makefile.security security-safety || true
+	@$(MAKE) -f Makefile.security security-pip-audit || true
+	@$(MAKE) -f Makefile.security security-gitleaks || true
+	@$(MAKE) -f Makefile.security security-custom-audit || true
+	@$(MAKE) -f Makefile.security security-deps || true
+	@echo "$(GREEN)Security audit complete! Reports in security-reports/$(NC)"
+
+# =============================================================================
+# Individual Security Tools
+# =============================================================================
+
+security-bandit:
+	@echo "$(BLUE)Running Bandit security linter...$(NC)"
+	@which bandit > /dev/null || (echo "$(YELLOW)Installing bandit...$(NC)" && pip install bandit[toml]>=1.7.0)
+	@mkdir -p security-reports
+	@echo "$(YELLOW)Scanning for high severity issues...$(NC)"
+	-bandit -r . \
+		-f json -o security-reports/bandit-high.json \
+		-lll -iii \
+		--exclude './.venv,./venv,./.git,./__pycache__,./.pytest_cache,./.mypy_cache,./build,./dist,./.eggs,./frontend/node_modules,./security-reports' \
+		2>/dev/null || true
+	-bandit -r . \
+		-f txt -o security-reports/bandit-report.txt \
+		--exclude './.venv,./venv,./.git,./__pycache__,./.pytest_cache,./.mypy_cache,./build,./dist,./.eggs,./frontend/node_modules,./security-reports' \
+		2>/dev/null || true
+	@if [ -f security-reports/bandit-report.txt ]; then \
+		cat security-reports/bandit-report.txt; \
+	fi
+	@echo "$(GREEN)Bandit scan complete$(NC)"
+
+security-safety:
+	@echo "$(BLUE)Running Safety vulnerability check...$(NC)"
+	@which safety > /dev/null || (echo "$(YELLOW)Installing safety...$(NC)" && pip install safety>=3.0.0)
+	@mkdir -p security-reports
+	-safety check --json --output security-reports/safety-report.json --file requirements.txt 2>/dev/null || true
+	-safety check --output security-reports/safety-report.txt --file requirements.txt 2>/dev/null || true
+	@if [ -f security-reports/safety-report.txt ]; then \
+		cat security-reports/safety-report.txt; \
+	fi
+	@echo "$(GREEN)Safety check complete$(NC)"
+
+security-pip-audit:
+	@echo "$(BLUE)Running pip-audit...$(NC)"
+	@which pip-audit > /dev/null || (echo "$(YELLOW)Installing pip-audit...$(NC)" && pip install pip-audit>=2.6.0)
+	@mkdir -p security-reports
+	-pip-audit --requirement requirements.txt \
+		--format=json --output=security-reports/pip-audit-report.json \
+		--vulnerability-service=pypi 2>/dev/null || true
+	-pip-audit --requirement requirements.txt \
+		--format=markdown --output=security-reports/pip-audit-report.md \
+		2>/dev/null || true
+	@if [ -f security-reports/pip-audit-report.md ]; then \
+		cat security-reports/pip-audit-report.md; \
+	fi
+	@echo "$(GREEN)pip-audit complete$(NC)"
+
+security-gitleaks:
+	@echo "$(BLUE)Running Gitleaks secret scanner...$(NC)"
+	@if command -v gitleaks >/dev/null 2>&1; then \
+		mkdir -p security-reports && \
+		gitleaks detect --source . \
+			--report-format json \
+			--report-path security-reports/gitleaks-report.json \
+			--verbose || true; \
+	else \
+		echo "$(YELLOW)Gitleaks not installed. Install from: https://github.com/gitleaks/gitleaks$(NC)"; \
+		echo "$(YELLOW)Or use Docker: docker run -v $$(pwd):/path zricethezav/gitleaks detect --source /path$(NC)"; \
+	fi
+	@echo "$(GREEN)Gitleaks scan complete$(NC)"
+
+security-custom-audit:
+	@echo "$(BLUE)Running custom security audit...$(NC)"
+	@mkdir -p security-reports
+	@python scripts/security/audit-codebase.py \
+		--output security-reports/custom-audit.json \
+		--format json 2>/dev/null || true
+	@python scripts/security/audit-codebase.py \
+		--output security-reports/custom-audit.txt \
+		--format text 2>/dev/null || true
+	@if [ -f security-reports/custom-audit.txt ]; then \
+		cat security-reports/custom-audit.txt; \
+	fi
+	@echo "$(GREEN)Custom audit complete$(NC)"
+
+security-deps:
+	@echo "$(BLUE)Running dependency health check...$(NC)"
+	@mkdir -p security-reports
+	@python scripts/security/check-dependencies.py \
+		--requirements requirements.txt \
+		--output security-reports/dependency-health.json 2>/dev/null || true
+	@python scripts/security/check-dependencies.py \
+		--requirements requirements.txt \
+		--output security-reports/dependency-health.txt \
+		--format text 2>/dev/null || true
+	@if [ -f security-reports/dependency-health.txt ]; then \
+		cat security-reports/dependency-health.txt; \
+	fi
+	@echo "$(GREEN)Dependency health check complete$(NC)"
+
+# =============================================================================
+# Utilities
+# =============================================================================
+
+security-clean:
+	@echo "$(BLUE)Cleaning security reports...$(NC)"
+	@rm -rf security-reports
+	@echo "$(GREEN)Security reports cleaned$(NC)"
+
+# =============================================================================
+# Development Helpers
+# =============================================================================
+
+# Install all security tools
+security-install-tools:
+	@echo "$(BLUE)Installing security tools...$(NC)"
+	@pip install --upgrade \
+		bandit[toml]>=1.7.0 \
+		safety>=3.0.0 \
+		pip-audit>=2.6.0
+	@echo "$(YELLOW)Note: Install Gitleaks separately from https://github.com/gitleaks/gitleaks$(NC)"
+	@echo "$(GREEN)Security tools installed$(NC)"
+
+# Quick security check for pre-commit
+security-quick:
+	@echo "$(BLUE)Running quick security check...$(NC)"
+	@python scripts/security/audit-codebase.py --fail-on critical --format text 2>/dev/null || true
+	@echo "$(GREEN)Quick check complete$(NC)"
+
+# Check specific file
+security-check-file:
+	@echo "$(BLUE)Checking file: $(FILE)$(NC)"
+	@python scripts/security/audit-codebase.py --path $(FILE) --format text 2>/dev/null || true

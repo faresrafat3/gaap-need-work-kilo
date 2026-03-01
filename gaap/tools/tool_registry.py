@@ -18,15 +18,12 @@ from __future__ import annotations
 
 import ast
 import asyncio
-import hashlib
 import importlib.util
-import logging
 import os
 import re
 import sys
 import threading
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -42,10 +39,10 @@ except ImportError:
     Observer = None
 
 from gaap.core.logging import get_standard_logger
-from gaap.tools.mcp_client import MCPClient, MCPTool
-from gaap.tools.native_caller import BUILTIN_TOOLS, ToolCall, ToolResult, ToolSchema
+from gaap.tools.mcp_client import MCPClient
+from gaap.tools.native_caller import BUILTIN_TOOLS, ToolResult, ToolSchema
 from gaap.tools.skill_cache import SkillCache
-from gaap.tools.synthesizer import SynthesizedTool, ToolSynthesizer
+from gaap.tools.synthesizer import ToolSynthesizer
 
 logger = get_standard_logger("gaap.tools.registry")
 

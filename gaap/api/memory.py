@@ -24,7 +24,6 @@ from gaap.core.events import EventEmitter, EventType
 from gaap.memory.hierarchical import (
     HierarchicalMemory,
     MemoryTier,
-    MemoryPriority,
 )
 
 logger = logging.getLogger("gaap.api.memory")
@@ -313,9 +312,9 @@ async def search_memory(query: str, limit: int = 10) -> SearchResponse:
                             "success": episode.success,
                             "model": episode.model,
                             "provider": episode.provider,
-                            "timestamp": episode.timestamp.isoformat()
-                            if episode.timestamp
-                            else None,
+                            "timestamp": (
+                                episode.timestamp.isoformat() if episode.timestamp else None
+                            ),
                         },
                     )
                 )

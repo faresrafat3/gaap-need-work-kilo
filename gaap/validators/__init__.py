@@ -42,27 +42,24 @@ from .ast_guard import (
     ASTScanResult,
     create_ast_guard,
 )
-
-from .performance import (
-    PerformanceValidator,
-    PerformanceReport,
-    ComplexityResult,
-    create_performance_validator,
-)
-
 from .axiom_compliance import (
     AxiomComplianceValidator,
     ComplianceResult,
     ConstraintType,
     create_axiom_validator,
 )
-
 from .behavioral import (
-    BehavioralValidator,
-    BehavioralReport,
     BehavioralConfig,
+    BehavioralReport,
+    BehavioralValidator,
     TestResult,
     create_behavioral_validator,
+)
+from .performance import (
+    ComplexityResult,
+    PerformanceReport,
+    PerformanceValidator,
+    create_performance_validator,
 )
 
 __all__ = [

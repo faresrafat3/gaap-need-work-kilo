@@ -13,12 +13,11 @@ Key Features:
 - Success indicators (not generic acceptance criteria)
 """
 
+import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from typing import Any, Literal
-import hashlib
-import json
 
 
 class TaskPhase(Enum):
@@ -347,15 +346,17 @@ class IntelligentTask:
             status=data.get("status", "pending"),
             result=data.get("result", {}),
             lessons_learned=data.get("lessons_learned", []),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if data.get("created_at")
-            else datetime.now(),
-            started_at=datetime.fromisoformat(data["started_at"])
-            if data.get("started_at")
-            else None,
-            completed_at=datetime.fromisoformat(data["completed_at"])
-            if data.get("completed_at")
-            else None,
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if data.get("created_at")
+                else datetime.now()
+            ),
+            started_at=(
+                datetime.fromisoformat(data["started_at"]) if data.get("started_at") else None
+            ),
+            completed_at=(
+                datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None
+            ),
             metadata=data.get("metadata", {}),
         )
 
@@ -478,18 +479,20 @@ class Phase:
             estimated_complexity=data.get("estimated_complexity", 0.5),
             actual_tasks=data.get("actual_tasks", 0),
             actual_duration_minutes=data.get("actual_duration_minutes", 0),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if data.get("created_at")
-            else datetime.now(),
-            expanded_at=datetime.fromisoformat(data["expanded_at"])
-            if data.get("expanded_at")
-            else None,
-            started_at=datetime.fromisoformat(data["started_at"])
-            if data.get("started_at")
-            else None,
-            completed_at=datetime.fromisoformat(data["completed_at"])
-            if data.get("completed_at")
-            else None,
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if data.get("created_at")
+                else datetime.now()
+            ),
+            expanded_at=(
+                datetime.fromisoformat(data["expanded_at"]) if data.get("expanded_at") else None
+            ),
+            started_at=(
+                datetime.fromisoformat(data["started_at"]) if data.get("started_at") else None
+            ),
+            completed_at=(
+                datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None
+            ),
             reassessment_count=data.get("reassessment_count", 0),
             last_reassessment_reason=data.get("last_reassessment_reason", ""),
             metadata=data.get("metadata", {}),

@@ -34,7 +34,6 @@ from typing import (
     Optional,
     ParamSpec,
     TypeVar,
-    cast,
 )
 
 from .exceptions import (
@@ -185,7 +184,6 @@ class BaseComponent(ABC):
         Raises:
             Exception: If initialization fails
         """
-        pass
 
     @abstractmethod
     def shutdown(self) -> None:
@@ -198,7 +196,6 @@ class BaseComponent(ABC):
         Raises:
             Exception: If shutdown fails
         """
-        pass
 
     def record_metric(self, key: str, value: Any) -> None:
         """
@@ -338,7 +335,6 @@ class BaseAgent(BaseComponent, Generic[T, R]):
             TaskError: If task execution fails
             TaskTimeoutError: If execution times out
         """
-        pass
 
     async def validate_task(self, task: Task) -> bool:
         """
@@ -567,14 +563,12 @@ class BaseProvider(BaseComponent):
         self, messages: list[Message], model: str, **kwargs: Any
     ) -> ChatCompletionResponse:
         """إكمال محادثة"""
-        pass
 
     @abstractmethod
     async def stream_chat_completion(
         self, messages: list[Message], model: str, **kwargs: Any
     ) -> AsyncIterator[str]:
         """إكمال محادثة بتدفق"""
-        pass
 
     def is_model_available(self, model: str) -> bool:
         """التحقق من توفر النموذج"""
@@ -650,7 +644,6 @@ class BaseLayer(BaseComponent):
     @abstractmethod
     async def process(self, input_data: Any) -> Any:
         """معالجة البيانات"""
-        pass
 
     async def send_to_lower(self, data: Any) -> Any:
         """إرسال للطبقة السفلى"""
@@ -690,7 +683,6 @@ class BaseCritic(BaseComponent):
     @abstractmethod
     async def evaluate(self, artifact: Any, context: dict[str, Any]) -> CriticEvaluation:
         """تقييم المخرجات"""
-        pass
 
     def is_approved(self, evaluation: CriticEvaluation) -> bool:
         """هل التقييم مقبول؟"""
@@ -739,7 +731,6 @@ class BaseHealer(BaseComponent):
         Returns:
             نتيجة التعافي
         """
-        pass
 
     def record_healing_attempt(
         self, task_id: str, level: HealingLevel, success: bool, details: dict[str, Any]
@@ -787,13 +778,11 @@ class BasePlugin(ABC):
     @abstractmethod
     def name(self) -> str:
         """اسم الإضافة"""
-        pass
 
     @property
     @abstractmethod
     def version(self) -> str:
         """إصدار الإضافة"""
-        pass
 
     def initialize(self) -> None:
         """تهيئة الإضافة"""
@@ -803,7 +792,6 @@ class BasePlugin(ABC):
     @abstractmethod
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """تنفيذ الإضافة"""
-        pass
 
     def shutdown(self) -> None:
         """إيقاف الإضافة"""
@@ -835,17 +823,14 @@ class BaseMemory(BaseComponent):
     @abstractmethod
     async def store(self, key: str, value: Any, metadata: dict[str, Any] | None = None) -> None:
         """تخزين قيمة"""
-        pass
 
     @abstractmethod
     async def retrieve(self, key: str) -> Any | None:
         """استرجاع قيمة"""
-        pass
 
     @abstractmethod
     async def search(self, query: str, limit: int = 10) -> list[Any]:
         """بحث"""
-        pass
 
     def record_access(self, key: str, operation: str) -> None:
         """تسجيل وصول"""

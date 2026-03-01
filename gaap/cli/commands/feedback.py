@@ -12,10 +12,8 @@ Usage:
     gaap feedback --task-id abc123 --rating 5 --comment "Great response"
 """
 
-import json
 import sys
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from gaap.storage.json_store import get_store

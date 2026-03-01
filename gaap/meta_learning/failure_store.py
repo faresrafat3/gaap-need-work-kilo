@@ -97,9 +97,9 @@ class FailedTrace:
             context=data.get("context", {}),
             agent_thoughts=data.get("agent_thoughts"),
             task_id=data.get("task_id"),
-            timestamp=datetime.fromisoformat(data["timestamp"])
-            if "timestamp" in data
-            else datetime.now(),
+            timestamp=(
+                datetime.fromisoformat(data["timestamp"]) if "timestamp" in data else datetime.now()
+            ),
             resolved=data.get("resolved", False),
             resolution_count=data.get("resolution_count", 0),
         )
@@ -143,9 +143,11 @@ class CorrectiveAction:
             success_rate=data.get("success_rate", 1.0),
             applied_count=data.get("applied_count", 1),
             source=data.get("source", "manual"),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if "created_at" in data
-            else datetime.now(),
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if "created_at" in data
+                else datetime.now()
+            ),
             metadata=data.get("metadata", {}),
         )
 

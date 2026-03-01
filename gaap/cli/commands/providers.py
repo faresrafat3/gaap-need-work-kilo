@@ -7,13 +7,6 @@ import os
 from typing import Any
 
 PROVIDERS_INFO: dict[str, dict[str, Any]] = {
-    "groq": {
-        "name": "Groq",
-        "type": "Free Tier",
-        "models": ["llama-3.3-70b", "llama-3.1-8b", "mixtral-8x7b"],
-        "env_key": "GROQ_API_KEY",
-        "status": "available",
-    },
     "gemini": {
         "name": "Google Gemini",
         "type": "Free Tier",
@@ -26,20 +19,6 @@ PROVIDERS_INFO: dict[str, dict[str, Any]] = {
         "type": "Free Tier",
         "models": ["llama-3.3-70b"],
         "env_key": "CEREBRAS_API_KEY",
-        "status": "available",
-    },
-    "mistral": {
-        "name": "Mistral",
-        "type": "Free Tier",
-        "models": ["mistral-small", "mistral-medium"],
-        "env_key": "MISTRAL_API_KEY",
-        "status": "available",
-    },
-    "g4f": {
-        "name": "G4F (Free)",
-        "type": "Free",
-        "models": ["auto", "gpt-4", "claude-3"],
-        "env_key": None,
         "status": "available",
     },
 }
@@ -120,11 +99,7 @@ def _test_provider(provider_name: str | None = None) -> None:
     async def test() -> None:
         try:
             prov: Any = None
-            if provider_name == "groq":
-                from gaap.providers.free_tier import GroqProvider
-
-                prov = GroqProvider(api_key=os.environ.get("GROQ_API_KEY"))
-            elif provider_name == "gemini":
+            if provider_name == "gemini":
                 from gaap.providers.free_tier import GeminiProvider
 
                 prov = GeminiProvider(api_key=os.environ.get("GEMINI_API_KEY"))

@@ -20,20 +20,18 @@ Smart Features:
 
 import asyncio
 import logging
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum, auto
 from typing import Any
-import uuid
 
-from gaap.swarm.reputation import ReputationStore
 from gaap.swarm.gisp_protocol import (
     TaskAuction,
-    TaskBid,
     TaskAward,
-    TaskDomain,
-    TaskPriority,
+    TaskBid,
 )
+from gaap.swarm.reputation import ReputationStore
 
 
 class AuctionState(Enum):

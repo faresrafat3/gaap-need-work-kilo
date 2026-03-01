@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger("gaap.core.artifacts")
 
@@ -276,9 +276,11 @@ class Artifact:
             content=data.get("content"),
             metadata=ArtifactMetadata.from_dict(data.get("metadata", {})),
             created_by=data.get("created_by", ""),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if "created_at" in data
-            else datetime.now(),
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if "created_at" in data
+                else datetime.now()
+            ),
             status=ArtifactStatus[data.get("status", "DRAFT")],
             parent_id=data.get("parent_id"),
             validation_errors=data.get("validation_errors", []),

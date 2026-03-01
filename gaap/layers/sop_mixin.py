@@ -14,14 +14,13 @@ Features:
 import logging
 from typing import Any
 
-from gaap.core.types import TaskType
 from gaap.core.governance import (
-    SOPGatekeeper,
-    SOPStore,
     SOPExecution,
+    SOPGatekeeper,
     SOPStepStatus,
-    ArtifactStatus,
+    SOPStore,
 )
+from gaap.core.types import TaskType
 
 
 class SOPExecutionMixin:

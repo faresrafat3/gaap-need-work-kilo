@@ -14,9 +14,9 @@ v2 improvements over v1:
   - Space-separated grid output (matches official format)
 
 Usage:
-    python -m gaap_system_glm5.benchmarks.arc_agi_bench --provider kimi --tasks 10
-    python -m gaap_system_glm5.benchmarks.arc_agi_bench --provider kimi --tasks 10 --strategy direct
-    python -m gaap_system_glm5.benchmarks.arc_agi_bench --provider deepseek --tasks 5 --attempts 3
+    python -m gaap.benchmarks.arc_agi_bench --provider kimi --tasks 10
+    python -m gaap.benchmarks.arc_agi_bench --provider kimi --tasks 10 --strategy direct
+    python -m gaap.benchmarks.arc_agi_bench --provider deepseek --tasks 5 --attempts 3
 """
 
 import argparse
@@ -27,8 +27,8 @@ import re
 import time
 from typing import Any
 
-from gaap_system_glm5.providers.account_manager import bootstrap_pools
-from gaap_system_glm5.providers.webchat_providers import webchat_call
+from gaap.providers.account_manager import bootstrap_pools
+from gaap.providers.webchat_providers import webchat_call
 
 # =============================================================================
 # ARC Color Map (for visual grid rendering)

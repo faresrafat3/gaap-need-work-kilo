@@ -7,6 +7,7 @@ Comprehensive observability stack for the GAAP system:
 - Session recording and replay
 - Flight recorder for crash analysis
 - Dashboard data providers
+- Performance monitoring with percentiles
 
 Usage:
     from gaap.observability import (
@@ -16,6 +17,7 @@ Usage:
         SessionReplay,
         FlightRecorder,
         DashboardProvider,
+        PerformanceMonitor,
     )
 
     tracer = GAAPTracer()
@@ -24,44 +26,87 @@ Usage:
 
     metrics = GAAPMetrics()
     metrics.record_request("layer1", "provider", "model", success=True)
+
+    # Performance monitoring
+    monitor = PerformanceMonitor()
+    with monitor.timing("database_query", component="storage"):
+        result = database.query()
 """
 
-from .dashboard import DashboardProvider, DashboardData
-from .flight_recorder import FlightRecorder, FlightEvent
+from .dashboard import DashboardData, DashboardProvider
+from .flight_recorder import FlightEvent, FlightRecorder
 from .metrics import GAAPMetrics, MetricsCollector, get_metrics
+from .performance_monitor import (
+    ErrorStats,
+    LatencyStats,
+    MemoryStats,
+    PerformanceConfig,
+    PerformanceMetrics,
+    PerformanceMonitor,
+    SamplingStrategy,
+    ThroughputStats,
+)
+from .performance_monitor import get_metrics as get_performance_metrics
+from .performance_monitor import (
+    get_performance_monitor,
+    record_error,
+    record_memory,
+    timed,
+    timing,
+)
 from .replay import (
-    SessionRecorder,
-    SessionReplay,
     RecordedSession,
     RecordedStep,
+    SessionRecorder,
+    SessionReplay,
     SessionState,
 )
 from .tracing import (
     GAAPTracer,
-    TraceContext,
     SpanAttributes,
     SpanEvents,
-    instrument_engine,
+    TraceContext,
     get_tracer,
+    instrument_engine,
 )
 
 __all__ = [
+    # Tracing
     "GAAPTracer",
     "TraceContext",
     "SpanAttributes",
     "SpanEvents",
     "instrument_engine",
     "get_tracer",
+    # Metrics
     "GAAPMetrics",
     "MetricsCollector",
     "get_metrics",
+    # Performance Monitor
+    "PerformanceMonitor",
+    "PerformanceConfig",
+    "SamplingStrategy",
+    "LatencyStats",
+    "MemoryStats",
+    "ThroughputStats",
+    "ErrorStats",
+    "PerformanceMetrics",
+    "get_performance_monitor",
+    "timing",
+    "timed",
+    "record_memory",
+    "record_error",
+    "get_performance_metrics",
+    # Session
     "SessionRecorder",
     "SessionReplay",
     "RecordedSession",
     "RecordedStep",
     "SessionState",
+    # Flight Recorder
     "FlightRecorder",
     "FlightEvent",
+    # Dashboard
     "DashboardProvider",
     "DashboardData",
 ]

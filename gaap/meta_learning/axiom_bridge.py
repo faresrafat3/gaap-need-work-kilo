@@ -19,14 +19,13 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
 from typing import Any
 
-from gaap.storage.atomic import atomic_write
-
 from gaap.core.axioms import Axiom, AxiomLevel, AxiomValidator
+from gaap.storage.atomic import atomic_write
 
 logger = logging.getLogger("gaap.meta_learning.axiom_bridge")
 
@@ -117,16 +116,18 @@ class AxiomProposal:
             success_rate=data.get("success_rate", 0.0),
             sample_size=data.get("sample_size", 0),
             source_heuristic_id=data.get("source_heuristic_id"),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if "created_at" in data
-            else datetime.now(),
-            reviewed_at=datetime.fromisoformat(data["reviewed_at"])
-            if data.get("reviewed_at")
-            else None,
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if "created_at" in data
+                else datetime.now()
+            ),
+            reviewed_at=(
+                datetime.fromisoformat(data["reviewed_at"]) if data.get("reviewed_at") else None
+            ),
             reviewed_by=data.get("reviewed_by"),
-            committed_at=datetime.fromisoformat(data["committed_at"])
-            if data.get("committed_at")
-            else None,
+            committed_at=(
+                datetime.fromisoformat(data["committed_at"]) if data.get("committed_at") else None
+            ),
             rejection_reason=data.get("rejection_reason"),
             review_notes=data.get("review_notes"),
             metadata=data.get("metadata", {}),
@@ -434,9 +435,11 @@ class AxiomBridge:
                 "name": proposal.axiom_name,
                 "description": proposal.axiom_description,
                 "level": proposal.axiom_level.name,
-                "added_at": proposal.committed_at.isoformat()
-                if proposal.committed_at
-                else datetime.now().isoformat(),
+                "added_at": (
+                    proposal.committed_at.isoformat()
+                    if proposal.committed_at
+                    else datetime.now().isoformat()
+                ),
                 "source": "meta_learning",
                 "proposal_id": proposal.get_id(),
             }

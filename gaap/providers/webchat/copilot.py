@@ -120,7 +120,6 @@ class CopilotWebChat(WebChatProvider):
             print("  (Browser opened automatically)")
         except Exception as e:
             logger.debug(f"Browser open failed: {e}")
-            pass
 
         print("\n  Waiting for authorization", end="", flush=True)
         start = time.time()

@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 DEFAULT_CONFIG = {
-    "default_provider": "groq",
+    "default_provider": "kimi",
     "default_model": "llama-3.3-70b",
     "default_budget": 10.0,
     "temperature": 0.7,

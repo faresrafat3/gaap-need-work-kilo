@@ -27,7 +27,6 @@ Features:
 """
 
 import asyncio
-import logging
 import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
@@ -355,7 +354,7 @@ class RetryManager:
         Example:
             >>> result = await manager.execute_with_retry(
             ...     lambda: api_call(),
-            ...     key="groq_request"
+            ...     key="kimi_request"
             ... )
         """
         attempt = 0
@@ -395,7 +394,7 @@ class UsageRecord:
 
     Attributes:
         timestamp: Time of the request
-        provider: Provider name (e.g., "groq", "gemini")
+        provider: Provider name (e.g., "kimi", "gemini")
         model: Model used (e.g., "llama-3.3-70b")
         input_tokens: Number of input tokens
         output_tokens: Number of output tokens
@@ -408,7 +407,7 @@ class UsageRecord:
     Usage:
         >>> record = UsageRecord(
         ...     timestamp=datetime.now(),
-        ...     provider="groq",
+        ...     provider="kimi",
         ...     model="llama-3.3-70b",
         ...     input_tokens=100,
         ...     output_tokens=50,
@@ -448,7 +447,7 @@ class UsageTracker:
     Usage:
         >>> tracker = UsageTracker(max_records=5000)
         >>> tracker.record(
-        ...     provider="groq",
+        ...     provider="kimi",
         ...     model="llama-3.3-70b",
         ...     input_tokens=100,
         ...     output_tokens=50,
@@ -546,7 +545,7 @@ class UsageTracker:
             Dictionary with totals for specified provider or all
 
         Example:
-            >>> totals = tracker.get_totals("groq")
+            >>> totals = tracker.get_totals("kimi")
             >>> print(totals["total_cost"])
             0.05
         """
@@ -681,7 +680,6 @@ class BaseProvider(ABC):
         Example:
             >>> response_data = await self._make_request(messages, model)
         """
-        pass
 
     @abstractmethod
     async def _stream_request(
@@ -717,7 +715,6 @@ class BaseProvider(ABC):
         Returns:
             Cost in USD
         """
-        pass
 
     # =========================================================================
     # Public Methods

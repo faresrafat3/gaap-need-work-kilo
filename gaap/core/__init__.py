@@ -338,10 +338,10 @@ __all__ = [
 
 # Logging
 from .logging import (
-    get_standard_logger,
     GAAPLogger,
     configure_logging,
     get_logger,
+    get_standard_logger,
     set_log_level,
 )
 
@@ -516,8 +516,8 @@ __all__.extend(
 )
 
 # SOP Governance
+from gaap.core.governance import Artifact as GovernanceArtifact
 from gaap.core.governance import (
-    Artifact as GovernanceArtifact,
     ArtifactStatus,
     RoleDefinition,
     SOPExecution,
@@ -575,6 +575,39 @@ __all__.extend(
     ]
 )
 
+# Secrets Management
+try:
+    from gaap.core.secrets import (
+        SecretsManager,
+        SecretsProvider,
+        audit_codebase_for_secrets,
+        check_env_file_exists,
+        generate_env_template,
+        get_secrets,
+        init_secrets,
+        mask_middle,
+        mask_secret,
+        validate_api_key_format,
+    )
+
+    __all__.extend(
+        [
+            # Secrets
+            "SecretsManager",
+            "SecretsProvider",
+            "mask_secret",
+            "mask_middle",
+            "validate_api_key_format",
+            "check_env_file_exists",
+            "generate_env_template",
+            "audit_codebase_for_secrets",
+            "get_secrets",
+            "init_secrets",
+        ]
+    )
+except ImportError:
+    pass  # Secrets module has optional dependency on python-dotenv
+
 # Artifact System (MetaGPT-inspired)
 from gaap.core.artifacts import (
     Artifact,
@@ -582,7 +615,9 @@ from gaap.core.artifacts import (
     ArtifactLink,
     ArtifactMetadata,
     ArtifactRegistry,
-    ArtifactStatus as ArtifactStatusType,
+)
+from gaap.core.artifacts import ArtifactStatus as ArtifactStatusType
+from gaap.core.artifacts import (
     ArtifactType,
     create_artifact_registry,
 )

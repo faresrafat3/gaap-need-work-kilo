@@ -16,7 +16,6 @@ Usage:
         context = distiller.get_active_context()
 """
 
-import json
 import re
 import time
 from dataclasses import dataclass, field

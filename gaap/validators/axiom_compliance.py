@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any
 
-
 logger = logging.getLogger("gaap.validators.axiom_compliance")
 
 

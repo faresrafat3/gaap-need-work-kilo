@@ -9,10 +9,9 @@ Implements: docs/evolution_plan_2026/29_TECHNICAL_DEBT_AGENT.md
 """
 
 import logging
-import os
 import subprocess
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 

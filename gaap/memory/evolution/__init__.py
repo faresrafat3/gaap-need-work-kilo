@@ -11,8 +11,8 @@ Components:
 Reference: docs/evolution_plan_2026/01_MEMORY_AND_DREAMING.md
 """
 
+from .clarification import ClarificationRequest, ClarificationSystem
 from .reap_engine import REAPEngine, REAPResult
-from .clarification import ClarificationSystem, ClarificationRequest
 
 __all__ = [
     "REAPEngine",

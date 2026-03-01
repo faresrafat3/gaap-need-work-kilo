@@ -13,12 +13,10 @@ from __future__ import annotations
 
 import ast
 import logging
-import re
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
 from typing import Any
-
 
 logger = logging.getLogger("gaap.context.smart_chunking")
 

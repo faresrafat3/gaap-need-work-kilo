@@ -12,7 +12,7 @@ Components:
 Reference: docs/evolution_plan_2026/25_MEMORY_AUDIT_SPEC.md
 """
 
-from .base import BaseReranker, RerankResult, RerankRequest
+from .base import BaseReranker, RerankRequest, RerankResult
 from .cross_encoder import CrossEncoderReranker
 from .llm_reranker import LLMReranker
 

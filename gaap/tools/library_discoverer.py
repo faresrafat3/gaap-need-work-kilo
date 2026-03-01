@@ -20,7 +20,6 @@ Usage:
 
 import asyncio
 import hashlib
-import json
 import os
 import time
 from dataclasses import dataclass, field

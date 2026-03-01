@@ -75,6 +75,7 @@ else:
         def labels(self, **kwargs: str) -> "Info": ...
         def set(self, value: dict) -> None: ...
 
+
 # =============================================================================
 # Optional Imports
 # =============================================================================
@@ -84,7 +85,7 @@ try:
     from opentelemetry.sdk.resources import SERVICE_NAME, Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
-    from opentelemetry.trace import Span, Status, StatusCode
+    from opentelemetry.trace import Status, StatusCode
 
     OTEL_AVAILABLE = True
     trace = _trace

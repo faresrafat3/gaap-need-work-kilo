@@ -52,29 +52,23 @@ Usage:
     result = await orchestrator.process_task(task)
 """
 
-from gaap.swarm.reputation import (
-    ReputationStore,
-    ReputationEntry,
-    ReputationScore,
-    DomainExpertise,
-)
-from gaap.swarm.gisp_protocol import (
-    GISPMessage,
-    TaskAuction,
-    TaskBid,
-    TaskAward,
-    ConsensusVote,
-    MessageType,
-)
 from gaap.swarm.auction import (
-    TaskAuctioneer,
     AuctionResult,
+    TaskAuctioneer,
     UtilityScore,
 )
 from gaap.swarm.fractal import (
     FractalAgent,
-    FractalState,
     FractalCapability,
+    FractalState,
+)
+from gaap.swarm.gisp_protocol import (
+    ConsensusVote,
+    GISPMessage,
+    MessageType,
+    TaskAuction,
+    TaskAward,
+    TaskBid,
 )
 from gaap.swarm.guild import (
     Guild,
@@ -82,9 +76,9 @@ from gaap.swarm.guild import (
     GuildProposal,
 )
 from gaap.swarm.orchestrator import (
-    SwarmOrchestrator,
     SwarmConfig,
     SwarmMetrics,
+    SwarmOrchestrator,
 )
 
 # Profile Evolver (MorphAgent-inspired)
@@ -95,6 +89,12 @@ from gaap.swarm.profile_evolver import (
     ProfileEvolution,
     ProfileEvolver,
     create_profile_evolver,
+)
+from gaap.swarm.reputation import (
+    DomainExpertise,
+    ReputationEntry,
+    ReputationScore,
+    ReputationStore,
 )
 
 __all__ = [

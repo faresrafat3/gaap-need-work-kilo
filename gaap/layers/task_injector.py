@@ -29,9 +29,6 @@ from gaap.layers.task_schema import (
     IntelligentTask,
     Phase,
     RiskLevel,
-    RiskFactor,
-    RiskType,
-    TaskPhase,
 )
 
 logger = get_logger("gaap.layer2.injector")

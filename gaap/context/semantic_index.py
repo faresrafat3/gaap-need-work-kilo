@@ -17,7 +17,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 logger = logging.getLogger("gaap.context.semantic_index")
 
 
@@ -132,7 +131,7 @@ class SemanticIndex:
 
     def _init_api_embeddings(self) -> None:
         try:
-            from gaap.providers import get_provider
+            pass
 
             self._embedding_provider = "api"
             self._logger.info("Using API embeddings")
@@ -180,9 +179,11 @@ class SemanticIndex:
         return await self.index_code(
             code=chunk.content,
             file_path=chunk.file_path,
-            chunk_type=chunk.chunk_type.name
-            if hasattr(chunk.chunk_type, "name")
-            else str(chunk.chunk_type),
+            chunk_type=(
+                chunk.chunk_type.name
+                if hasattr(chunk.chunk_type, "name")
+                else str(chunk.chunk_type)
+            ),
             name=chunk.name,
             signature=chunk.signature,
         )
@@ -195,7 +196,7 @@ class SemanticIndex:
 
         code = path.read_text(encoding="utf-8")
 
-        from gaap.context.smart_chunking import SmartChunker, ChunkingConfig
+        from gaap.context.smart_chunking import ChunkingConfig, SmartChunker
 
         chunker = SmartChunker(ChunkingConfig.for_context())
         chunks = chunker.chunk(code, str(path))

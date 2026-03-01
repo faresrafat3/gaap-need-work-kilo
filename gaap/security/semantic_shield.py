@@ -16,7 +16,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from gaap.providers.base_provider import BaseProvider

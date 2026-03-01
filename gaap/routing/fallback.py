@@ -1,6 +1,5 @@
 # Fallback Manager
 import asyncio
-import logging
 import random
 import time
 from dataclasses import dataclass, field
@@ -11,6 +10,7 @@ from typing import Any
 from gaap.core.exceptions import (
     MaxRetriesExceededError,
 )
+from gaap.core.logging import get_standard_logger as get_logger
 from gaap.core.types import (
     ChatCompletionResponse,
     Message,
@@ -23,9 +23,6 @@ from gaap.routing.router import SmartRouter
 # =============================================================================
 # Logger Setup
 # =============================================================================
-
-
-from gaap.core.logging import get_standard_logger as get_logger
 
 
 @dataclass
@@ -168,12 +165,12 @@ class FallbackManager:
     def get_default_fallbacks(self, provider_type: ProviderType) -> list[str]:
         """الحصول على البدائل الافتراضية"""
         default_chains = {
-            ProviderType.CHAT_BASED: ["groq", "gemini"],
-            ProviderType.FREE_TIER: ["g4f", "groq"],
-            ProviderType.PAID: ["groq", "gemini", "g4f"],
-            ProviderType.LOCAL: ["groq", "g4f"],
+            ProviderType.CHAT_BASED: ["kimi", "deepseek", "glm"],
+            ProviderType.FREE_TIER: ["kimi", "deepseek", "glm"],
+            ProviderType.PAID: ["deepseek", "glm", "kimi"],
+            ProviderType.LOCAL: ["deepseek", "glm", "kimi"],
         }
-        return default_chains.get(provider_type, ["groq", "gemini"])
+        return default_chains.get(provider_type, ["kimi", "deepseek", "glm"])
 
     # =========================================================================
     # Execution with Fallback

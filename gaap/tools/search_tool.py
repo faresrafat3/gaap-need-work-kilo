@@ -516,9 +516,9 @@ class APISearchTool:
                         module=module_name,
                         documentation_url=library_info.documentation_url,
                         metadata={
-                            "library_info": library_info.__dict__
-                            if hasattr(library_info, "__dict__")
-                            else {}
+                            "library_info": (
+                                library_info.__dict__ if hasattr(library_info, "__dict__") else {}
+                            )
                         },
                     )
                     self._cache[api_name] = info

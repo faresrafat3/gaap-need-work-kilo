@@ -1,0 +1,86 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    batchwait: 1s
+    batchsize: 1048576
+    backoff_config:
+      min_period: 100ms
+      max_period: 5s
+      max_retries: 10
+
+scrape_configs:
+  # GAAP Application Logs
+  - job_name: gaap-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: gaap
+          __path__: /var/log/gaap/*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            timestamp: timestamp
+            message: message
+            correlation_id: correlation_id
+            request_id: request_id
+            session_id: session_id
+            logger: logger
+      - labels:
+          level:
+          logger:
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      - output:
+          source: message
+
+  # System Logs
+  - job_name: system-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          __path__: /var/log/syslog
+      - targets:
+          - localhost
+        labels:
+          job: auth
+          __path__: /var/log/auth.log
+
+  # Docker Container Logs
+  - job_name: docker-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker
+          __path__: /var/lib/docker/containers/*/*log
+    pipeline_stages:
+      - json:
+          expressions:
+            log: log
+            stream: stream
+            time: time
+      - json:
+          source: log
+          expressions:
+            level: level
+            msg: msg
+            correlation_id: correlation_id
+      - labels:
+          stream:
+          level:
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+      - output:
+          source: log

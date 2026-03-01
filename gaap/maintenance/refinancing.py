@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from gaap.maintenance.debt_config import DebtConfig, DebtPriority, ProposalStatus
+from gaap.maintenance.debt_config import DebtConfig, ProposalStatus
 from gaap.maintenance.debt_scanner import DebtItem
 
 logger = logging.getLogger("gaap.maintenance.refinancing")
@@ -77,9 +77,9 @@ class RefactoringProposal:
             branch_name=data["branch_name"],
             status=ProposalStatus[data["status"]],
             created_at=datetime.fromisoformat(data["created_at"]),
-            updated_at=datetime.fromisoformat(data["updated_at"])
-            if data.get("updated_at")
-            else None,
+            updated_at=(
+                datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
+            ),
             llm_generated=data.get("llm_generated", False),
             confidence=data.get("confidence", 0.0),
             test_results=data.get("test_results"),

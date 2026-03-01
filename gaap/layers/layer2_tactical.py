@@ -1,6 +1,5 @@
 # Layer 2: Tactical Layer
 import json
-import logging
 import re
 import time
 from dataclasses import dataclass, field
@@ -23,12 +22,11 @@ from gaap.core.world_model import Action, WorldModel
 from gaap.layers.layer1_strategic import ArchitectureSpec
 from gaap.memory import VECTOR_MEMORY_AVAILABLE
 
-from gaap.layers.layer2_config import Layer2Config, create_layer2_config
+from gaap.layers.layer2_config import Layer2Config
 from gaap.layers.task_schema import (
     IntelligentTask,
     Phase,
     TaskPhase,
-    RiskLevel,
     ReassessmentResult,
 )
 from gaap.layers.phase_planner import (
@@ -57,7 +55,6 @@ from gaap.tools import ToolSynthesizer
 
 
 from gaap.core.logging import get_standard_logger as get_logger
-
 
 # =============================================================================
 # Enums
@@ -666,12 +663,16 @@ Return a JSON array of objects with fields:
         prompt = prompt_template.format(
             original_text=original_text,
             paradigm=spec.paradigm.value if hasattr(spec.paradigm, "value") else str(spec.paradigm),
-            data_strategy=spec.data_strategy.value
-            if hasattr(spec.data_strategy, "value")
-            else str(spec.data_strategy),
-            communication=spec.communication.value
-            if hasattr(spec.communication, "value")
-            else str(spec.communication),
+            data_strategy=(
+                spec.data_strategy.value
+                if hasattr(spec.data_strategy, "value")
+                else str(spec.data_strategy)
+            ),
+            communication=(
+                spec.communication.value
+                if hasattr(spec.communication, "value")
+                else str(spec.communication)
+            ),
             tech_stack=json.dumps(spec.tech_stack),
             components=json.dumps(
                 [

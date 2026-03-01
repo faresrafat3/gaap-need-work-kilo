@@ -15,12 +15,13 @@ import hashlib
 import hmac
 import json
 import logging
+import threading
 import time
 import urllib.parse
 import uuid
 from typing import Any
 
-from .base import WebChatAuth, WebChatProvider, save_auth
+from .base import WebChatAuth, WebChatProvider
 
 logger = logging.getLogger("gaap.providers.webchat")
 
@@ -50,6 +51,139 @@ class GLMWebChat(WebChatProvider):
     }
 
     _MAX_RESPONSE_BYTES = 512 * 1024
+
+    # Model detection cache settings
+    _MODEL_CACHE_TTL = 300  # 5 minutes
+
+    def __init__(self, account: str = "default") -> None:
+        super().__init__(account)
+        self._actual_model: str | None = None
+        self._last_api_response: dict[str, Any] | None = None
+        self._model_detected_at: float = 0
+        self._model_lock = threading.Lock()
+
+    def _is_model_cache_valid(self) -> bool:
+        """Check if the cached model is still valid (within TTL)."""
+        if not self._actual_model:
+            return False
+        return (time.time() - self._model_detected_at) < self._MODEL_CACHE_TTL
+
+    def _extract_model_from_response(
+        self, response: Any, response_data: dict[str, Any] | None = None
+    ) -> str | None:
+        """
+        Extract the actual model from API response.
+        Checks response headers, JSON body, and SSE data.
+        """
+        model: str | None = None
+
+        # Try response headers first
+        if hasattr(response, "headers"):
+            headers = response.headers
+            for header_name in ["X-Model-Used", "X-Model", "X-Glm-Model", "Model"]:
+                if header_name in headers:
+                    model = headers[header_name]
+                    break
+
+        # Try response body/model field
+        if not model and response_data:
+            if isinstance(response_data, dict):
+                model = response_data.get("model") or response_data.get("model_id")
+
+                # Try nested in choices
+                if (
+                    not model
+                    and "choices" in response_data
+                    and isinstance(response_data["choices"], list)
+                ):
+                    for choice in response_data["choices"]:
+                        if isinstance(choice, dict) and "model" in choice:
+                            model = choice["model"]
+                            break
+
+        # Normalize and validate detected model
+        if model:
+            model = self._normalize_model_name(model)
+
+        return model
+
+    def _normalize_model_name(self, model: str) -> str | None:
+        """
+        Normalize model name to internal naming convention.
+        Returns None if model cannot be identified.
+        """
+        if not model:
+            return None
+
+        model_lower = model.lower().replace("-", "").replace("_", "").replace(" ", "")
+
+        # Known model mappings
+        model_mappings = {
+            "glm5": "GLM-5",
+            "glm4.7": "GLM-4.7",
+            "glm47": "GLM-4.7",
+            "glm4.6": "GLM-4.6",
+            "glm46": "GLM-4.6",
+            "glm4.5": "GLM-4.5",
+            "glm45": "GLM-4.5",
+            "glm4.5v": "GLM-4.5V",
+            "glm45v": "GLM-4.5V",
+            "glm4plus": "GLM-4-plus",
+            "glm-4-plus": "GLM-4-plus",
+            "z1rumination": "Z1-Rumination",
+            "z1": "Z1-Rumination",
+        }
+
+        # Check direct mapping
+        if model_lower in model_mappings:
+            return model_mappings[model_lower]
+
+        # Check if it contains known model strings
+        for key, normalized in model_mappings.items():
+            if key in model_lower:
+                return normalized
+
+        # Fallback: if it starts with glm-, return as-is with GLM- prefix
+        if model_lower.startswith("glm"):
+            return model.upper() if model.startswith("GLM") else f"GLM-{model[3:].upper()}"
+
+        # Unknown model - return as generic GLM model
+        logger.debug(f"Unknown model detected: {model}, using as-is")
+        return model
+
+    def _update_detected_model(self, model: str | None) -> None:
+        """Update the detected model with thread-safe locking."""
+        if not model:
+            return
+
+        with self._model_lock:
+            self._actual_model = model
+            self._model_detected_at = time.time()
+            logger.debug(f"Detected model updated: {model}")
+
+    def get_actual_model(self) -> str:
+        """
+        Get the actual model being used by the API.
+        Returns cached model if valid, otherwise falls back to DEFAULT_MODEL.
+        """
+        with self._model_lock:
+            if self._is_model_cache_valid():
+                return self._actual_model or self.DEFAULT_MODEL
+            return self.DEFAULT_MODEL
+
+    def get_provider_info(self) -> dict[str, Any]:
+        """Return full provider status including detected model information."""
+        with self._model_lock:
+            return {
+                "provider": self.PROVIDER_NAME,
+                "account": self.account,
+                "default_model": self.DEFAULT_MODEL,
+                "actual_model": self._actual_model,
+                "model_cache_valid": self._is_model_cache_valid(),
+                "model_detected_at": self._model_detected_at,
+                "supported_models": self.MODELS,
+                "is_authenticated": self.auth is not None,
+            }
 
     @staticmethod
     def _is_real_user_token(token: str, cookies: dict[str, str] | None = None) -> dict[str, Any]:
@@ -315,6 +449,17 @@ class GLMWebChat(WebChatProvider):
         if r.status_code != 200:
             raise RuntimeError(f"GLM API error {r.status_code}: {r.text[:200]}")
 
+        # Store response reference for model detection
+        self._last_api_response = {
+            "headers": dict(r.headers) if hasattr(r, "headers") else {},
+            "status_code": r.status_code,
+        }
+
+        # Try to extract model from headers immediately
+        detected_model = self._extract_model_from_response(r)
+        if detected_model:
+            self._update_detected_model(detected_model)
+
         return self._parse_sse_stream(r)
 
     def _parse_sse_stream(self, response: Any) -> str:
@@ -335,6 +480,12 @@ class GLMWebChat(WebChatProvider):
                         break
                     try:
                         chunk_data = json.loads(data_str)
+
+                        # Try to extract model from SSE data
+                        detected_model = self._extract_model_from_response(None, chunk_data)
+                        if detected_model:
+                            self._update_detected_model(detected_model)
+
                         if chunk_data.get("type") == "chat:completion":
                             data = chunk_data.get("data", {})
                             phase = data.get("phase", "")

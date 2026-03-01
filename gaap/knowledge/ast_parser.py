@@ -28,28 +28,28 @@ _tree_sitter_available = False
 _languages = None
 
 try:
-    import tree_sitter_python
+    pass
 
     _tree_sitter_available = True
 except ImportError:
     pass
 
 try:
-    import tree_sitter_javascript
+    pass
 
     _tree_sitter_available = True
 except ImportError:
     pass
 
 try:
-    import tree_sitter_typescript
+    pass
 
     _tree_sitter_available = True
 except ImportError:
     pass
 
 try:
-    from tree_sitter import Language, Parser
+    pass
 except ImportError:
     _tree_sitter_available = False
 
@@ -568,7 +568,6 @@ class ASTParser:
 
     def _extract_js_ts_structure(self, node: Any, result: ParsedFile) -> None:
         """Extract structure from JS/TS tree-sitter node."""
-        pass
 
     def _detect_language(self, file_path: Path) -> str:
         """Detect programming language from file extension."""
@@ -597,7 +596,6 @@ class ASTParser:
 
     def _init_tree_sitter(self) -> None:
         """Initialize tree-sitter parsers."""
-        pass
 
 
 def create_parser(config: KnowledgeConfig | None = None) -> ASTParser:

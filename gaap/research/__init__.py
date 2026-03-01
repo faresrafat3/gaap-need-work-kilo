@@ -22,38 +22,36 @@ Usage:
     result = await engine.research("FastAPI async best practices")
 """
 
-from .types import (
-    ETSLevel,
-    Source,
-    SourceStatus,
-    Hypothesis,
-    HypothesisStatus,
-    AssociativeTriple,
-    ResearchFinding,
-    ResearchResult,
-    ResearchMetrics,
-    ExecutionStep,
-    Claim,
-    Contradiction,
-    SearchResult,
-    ExtractedContent,
-)
-
 from .config import (
-    WebFetcherConfig,
+    ContentExtractorConfig,
+    DDEConfig,
+    DeepDiveConfig,
     LLMValidatorConfig,
     SourceAuditConfig,
-    ContentExtractorConfig,
-    SynthesizerConfig,
-    DeepDiveConfig,
     StorageConfig,
-    DDEConfig,
+    SynthesizerConfig,
+    WebFetcherConfig,
 )
-
 from .engine import DeepDiscoveryEngine, create_engine
-from .web_fetcher import create_web_fetcher
 from .source_auditor import create_source_auditor
 from .synthesizer import create_synthesizer
+from .types import (
+    AssociativeTriple,
+    Claim,
+    Contradiction,
+    ETSLevel,
+    ExecutionStep,
+    ExtractedContent,
+    Hypothesis,
+    HypothesisStatus,
+    ResearchFinding,
+    ResearchMetrics,
+    ResearchResult,
+    SearchResult,
+    Source,
+    SourceStatus,
+)
+from .web_fetcher import create_web_fetcher
 
 __all__ = [
     # Types
